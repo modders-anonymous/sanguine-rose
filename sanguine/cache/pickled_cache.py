@@ -20,7 +20,8 @@ def pickled_cache(cachedir: str, cachedata: dict[str, any], prefix: str, origfil
         origfiles = sorted(origfiles)
         for i in range(len(readpaths)):
             rd = readpaths[i]
-            of = (origfiles[i], os.path.getmtime(origfiles[i]))
+            st = os.lstat(origfiles[i])
+            of = (origfiles[i], st.st_size, st.st_mtime)
             assert isinstance(rd, list)
             assert is_normalized_file_path(rd[0])
             assert is_normalized_file_path(of[0])
@@ -39,12 +40,18 @@ def pickled_cache(cachedir: str, cachedata: dict[str, any], prefix: str, origfil
             return pickle.load(rf), {}
 
     cachedataoverwrites = {}
-    files = [(of, os.path.getmtime(of)) for of in origfiles]
+    files = []
+    for of in origfiles:
+        st = os.lstat(of)
+        files.append((of, st.st_size, st.st_mtime))
+    assert len(files) == len(origfiles)
+
     out = calc(params)
 
     for f in files:
-        abort_if_not(f[1] == os.path.getmtime(f[
-                                                  0]))  # if any of the files we depend on, has changed while calc() was calculated - something is really weird is going on here
+        st = os.lstat(f[0])
+        abort_if_not(f[1] == st.st_size and f[
+            2] == st.st_mtime)  # if any of the files we depend on, has changed while calc() was calculated - something is really weird is going on here
 
     with open(cachedir + prefix + '.pickle', 'wb') as wf:
         # noinspection PyTypeChecker
