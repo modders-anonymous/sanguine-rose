@@ -207,8 +207,8 @@ def _save_tentative_names_task_func(param: tuple[str, dict[bytes, list[str]]]) -
         # warn(str(len(saved_loaded)))
         sorted_tanames: list[tuple[bytes, list[str]]] = sorted(tanames.items())
         for i in range(len(sorted_tanames)):
-            fox = sorted_tanames[i]
-            sorted_tanames[i] = (fox[0], sorted(fox[1], key=lambda fo2: fo2.tentative_name))
+            tan = sorted_tanames[i]
+            sorted_tanames[i] = (tan[0], sorted(tan[1]))
         _debug_assert_eq_list(saved_loaded, sorted_tanames)
 
 
@@ -404,6 +404,19 @@ class RootGitData:
         for plugin in file_origin_plugins():
             if plugin.add_file_origin(h, fo):
                 self._dirty_fo = True
+
+    def add_tentative_name(self, h: bytes, tentativename: str) -> None:
+        tentativename = tentativename.lower()
+        assert self._fo_is_ready == 1
+        if h in self._tentative_archive_names:
+            for tn in self._tentative_archive_names[h]:
+                if tn == tentativename:
+                    return
+            self._tentative_archive_names[h].append(tentativename)
+            self._dirty_fo = True
+        else:
+            self._tentative_archive_names[h] = [tentativename]
+            self._dirty_fo = True
 
     def start_done_hashing_task(self,  # should be called only after all start_hashing_archive() calls are done
                                 parallel: tasks.Parallel) -> str:

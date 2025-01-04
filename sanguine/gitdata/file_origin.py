@@ -142,9 +142,9 @@ class GitTentativeArchiveNames:
         pass
 
     def write(self, wfile: typing.TextIO, tentativearchivenames: dict[bytes, list[str]]) -> None:
-        folist: list[tuple[bytes, list[str]]] = sorted(tentativearchivenames.items())
-        for fox in folist:
-            fox[1].sort(key=lambda fo2: fo2.tentative_name)
+        talist: list[tuple[bytes, list[str]]] = sorted(tentativearchivenames.items())
+        for tan in talist:
+            tan[1].sort()
         gitdatafile.write_git_file_header(wfile)
         wfile.write(
             '  tentative_names: // Legend: n=tentative_name,  h=hash\n')
@@ -153,9 +153,9 @@ class GitTentativeArchiveNames:
         da = gitdatafile.GitDataWriteList(_GitTentativeArchiveNamesReadHandler.COMMON_FIELDS, [tahandler])
         writer = gitdatafile.GitDataListWriter(da, wfile)
         writer.write_begin()
-        for fox in folist:
-            for tname in fox[1]:
-                writer.write_line(tahandler, (tname, fox[0]))
+        for tan in talist:
+            for tname in tan[1]:
+                writer.write_line(tahandler, (tname, tan[0]))
         writer.write_end()
         gitdatafile.write_git_file_footer(wfile)
 

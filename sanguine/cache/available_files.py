@@ -11,17 +11,20 @@ from sanguine.helpers.file_retriever import (FileRetriever, ZeroFileRetriever, G
 from sanguine.helpers.tmp_path import TmpPath
 
 
-def _file_origins_task_func(param: tuple[list[bytes, str]]) -> tuple[list[tuple[bytes, list[FileOrigin]]]]:
+def _file_origins_task_func(param: tuple[list[bytes, str]]) -> tuple[
+    list[tuple[bytes, list[FileOrigin]]], list[tuple[bytes, str]]]:
     (filtered_downloads,) = param
     allorigins: list[tuple[bytes, list[FileOrigin]]] = []
+    alltentativefiles: list[tuple[bytes, str]] = []
     for fhash, fpath in filtered_downloads:
-        # TODO: multi-picklecache for file origins
+        # TODO/PERFORMANCE: multi-picklecache for file origins
         origins = file_origins_for_file(fpath)
         if origins is None:
             warn('Available: file without known origin {}'.format(fpath))
         else:
             allorigins.append((fhash, origins))
-    return (allorigins,)
+        alltentativefiles.append((fhash, os.path.split(fpath)[1]))
+    return allorigins, alltentativefiles
 
 
 class AvailableFiles:
@@ -198,11 +201,13 @@ class AvailableFiles:
             ['sanguine.available.file_origins()'])
 
     def _file_origins_own_task_func(self, parallel: tasks.Parallel,
-                                    out: tuple[list[tuple[bytes, list[FileOrigin]]]]) -> None:
-        (origins,) = out
+                                    out: tuple[list[tuple[bytes, list[FileOrigin]]], list[tuple[bytes, str]]]) -> None:
+        (origins, tentativefiles) = out
         for fox in origins:
             for fo in fox[1]:
                 self._root_data.add_file_origin(fox[0], fo)
+        for tf in tentativefiles:
+            self._root_data.add_tentative_name(tf[0], tf[1])
         self._root_data.start_done_adding_file_origins_task(parallel)  # no need to wait for it
 
         gitarchivesdonehashingtaskname: str = self._root_data.start_done_hashing_task(parallel)
