@@ -235,6 +235,24 @@ def _save_nexus_json5(wf: typing.TextIO, data: tuple[dict[bytes, bytes], dict[by
 
 ### Plugin
 
+class NexusMd5Hash(ExtraHash):
+    _md5: any
+
+    def __init__(self):
+        super().__init__()
+        self._md5 = hashlib.md5(usedforsecurity=False)
+
+    def update(self, data: bytes) -> None:
+        self._md5.update(data)
+
+    def digest(self) -> bytes:
+        return self._md5.digest()
+
+
+def _nexus_md5_factory() -> NexusMd5Hash:
+    return NexusMd5Hash()
+
+
 class NexusFileOriginPlugin(FileOriginPluginBase):
     nexus_hash_mapping: dict[bytes, bytes]
     nexus_file_origins: dict[bytes, list[NexusFileOrigin]]
@@ -280,3 +298,14 @@ class NexusFileOriginPlugin(FileOriginPluginBase):
         else:
             self.nexus_file_origins[h] = [fo]
             return True
+
+    def extra_hash_factory(self) -> ExtraHashFactory:
+        return _nexus_md5_factory
+
+    def add_hash_mapping(self, h: bytes, xh: bytes) -> bool:
+        if h not in self.nexus_hash_mapping:
+            self.nexus_hash_mapping[h] = xh
+            return True
+        else:
+            assert self.nexus_hash_mapping[h] == xh
+            return False

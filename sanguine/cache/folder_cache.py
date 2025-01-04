@@ -188,11 +188,11 @@ def _scan_folder_task_func(
     return tocache, stats, sdout
 
 
-def _calc_hash_task_func(param: tuple[str, float, int]) -> tuple[FileOnDisk]:
-    (fpath, tstamp, fsize) = param
-    s, h = calculate_file_hash(fpath)
+def _calc_hash_task_func(param: tuple[str, float, int, list[ExtraHashFactory]]) -> tuple[FileOnDisk, list[bytes]]:
+    (fpath, tstamp, fsize, extrahashes) = param
+    s, h, xtra = calculate_file_hash_ex(fpath, extrahashes)
     assert s == fsize
-    return (FileOnDisk(h, tstamp, fpath, fsize),)
+    return FileOnDisk(h, tstamp, fpath, fsize), xtra
 
 
 def _save_files_task_func(
@@ -301,17 +301,22 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
     _all_scan_stats: dict[str, dict[str, int]]  # rootfolder -> {fpath -> nfiles}
     _new_all_scan_stats: dict[str, dict[str, int]] | None
     _state: int  # bitmask: 0x1 - load completed, 0x2 - reconcile completed
+    _extra_hash_factories: list[ExtraHashFactory]
+    extra_hashes: dict[bytes, list[bytes]]
 
-    def __init__(self, cachedir: str, name: str, folder_list: FolderListToCache) -> None:
-        assert not FolderCache._folder_list_self_overlaps(folder_list)
+    def __init__(self, cachedir: str, name: str, folderlist: FolderListToCache,
+                 extrahashfactories: list[ExtraHashFactory] | None = None) -> None:
+        assert not FolderCache._folder_list_self_overlaps(folderlist)
         self._cache_dir = cachedir
         self.name = name
-        self._folder_list = folder_list
+        self._folder_list = folderlist
         self._files_by_path = None
         self._filtered_files = []
         self._all_scan_stats = _read_all_scan_stats(cachedir, name)
         self._new_all_scan_stats = {}
         self._state = 0
+        self._extra_hash_factories = extrahashfactories if extrahashfactories is not None else []
+        self.extra_hashes = {}
 
     def start_tasks(self, parallel: tasks.Parallel) -> None:
         return self._start_tasks(parallel)
@@ -612,11 +617,20 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
             ['sanguine.foldercache.' + self.name + '.reconciled()'],
             [])
 
-    def _own_calc_hash_task_func(self, out: tuple[FileOnDisk], scannedfiles: dict[str, FileOnDisk]) -> None:
+    def _own_calc_hash_task_func(self, out: tuple[FileOnDisk, list[bytes]],
+                                 scannedfiles: dict[str, FileOnDisk]) -> None:
         assert (self._state & 0x3) == 0x1
-        (f,) = out
+        (f, xtra) = out
         scannedfiles[f.file_path] = f
         self._files_by_path[f.file_path] = f
+        assert len(xtra) == len(self._extra_hash_factories)
+        if __debug__:
+            if f.file_hash in self.extra_hashes:
+                oldxtra = self.extra_hashes[f.file_hash]
+                assert len(xtra) == len(oldxtra)
+                for i in range(len(xtra)):
+                    assert xtra[i] == oldxtra[i]
+        self.extra_hashes[f.file_hash] = xtra
 
     def _ownreconciletask_datadeps(self) -> tasks.TaskDataDependencies:
         return tasks.TaskDataDependencies(
@@ -686,7 +700,7 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
             debug(fpath)  # RM
             htaskname = self._hashing_task_name(fpath)
             htask = tasks.Task(htaskname, _calc_hash_task_func,
-                               (fpath, tstamp, fsize),
+                               (fpath, tstamp, fsize, self._extra_hash_factories),
                                [], _hashing_file_time_estimate(fsize))
             howntaskname = self._hashing_own_task_name(fpath)
             howntask = tasks.OwnTask(howntaskname,

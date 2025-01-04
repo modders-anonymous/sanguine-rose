@@ -3,7 +3,7 @@ import sanguine.tasks as tasks
 from sanguine.cache.pickled_cache import pickled_cache
 from sanguine.common import *
 from sanguine.gitdata.file_origin import (FileOrigin, GitTentativeArchiveNames,
-                                          file_origin_plugins, file_origin_plugin_by_name)
+                                          file_origin_plugins, file_origin_plugin_by_name, FileOriginPluginBase)
 from sanguine.gitdata.root_git_archives import GitArchivesJson
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.archives import ArchivePluginBase, all_archive_plugins_extensions, archive_plugin_for
@@ -403,6 +403,13 @@ class RootGitData:
         assert self._fo_is_ready == 1
         for plugin in file_origin_plugins():
             if plugin.add_file_origin(h, fo):
+                self._dirty_fo = True
+
+    def add_hash_mappings(self, h: bytes, plugins: list[FileOriginPluginBase], hashes: list[bytes]) -> None:
+        assert len(plugins) == len(hashes)
+        assert self._fo_is_ready == 1
+        for i in range(len(plugins)):
+            if plugins[i].add_hash_mapping(h, hashes[i]):
                 self._dirty_fo = True
 
     def add_tentative_name(self, h: bytes, tentativename: str) -> None:

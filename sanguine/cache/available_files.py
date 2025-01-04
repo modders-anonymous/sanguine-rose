@@ -4,7 +4,7 @@ import sanguine.tasks as tasks
 from sanguine.cache.folder_cache import FolderCache, FileOnDisk
 from sanguine.cache.root_git_data import RootGitData
 from sanguine.common import *
-from sanguine.gitdata.file_origin import file_origins_for_file, FileOrigin
+from sanguine.gitdata.file_origin import file_origins_for_file, FileOrigin, file_origin_plugins, FileOriginPluginBase
 from sanguine.helpers.archives import all_archive_plugins_extensions
 from sanguine.helpers.file_retriever import (FileRetriever, ZeroFileRetriever, GithubFileRetriever,
                                              ArchiveFileRetriever, ArchiveFileRetrieverHelper)
@@ -33,13 +33,25 @@ class AvailableFiles:
     _downloads_cache: FolderCache
     _root_data: RootGitData
     _github_folders: list[GithubFolder]
+    _HASHMAPPINGSTASKNAME = 'sanguine.available.ownhashmappings'
     _READYOWNTASKNAME = 'sanguine.available.ownready'
     _is_ready: bool
+    _hash_remapping_plugins: list[FileOriginPluginBase]
 
     def __init__(self, by: str, cachedir: str, tmpdir: str, rootgitdir: str, downloads: list[str],
                  github_folders: list[GithubFolder], cache_data: dict[str, any]) -> None:
+        self._hash_remapping_plugins = []
+        extrahashfactories = []
+        for plugin in file_origin_plugins():
+            xf = plugin.extra_hash_factory()
+            if xf is not None:
+                self._hash_remapping_plugins.append(plugin)
+                extrahashfactories.append(xf)
+        assert len(self._hash_remapping_plugins) == len(extrahashfactories)
+
         self._downloads_cache = FolderCache(cachedir, 'downloads',
-                                            FolderListToCache([FolderToCache(d, []) for d in downloads]))
+                                            FolderListToCache([FolderToCache(d, []) for d in downloads]),
+                                            extrahashfactories=extrahashfactories)
         self._github_cache = FolderCache(cachedir, 'github',
                                          FolderListToCache([FolderToCache(g.local_folder, []) for g in github_folders]))
         self._github_cache_by_hash = None
@@ -68,6 +80,13 @@ class AvailableFiles:
                                             [self._downloads_cache.ready_task_name()],
                                             datadeps=self._startorigins_owntask_datadeps())
         parallel.add_task(startoriginsowntask)
+
+        hashmappingsowntaskname = AvailableFiles._HASHMAPPINGSTASKNAME
+        hashmappingsowntask = tasks.OwnTask(hashmappingsowntaskname,
+                                            lambda _, _1, _2: self._hash_mappings_own_task_func(), None,
+                                            [self._downloads_cache.ready_task_name(),
+                                             self._root_data.ready_to_start_adding_file_origins_task_name()])
+        parallel.add_task(hashmappingsowntask)
 
         readyowntaskname = AvailableFiles._READYOWNTASKNAME
         fakereadyowntask = tasks.TaskPlaceholder(readyowntaskname)
@@ -213,9 +232,16 @@ class AvailableFiles:
         gitarchivesdonehashingtaskname: str = self._root_data.start_done_hashing_task(parallel)
         readyowntaskname = AvailableFiles._READYOWNTASKNAME
         readyowntask = tasks.OwnTask(readyowntaskname,
-                                     lambda _, _1, _2: self._ready_own_task_func(), None,
-                                     [gitarchivesdonehashingtaskname, self._github_cache.ready_task_name()])
+                                     lambda _, _1, _2, _3: self._ready_own_task_func(), None,
+                                     [gitarchivesdonehashingtaskname,
+                                      self._github_cache.ready_task_name(),
+                                      AvailableFiles._HASHMAPPINGSTASKNAME])
         parallel.replace_task_placeholder(readyowntask)
+
+    def _hash_mappings_own_task_func(self):
+        for h, xh in self._downloads_cache.extra_hashes.items():
+            assert len(xh) == len(self._hash_remapping_plugins)
+            self._root_data.add_hash_mappings(h, self._hash_remapping_plugins, xh)
 
     def _ready_owntask_datadeps(self) -> tasks.TaskDataDependencies:
         return tasks.TaskDataDependencies(

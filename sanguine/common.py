@@ -91,11 +91,30 @@ class FolderListToCache:
         return len(self.folders)
 
 
-def calculate_file_hash(
-        fpath: str) -> tuple[int, bytes]:  # using SHA-256, the fastest crypto-hash because of hardware instruction
+### Hashing
+
+class ExtraHash(ABC):
+    @abstractmethod
+    def update(self, data: bytes) -> None:
+        pass
+
+    @abstractmethod
+    def digest(self) -> bytes:
+        pass
+
+
+type ExtraHashFactory = Callable[[], ExtraHash]
+
+
+def calculate_file_hash_ex(fpath: str, extrahashfactories: list[ExtraHashFactory]) -> tuple[int, bytes, list[bytes]]:
+    """
+    As our native hash, we are using SHA-256, the fastest crypto-hash because of hardware instruction.
+    Other hashes may be requested by fileorigin plugins.
+    """
     st = os.lstat(fpath)
     assert S_ISREG(st.st_mode) and not S_ISLNK(st.st_mode)
     h = hashlib.sha256()
+    xh = [xf() for xf in extrahashfactories]
     blocksize = 1048576
     fsize = 0
     with open(fpath, 'rb') as f:
@@ -104,6 +123,8 @@ def calculate_file_hash(
             if not bb:
                 break
             h.update(bb)
+            for x in xh:
+                x.update(bb)
             lbb = len(bb)
             assert lbb <= blocksize
             fsize += lbb
@@ -113,7 +134,16 @@ def calculate_file_hash(
     st2 = os.lstat(fpath)
     assert st2.st_size == st.st_size
     assert st2.st_mtime == st.st_mtime
-    return fsize, h.digest()
+    return fsize, h.digest(), [x.digest() for x in xh]
+
+
+def calculate_file_hash(fpath: str) -> tuple[int, bytes]:
+    """
+    As our native hash, we are using SHA-256, the fastest crypto-hash because of hardware instruction.
+    """
+    (fsize, h, x) = calculate_file_hash_ex(fpath, [])
+    assert len(x) == 0
+    return fsize, h
 
 
 def truncate_file_hash(h: bytes) -> bytes:

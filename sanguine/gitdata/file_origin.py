@@ -72,6 +72,14 @@ class FileOriginPluginBase(ABC):
     def add_file_origin(self, h: bytes, fo: FileOrigin) -> bool:
         pass
 
+    @abstractmethod
+    def extra_hash_factory(self) -> ExtraHashFactory:  # returned factory function cannot be a lambda
+        pass
+
+    @abstractmethod
+    def add_hash_mapping(self, h: bytes, xh: bytes) -> bool:
+        pass
+
 
 _file_origin_plugins: dict[str, FileOriginPluginBase] = {}
 
