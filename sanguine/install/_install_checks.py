@@ -21,7 +21,7 @@ def _is_module_installed(module: str) -> bool:
 
 def _not_installed(msg: str) -> None:
     critical(msg)
-    critical('Aborting. Please make sure to run sanguine-rose/sanguine-install.py')
+    critical('Aborting. Please make sure to run sanguine-rose/sanguine-install-dependencies.py')
     # noinspection PyProtectedMember, PyUnresolvedReferences
     os._exit(1)
 

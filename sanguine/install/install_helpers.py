@@ -20,6 +20,16 @@ def _install_pip_module(module: str) -> None:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
 
 
+def _yesno(prompt: str) -> bool:
+    while True:
+        critical(prompt)
+        ok = input().lower()
+        if ok in ('y', 'yes'):
+            return True
+        if ok in ('n', 'no'):
+            return False
+
+
 ### install
 
 def _run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
@@ -32,14 +42,11 @@ def _run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
     if msg:
         critical(msg)
 
-    while True:
-        ok = input('Do you want to proceed (Y/N)?')
-        if ok == 'Y' or ok == 'y':
-            break
-        if ok == 'N' or ok == 'n':
-            critical('Aborting installation. sanguine-rose is likely to be unusable')
-            # noinspection PyProtectedMember, PyUnresolvedReferences
-            os._exit(1)
+    ok = _yesno('Do you want to proceed (Y/N)?')
+    if not ok:
+        critical('Aborting installation. sanguine-rose is likely to be unusable')
+        # noinspection PyProtectedMember, PyUnresolvedReferences
+        os._exit(1)
 
     subprocess.check_call(cmd, shell=True)
 

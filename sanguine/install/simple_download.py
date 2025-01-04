@@ -1,3 +1,4 @@
+import gzip
 import os
 import re
 import tempfile
@@ -16,6 +17,8 @@ def pattern_from_url(url: str, pattern: str, encoding: str = 'utf-8') -> list[st
     with urllib.request.urlopen(rq) as f:
         b: bytes = f.read(_MAX_PAGE_SIZE)
         assert len(b) < _MAX_PAGE_SIZE
+        if f.getheader('content-encoding') == 'gzip':
+            b = gzip.decompress(b)
         html: str = b.decode(encoding)
         return re.findall(pattern, html, re.IGNORECASE)
 
