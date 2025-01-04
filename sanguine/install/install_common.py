@@ -17,8 +17,6 @@ Type = typing.Type
 # noinspection PyUnresolvedReferences, PyProtectedMember
 from sanguine.install.install_logging import (debug, info, perf_warn, warn, alert, critical,
                                               info_or_perf_warn, log_with_level, add_file_logging)
-# noinspection PyUnresolvedReferences, PyProtectedMember
-from sanguine.install._install_checks import check_sanguine_prerequisites
 
 
 ### error-handling related

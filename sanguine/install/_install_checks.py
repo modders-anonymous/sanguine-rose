@@ -6,8 +6,9 @@ import subprocess
 #                    2. may use only those sanguine modules which are specifically designated as install-friendly
 from sanguine.install.install_common import *
 
-REQUIRED_PIP_MODULES = ['json5', 'bethesda-structs', 'pywin32']
-PIP2PYTHON_MODULE_NAME_REMAPPING = {'bethesda-structs': 'bethesda_structs', 'pywin32': ['win32api', 'win32file']}
+REQUIRED_PIP_MODULES = ['json5', 'bethesda-structs', 'pywin32', 'pyinstaller']
+PIP2PYTHON_MODULE_NAME_REMAPPING = {'bethesda-structs': 'bethesda_structs', 'pywin32': ['win32api', 'win32file'],
+                                    'pyinstaller': []}
 
 
 def _is_module_installed(module: str) -> bool:
