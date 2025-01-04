@@ -2,6 +2,7 @@ import sanguine.tasks as tasks
 from sanguine.cache.available_files import FileRetriever, AvailableFiles
 from sanguine.cache.folder_cache import FileOnDisk, FolderCache
 from sanguine.common import *
+from sanguine.common import SanguineJsonEncoder
 from sanguine.helpers.project_config import ProjectConfig
 
 
@@ -70,7 +71,7 @@ class WholeCache:
     def done(self) -> None:
         with open(self.cache_data_fname, 'w') as f:
             # noinspection PyTypeChecker
-            json.dump(self.cache_data, f, indent=4)
+            json.dump(self.cache_data, f, indent=2, cls=SanguineJsonEncoder)
 
 
 if __name__ == '__main__':

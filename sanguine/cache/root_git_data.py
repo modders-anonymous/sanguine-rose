@@ -331,6 +331,7 @@ class RootGitData:
         (name, plugindata) = loadret
         plugin = file_origin_plugin_by_name(name)
         plugin.got_loaded_data(plugindata)
+        self._cache_data |= cacheoverrides
 
     def start_tasks(self, parallel: tasks.Parallel) -> None:
         loadtaskname = 'sanguine.rootgit.loadar'

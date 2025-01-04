@@ -45,6 +45,7 @@ class AvailableFiles:
         for plugin in file_origin_plugins():
             xf = plugin.extra_hash_factory()
             if xf is not None:
+                assert callable(xf) and not tasks.is_lambda(xf)
                 self._hash_remapping_plugins.append(plugin)
                 extrahashfactories.append(xf)
         assert len(self._hash_remapping_plugins) == len(extrahashfactories)

@@ -245,7 +245,7 @@ def from_json_hash(s: str) -> bytes:
     return b
 
 
-class _JsonEncoder(json.JSONEncoder):
+class SanguineJsonEncoder(json.JSONEncoder):
     def encode(self, o: any) -> any:
         return json.JSONEncoder.encode(self, self.default(o))
 
@@ -273,7 +273,7 @@ class _JsonEncoder(json.JSONEncoder):
 
 
 def as_json(data: any) -> str:
-    return _JsonEncoder().encode(data)
+    return SanguineJsonEncoder().encode(data)
 
 
 ### file-related helpers
