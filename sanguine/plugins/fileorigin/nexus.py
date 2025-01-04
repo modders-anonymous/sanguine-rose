@@ -97,7 +97,7 @@ class GitNexusData:
         hwriter.write_begin()
         for hm in hmap:
             hwriter.write_line(hrhandler, (hm[0], hm[1]))
-        hwriter.write_end()
+        hwriter.write_end(True)
 
         wfile.write(
             '  file_origins: // Legend: h=hash,  f=fileid, m=modid, g=gameid\n')

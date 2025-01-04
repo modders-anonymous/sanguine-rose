@@ -546,10 +546,13 @@ class GitDataListWriter:
         ln += '}'
         self.wfile.write(ln)
 
-    def write_end(self) -> None:
+    def write_end(self, moredatafollows: bool = False) -> None:
         if self.line_num > 0:
             self.wfile.write('\n')
-        self.wfile.write(']\n')
+        if moredatafollows:
+            self.wfile.write('],\n')
+        else:
+            self.wfile.write(']\n')
 
 
 ### reading
