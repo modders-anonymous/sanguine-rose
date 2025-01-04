@@ -23,7 +23,7 @@ def _file_origins_task_func(param: tuple[list[bytes, str]]) -> tuple[
             warn('Available: file without known origin {}'.format(fpath))
         else:
             allorigins.append((fhash, origins))
-        alltentativefiles.append((fhash, os.path.split(fpath)[1]))
+            alltentativefiles.append((fhash, os.path.split(fpath)[1]))
     return allorigins, alltentativefiles
 
 
