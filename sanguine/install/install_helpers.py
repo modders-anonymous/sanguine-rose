@@ -61,14 +61,14 @@ def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
     warn("     but when, after entering 'Y' below, Windows will ask you stupid questions,")
     critical("     please make sure to tell Windows that you're ok with it")
 
-    if msg:
-        critical(msg)
-
     choice = message_box('Do you want to proceed?', ['Yes', 'no'])
     if choice == 'no':
         critical('Aborting installation. sanguine-rose is likely to be unusable')
         # noinspection PyProtectedMember, PyUnresolvedReferences
         os._exit(1)
+
+    if msg:
+        critical(msg)
 
     subprocess.check_call(cmd, shell=True)
 
@@ -90,7 +90,8 @@ def download_file_nice_name(url: str) -> str:
 def clone_github_project(githubdir: str, author: str, project: str) -> None:
     targetdir = githubdir + '\\' + author
     abort_if_not(not os.path.exists(targetdir + '\\' + project))
-    os.makedirs(targetdir)
+    if not os.path.isdir(targetdir):
+        os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
     subprocess.check_call(['git', 'clone', url], cwd=targetdir)
     info('{} successfully cloned'.format(author, targetdir))
