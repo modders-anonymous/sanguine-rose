@@ -12,7 +12,7 @@ from sanguine.install.install_helpers import (run_installer, download_file_nice_
                                               safe_call_with_double_check)
 from sanguine.install.simple_download import pattern_from_url
 
-safe_call(['echo', 'Starting {}...'.format(sys.argv[0])],
+safe_call(['echo', 'Starting', sys.argv[0], '...'],
           shell=True)  # for a mystical reason, it solves console color issues
 
 critical('This will install sanguine-rose from scratch, including, if necessary, installing python.')
@@ -37,7 +37,7 @@ else:
     abort_if_not(safe_call(['py', '--version'], shell=True))
     info('Python is available now.')
 
-if safe_call(['git', '--version']):
+if safe_call_with_double_check(['git', '--version']):
     info('git found, no need to download and install git')
 else:
     info('git not found, need to download and install git')
@@ -92,4 +92,3 @@ else:
     cmd = '{}\\sanguine-install-dependencies.py'.format(sanguinedir)
     info('Running {}...'.format(cmd))
     subprocess.check_call([cmd], shell=True)
-    info('Dependencies installed successfully, you are ready to run sanguine-rose')

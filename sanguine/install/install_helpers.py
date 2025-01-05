@@ -44,21 +44,51 @@ def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
     return got
 
 
-def safe_call(cmd: list[str], shell: bool = False) -> bool:
+def safe_call(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
     try:
-        ret = subprocess.call(cmd, shell=shell)
+        ret = subprocess.call(cmd, shell=shell, cwd=cwd)
         return ret == 0
     except OSError:
         return False
 
 
 def safe_call_with_double_check(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
-    if safe_call(cmd, shell=shell):
+    if safe_call(cmd, shell=shell, cwd=cwd):
         return True
-    try:
-        return subprocess.call(['start', '/I'] + cmd, shell=True, cwd=cwd) == 0
-    except OSError:
+    
+    warn('Cannot run {} using current PATH, will try looking for PATH in registry'.format(cmd[0]))
+    out = subprocess.check_output(['reg','query','HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment','/v','PATH'])
+    out = out.decode('ascii')
+    #print('out:'+out+'\n')
+    m = re.search(r'\s*PATH\s*REG_EXPAND_SZ\s*(.*)',out)
+    if not m:
         return False
+    
+    reg_path = m.group(1).lower()
+    #print(reg_path+'\n')
+    for e in os.environ.keys():
+        subst = '%'+e.lower()+'%'
+        #print(subst+'->'+os.environ[e])
+        reg_path = reg_path.replace(subst,os.environ[e])
+    #print(reg_path+'\n')
+    reg_path_split = reg_path.split(';')
+    reg_path_split = [p.strip().lower() for p in reg_path_split]
+    env_path = os.environ['PATH'].lower()
+    env_path_split = env_path.split(';')
+    env_path_split = [p.strip() for p in env_path_split]
+    remainder = []
+    for d in reg_path_split:
+        if d not in env_path_split:
+            remainder.append(d)
+    for d in remainder:
+        info('Found recently appended PATH in registry: {}'.format(d))
+        if not d.endswith('\\'):
+            d += '\\'
+        cmd1 = [d+cmd[0]]+cmd[1:]
+        #print(cmd1)
+        if safe_call(cmd1, shell=shell, cwd=cwd):
+            return True
+    return False
 
 
 ### install
@@ -102,8 +132,8 @@ def clone_github_project(githubdir: str, author: str, project: str) -> None:
     if not os.path.isdir(targetdir):
         os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
-    err = safe_call_with_double_check(['git', 'clone', url], cwd=targetdir, shell=True)
-    abort_if_not(err == 0)
+    ok = safe_call_with_double_check(['git', 'clone', url], cwd=targetdir, shell=True)
+    abort_if_not(ok)
     info('{} successfully cloned'.format(author, targetdir))
 
 
@@ -136,13 +166,14 @@ def _install_vs_build_tools() -> None:
     info('Download complete.')
     run_installer([exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
     info('Visual C++ build tools install started.')
-    info('Please proceed with VC++ and restart {} afterwards.'.format(sys.argv[0]))
+    alert('Please proceed with VC++ install and restart {} afterwards.'.format(sys.argv[0]))
     # noinspection PyProtectedMember, PyUnresolvedReferences
     os._exit(0)
 
 
 def install_sanguine_prerequisites() -> None:
-    subprocess.check_call(['git', '--version'])
+    ok = safe_call_with_double_check(['git', '--version'])
+    abort_if_not(ok)
     _install_vs_build_tools()  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:
