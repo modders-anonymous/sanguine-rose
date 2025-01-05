@@ -43,6 +43,10 @@ def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
         return default
     return got
 
+def confirm_box(prompt: str, level: int = logging.ERROR) -> None:
+    log_with_level(level, prompt)
+    input()
+
 
 def safe_call(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
     try:
@@ -179,6 +183,7 @@ def _install_vs_build_tools() -> None:
     run_installer([exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
     info('Visual C++ build tools install started.')
     alert('Please proceed with VC++ install and restart {} afterwards.'.format(sys.argv[0]))
+    confirm_box('Press any key to exit {} now.'.format(sys.argv[0]))
     # noinspection PyProtectedMember, PyUnresolvedReferences
     os._exit(0)
 
