@@ -33,42 +33,65 @@ def log_level_name(levelno: int) -> str:
             return 'LEVEL={}'.format(levelno)
 '''
 
-_FORMAT: str = '[%(levelname)s@%(sanguine_from_start).2f]:%(sanguine_prefix)s %(message)s (%(filename)s:%(lineno)d)'
+_FORMAT: str = '%(message)s'
+_FORMAT_EX: str = '[%(levelname)s@%(sanguine_from_start).2f]:%(sanguine_prefix)s %(message)s (%(filename)s:%(lineno)d)'
 
 
 class _SanguineFormatter(logging.Formatter):
-    FORMATS: dict[int, str] = {
-        logging.DEBUG: '\x1b[90m' + _FORMAT + '\x1b[0m',
-        logging.INFO: '\x1b[32m' + _FORMAT + '\x1b[0m',
-        _PERFWARN_LEVEL_NUM: '\x1b[34m' + _FORMAT + '\x1b[0m',
-        logging.WARNING: '\x1b[33m' + _FORMAT + '\x1b[0m',
-        logging.ERROR: '\x1b[93m' + _FORMAT + '\x1b[0m',  # alert()
-        logging.CRITICAL: '\x1b[91;1m' + _FORMAT + '\x1b[0m'
-    }
+    _formats: dict[int, str]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._formats = _SanguineFormatter._formats_dict(_FORMAT)
+
+    @staticmethod
+    def _formats_dict(fmt: str) -> dict[int, str]:
+        return {
+            logging.DEBUG: '\x1b[90m' + fmt + '\x1b[0m',
+            logging.INFO: '\x1b[32m' + fmt + '\x1b[0m',
+            _PERFWARN_LEVEL_NUM: '\x1b[34m' + fmt + '\x1b[0m',
+            logging.WARNING: '\x1b[33m' + fmt + '\x1b[0m',
+            logging.ERROR: '\x1b[93m' + fmt + '\x1b[0m',  # alert()
+            logging.CRITICAL: '\x1b[91;1m' + fmt + '\x1b[0m'
+        }
 
     def format(self, record) -> str:
-        log_fmt = self.FORMATS.get(record.levelno)
+        log_fmt = self._formats.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         _sanguine_patch_record(record)
         return formatter.format(record)
+
+    def enable_ex_logging(self) -> None:
+        self._formats = _SanguineFormatter._formats_dict(_FORMAT_EX)
 
 
 class _SanguineHtmlFileFormatter(logging.Formatter):
-    FORMATS: dict[int, str] = {
-        logging.DEBUG: '<div class="debug">' + _FORMAT + '</div>',
-        logging.INFO: '<div class="info">' + _FORMAT + '</div>',
-        _PERFWARN_LEVEL_NUM: '<div class="perf_warn">' + _FORMAT + '</div>',
-        logging.WARNING: '<div class="warn">' + _FORMAT + '</div>',
-        logging.ERROR: '<div class="alert">' + _FORMAT + '</div>',
-        logging.CRITICAL: '<div class="critical">' + _FORMAT + '</div>',
-    }
+    _formats: dict[int, str]
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._formats = _SanguineHtmlFileFormatter._formats_dict(_FORMAT)
+
+    @staticmethod
+    def _formats_dict(fmt: str) -> dict[int, str]:
+        return {
+            logging.DEBUG: '<div class="debug">' + fmt + '</div>',
+            logging.INFO: '<div class="info">' + fmt + '</div>',
+            _PERFWARN_LEVEL_NUM: '<div class="perf_warn">' + fmt + '</div>',
+            logging.WARNING: '<div class="warn">' + fmt + '</div>',
+            logging.ERROR: '<div class="alert">' + fmt + '</div>',
+            logging.CRITICAL: '<div class="critical">' + fmt + '</div>',
+        }
 
     def format(self, record) -> str:
         record.msg = record.msg.replace('\n', '<br>')
-        log_fmt = self.FORMATS.get(record.levelno)
+        log_fmt = self._formats.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         _sanguine_patch_record(record)
         return formatter.format(record)
+
+    def enable_ex_logging(self) -> None:
+        self._formats = _SanguineHtmlFileFormatter._formats_dict(_FORMAT_EX)
 
 
 logging.addLevelName(_PERFWARN_LEVEL_NUM, "PERFWARN")
@@ -113,13 +136,29 @@ class _HtmlFileHandler(logging.FileHandler):
         self.stream.write('<div class="info">[STARTING LOGGING]: {}</div>\n'.format(time.asctime()))
 
 
+_ex_logging: bool = False
+
+
 def add_file_logging(fpath: str) -> None:
     global _logger, _logger_file_handler
     assert _logger_file_handler is None
     _logger_file_handler = _HtmlFileHandler(fpath)
     _logger_file_handler.setLevel(logging.DEBUG if __debug__ else logging.INFO)
     _logger_file_handler.setFormatter(_SanguineHtmlFileFormatter())
+    if _ex_logging:
+        assert isinstance(_logger_file_handler.formatter, _SanguineHtmlFileFormatter)
+        _logger_file_handler.formatter.enable_ex_logging()
     _logger.addHandler(_logger_file_handler)
+
+
+def enable_ex_logging() -> None:
+    global _console_handler, _logger_file_handler, _ex_logging
+    assert isinstance(_console_handler.formatter, _SanguineFormatter)
+    _console_handler.formatter.enable_ex_logging()
+    if _logger_file_handler is not None:
+        assert isinstance(_logger_file_handler.formatter, _SanguineHtmlFileFormatter)
+        _logger_file_handler.formatter.enable_ex_logging()
+    _ex_logging = True
 
 
 def add_logging_handler(handler: logging.StreamHandler) -> None:

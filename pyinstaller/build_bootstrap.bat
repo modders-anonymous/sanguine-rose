@@ -1,1 +1,1 @@
-pyinstaller ..\sanguine-bootstrap.py
+pyinstaller --onefile --uac-admin ..\sanguine-bootstrap.py

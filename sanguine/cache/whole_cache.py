@@ -81,6 +81,7 @@ if __name__ == '__main__':
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
         ttmppath = normalize_dir_path('../../../sanguine.tmp\\')
         add_file_logging(ttmppath + 'sanguine.log.html')
+        enable_ex_logging()
         check_sanguine_prerequisites()
 
         cfgfname = normalize_file_path('../../../KTA\\KTA.json5')

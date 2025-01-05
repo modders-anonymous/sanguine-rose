@@ -11,6 +11,8 @@ from sanguine.install.install_helpers import (run_installer, download_file_nice_
                                               message_box, input_box, clone_github_project, safe_call)
 from sanguine.install.simple_download import pattern_from_url
 
+safe_call(['sanguine.nonexistent'])  # for a mystical reason, it solves console color issues
+
 critical('This will install sanguine-rose from scratch, including, if necessary, installing python.')
 choice = message_box('Do you want to proceed?', ['Yes', 'no'])
 if choice == 'no':
@@ -28,8 +30,10 @@ else:
     info('Downloading {}...'.format(dlurl[0]))
     pyinstallexe = download_file_nice_name(dlurl[0])
     run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
-                  'Make sure to find permission request window in your taskbar and allow proceeding with installation.\n'
-                  + '    Afterwards, install will continue in silent mode and may take up to 5 minutes.')
+                  'Installing python... It runs in silent mode and may take up to 5 minutes.')
+    info('Python installer finished.')
+    abort_if_not(safe_call(['py', '--version'], shell=True))
+    info('Python is available now.')
 
 if safe_call(['git', '--version']):
     info('git found, no need to download and install git')
@@ -46,8 +50,10 @@ else:
     info('Downloading {}...'.format(url))
     gitinstallexe = download_file_nice_name(url)
     run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com',
-                  'Make sure to find permission request window in your taskbar and allow proceeding with installation.\n'
-                  + '    Afterwards, install will continue in silent mode and may take up to 5 minutes.')
+                  'Installing git... It runs in silent mode and may take up to 5 minutes.')
+    info('Git installer finished.')
+    abort_if_not(safe_call(['git', '--version'], shell=True))
+    info('Git is available now.')
 
 skiprepo = False
 while True:

@@ -93,7 +93,7 @@ def clone_github_project(githubdir: str, author: str, project: str) -> None:
     if not os.path.isdir(targetdir):
         os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
-    subprocess.check_call(['git', 'clone', url], cwd=targetdir)
+    subprocess.check_call(['git', 'clone', url], cwd=targetdir,shell=True)
     info('{} successfully cloned'.format(author, targetdir))
 
 
