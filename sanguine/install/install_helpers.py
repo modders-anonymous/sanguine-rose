@@ -95,9 +95,9 @@ def safe_call_with_double_check(cmd: list[str], shell: bool = False, cwd: str | 
     pf = os.environ['ProgramFiles']
     for curdir, _, files in os.walk(pf):
         for f in files:
-            fname,fext = os.path.splitext(f)
+            fname, fext = os.path.splitext(f)
             if fname == cmd[0] and (fext == '.exe' or fext == '.bat'):
-                cmd1 = [curdir+'\\'+cmd[0]] + cmd[1:]
+                cmd1 = [curdir + '\\' + cmd[0]] + cmd[1:]
                 if safe_call(cmd1, shell=shell, cwd=cwd):
                     return True
     return False
