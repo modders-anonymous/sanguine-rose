@@ -98,24 +98,6 @@ def clone_github_project(githubdir: str, author: str, project: str) -> None:
 
 ### specific installers
 
-def _install_git() -> None:
-    if safe_call(['git', '--version']):
-        info('git found, no need to download and install git')
-    else:
-        info('git not found, need to download and install git')
-        tags = simple_download.pattern_from_url('https://gitforwindows.org/',
-                                                r'https://github.com/git-for-windows/git/releases/tag/([a-zA-Z0-9.]*)"')
-        abort_if_not(len(tags) == 1)
-        tag = tags[0]
-        m = re.match(r'v([0-9.]*)\.windows\.[0-9]*', tag)
-        abort_if_not(bool(m))
-        ver = m.group(1)
-        url = 'https://github.com/git-for-windows/git/releases/download/{}/Git-{}-64-bit.exe'.format(tag, ver)
-        info('Downloading {}...'.format(url))
-        gitinstallexe = download_file_nice_name(url)
-        run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com', '')
-
-
 def _install_vs_build_tools() -> None:
     # trying to find one
     programfiles = os.environ['ProgramFiles(x86)']
@@ -149,7 +131,7 @@ def _install_vs_build_tools() -> None:
 
 
 def install_sanguine_prerequisites() -> None:
-    _install_git()
+    subprocess.check_call(['git', '--version'])
     _install_vs_build_tools()  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:

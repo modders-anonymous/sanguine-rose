@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import subprocess
 import sys
 
@@ -28,7 +29,25 @@ else:
     pyinstallexe = download_file_nice_name(dlurl[0])
     run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
                   'Make sure to find permission request window in your taskbar and allow proceeding with installation.\n'
-                  + '    Afterwards, install may take up to 5 minutes.')
+                  + '    Afterwards, install will continue in silent mode and may take up to 5 minutes.')
+
+if safe_call(['git', '--version']):
+    info('git found, no need to download and install git')
+else:
+    info('git not found, need to download and install git')
+    tags = pattern_from_url('https://gitforwindows.org/',
+                            r'https://github.com/git-for-windows/git/releases/tag/([a-zA-Z0-9.]*)"')
+    abort_if_not(len(tags) == 1)
+    tag = tags[0]
+    m = re.match(r'v([0-9.]*)\.windows\.[0-9]*', tag)
+    abort_if_not(bool(m))
+    ver = m.group(1)
+    url = 'https://github.com/git-for-windows/git/releases/download/{}/Git-{}-64-bit.exe'.format(tag, ver)
+    info('Downloading {}...'.format(url))
+    gitinstallexe = download_file_nice_name(url)
+    run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com',
+                  'Make sure to find permission request window in your taskbar and allow proceeding with installation.\n'
+                  + '    Afterwards, install will continue in silent mode and may take up to 5 minutes.')
 
 skiprepo = False
 while True:
