@@ -1,12 +1,12 @@
-import os
+import logging
 import re
 import shutil
 import subprocess
 import sys
 
 import sanguine.install.simple_download as simple_download
-from sanguine.install._install_checks import (REQUIRED_PIP_MODULES, info, warn, critical,
-                                              check_sanguine_prerequisites)
+from sanguine.install._install_checks import REQUIRED_PIP_MODULES, check_sanguine_prerequisites
+from sanguine.install.install_common import *
 
 
 # for _install_helpers we cannot use any files with non-guaranteed dependencies, so we:
@@ -20,19 +20,33 @@ def _install_pip_module(module: str) -> None:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
 
 
-def _yesno(prompt: str) -> bool:
+def message_box(prompt: str, spec: list[str], level: int = logging.CRITICAL) -> str:
+    assert len(spec) > 0
+    assert len(set([s[0].lower() for s in spec])) == len(spec)
+    specstr = '/'.join(spec)
     while True:
-        critical(prompt)
-        ok = input().lower()
-        if ok in ('y', 'yes'):
-            return True
-        if ok in ('n', 'no'):
-            return False
+        log_with_level(level, '{} ({})'.format(prompt, specstr))
+        got = input().lower().strip()
+        if got == '':
+            log_with_level(level, spec[0])
+            return spec[0]
+        for i in range(len(spec)):
+            if spec[i].lower() == got or spec[i][0].lower() == got:
+                return spec[i]
+
+
+def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
+    log_with_level(level, '{} [{}]'.format(prompt, default))
+    got = input()
+    if got.strip() == '':
+        log_with_level(level, default)
+        return default
+    return got
 
 
 ### install
 
-def _run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
+def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
     critical("We're about to run the following installer: {}".format(cmd[0]))
     warn("It was downloaded from {}".format(sitefrom))
     warn("Feel free to run it through your favorite virus checker,")
@@ -42,8 +56,8 @@ def _run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
     if msg:
         critical(msg)
 
-    ok = _yesno('Do you want to proceed (Y/N)?')
-    if not ok:
+    choice = message_box('Do you want to proceed?', ['Yes', 'no'])
+    if choice == 'no':
         critical('Aborting installation. sanguine-rose is likely to be unusable')
         # noinspection PyProtectedMember, PyUnresolvedReferences
         os._exit(1)
@@ -55,7 +69,7 @@ def _tools_dir() -> str:
     return os.path.abspath(os.path.split(os.path.abspath(__file__))[0] + '\\..\\tools')
 
 
-def _download_file_nice_name(url: str) -> str:
+def download_file_nice_name(url: str) -> str:
     tfname = simple_download.download_temp(url)
     desired_fname = url.split('/')[-1]
     new_fname = os.path.split(tfname)[0] + '\\' + desired_fname
@@ -65,7 +79,34 @@ def _download_file_nice_name(url: str) -> str:
     return new_fname
 
 
+def clone_github_project(githubdir: str, author: str, project: str) -> None:
+    targetdir = githubdir + '\\' + author
+    abort_if_not(not os.path.exists(targetdir))
+    os.makedirs(targetdir)
+    url = 'https://github.com/{}/{}.git'.format(author, project)
+    subprocess.check_call(['git', 'clone', url], cwd=targetdir)
+    info('{} successfully cloned'.format(author, targetdir))
+
+
 ### specific installers
+
+def _install_git() -> None:
+    if subprocess.call(['git', '--version']) == 0:
+        info('git found, no need to download and install git')
+    else:
+        info('git not found, need to download and install git')
+        tags = simple_download.pattern_from_url('https://gitforwindows.org/',
+                                                r'https://github.com/git-for-windows/git/releases/tag/([a-zA-Z0-9.]*)"')
+        abort_if_not(len(tags) == 1)
+        tag = tags[0]
+        m = re.match(r'v([0-9.]*)\.windows\.[0-9]*', tag)
+        abort_if_not(bool(m))
+        ver = m.group(1)
+        url = 'https://github.com/git-for-windows/git/releases/download/{}/Git-{}-64-bit.exe'.format(tag, ver)
+        info('Downloading {}...'.format(url))
+        gitinstallexe = download_file_nice_name(url)
+        run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com', '')
+
 
 def _install_vs_build_tools() -> None:
     # trying to find one
@@ -90,16 +131,17 @@ def _install_vs_build_tools() -> None:
     assert len(urls) == 1
     url = urls[0]
     info('Downloading {}...'.format(url))
-    exe = _download_file_nice_name(url)
+    exe = download_file_nice_name(url)
     info('Download complete.')
-    _run_installer([exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
+    run_installer([exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
     info('Visual C++ build tools install started.')
-    info('Please proceed with installation and restart {} afterwards.'.format(sys.argv[0]))
+    info('Please proceed with VC++ and restart {} afterwards.'.format(sys.argv[0]))
     # noinspection PyProtectedMember, PyUnresolvedReferences
     os._exit(0)
 
 
 def install_sanguine_prerequisites() -> None:
+    _install_git()
     _install_vs_build_tools()  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:
