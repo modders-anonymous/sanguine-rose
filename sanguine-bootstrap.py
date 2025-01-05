@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import subprocess
 import sys
 
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
@@ -13,7 +12,7 @@ from sanguine.install.install_helpers import (run_installer, download_file_nice_
 from sanguine.install.simple_download import pattern_from_url
 
 safe_call(['echo', 'Starting', sys.argv[0], '...'],
-          shell=True)  # for a mystical reason, it solves console color issues
+          shell=True)  # for a mystical reason, launching an external process which prints something to the screen, solves console color issues
 
 critical('This will install sanguine-rose from scratch, including, if necessary, installing python.')
 choice = message_box('Do you want to proceed?', ['Yes', 'no'])
@@ -25,16 +24,16 @@ if choice == 'no':
 if safe_call(['py', '--version'], shell=True):
     info('py found, no need to download and install python')
 else:
-    info('py not found, need to download and install python')
+    info('py not found, will try to download and install python')
     dlurl = pattern_from_url('https://python.org/downloads/',
                              r'(https://www\.python\.org/ftp/python/3\.[0-9.]*/python-3\.[0-9.]*-amd64.exe)')
     abort_if_not(len(dlurl) == 1)
     info('Downloading {}...'.format(dlurl[0]))
     pyinstallexe = download_file_nice_name(dlurl[0])
     run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
-                  'Installing python... It runs in silent mode and may take up to 5 minutes.')
+                  'Installing python... Installer runs in silent mode and may take up to 5 minutes.')
     info('Python installer finished.')
-    abort_if_not(safe_call(['py', '--version'], shell=True))
+    abort_if_not(safe_call_with_double_check(['py', '--version'], shell=True))
     info('Python is available now.')
 
 if safe_call_with_double_check(['git', '--version']):
@@ -52,7 +51,7 @@ else:
     info('Downloading {}...'.format(url))
     gitinstallexe = download_file_nice_name(url)
     run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com',
-                  'Installing git... It runs in silent mode and may take up to 5 minutes.')
+                  'Installing git... Installer runs in silent mode and may take up to 5 minutes.')
     info('Git installer finished.')
     abort_if_not(safe_call_with_double_check(['git', '--version'], shell=True))
     info('Git is available now.')
@@ -91,4 +90,4 @@ if choice == 'no':
 else:
     cmd = '{}\\sanguine-install-dependencies.py'.format(sanguinedir)
     info('Running {}...'.format(cmd))
-    subprocess.check_call([cmd], shell=True)
+    ok = safe_call_with_double_check(['py', cmd], shell=True)
