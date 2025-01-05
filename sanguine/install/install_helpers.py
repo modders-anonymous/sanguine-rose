@@ -56,9 +56,9 @@ def safe_call_with_double_check(cmd: list[str], shell: bool = False, cwd: str | 
     if safe_call(cmd, shell=shell, cwd=cwd):
         return True
 
-    warn('Cannot run {} using current PATH, will try looking for PATH in registry'.format(cmd[0]))
+    warn('Cannot run {} using current PATH, will try looking for PATH in registry...'.format(cmd[0]))
     out = subprocess.check_output(
-        ['reg', 'query', 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment', '/v', 'PATH'])
+        ['reg', 'query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment', '/v', 'PATH'])
     out = out.decode('ascii')
     # print('out:'+out+'\n')
     m = re.search(r'\s*PATH\s*REG_EXPAND_SZ\s*(.*)', out)
@@ -89,6 +89,17 @@ def safe_call_with_double_check(cmd: list[str], shell: bool = False, cwd: str | 
         # print(cmd1)
         if safe_call(cmd1, shell=shell, cwd=cwd):
             return True
+
+    # last resort: direct search in Program Files
+    warn('Cannot run {} using registry PATH, will try looking for executable in Program Files...'.format(cmd[0]))
+    pf = os.environ['ProgramFiles']
+    for curdir, _, files in os.walk(pf):
+        for f in files:
+            fname,fext = os.path.splitext(f)
+            if fname == cmd[0] and (fext == '.exe' or fext == '.bat'):
+                cmd1 = [curdir+'\\'+cmd[0]] + cmd[1:]
+                if safe_call(cmd1, shell=shell, cwd=cwd):
+                    return True
     return False
 
 
