@@ -44,6 +44,14 @@ def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
     return got
 
 
+def safe_call(cmd: list[str], shell: bool = False) -> bool:
+    try:
+        ret = subprocess.call(cmd, shell=shell)
+        return ret == 0
+    except OSError:
+        return False
+
+
 ### install
 
 def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
@@ -91,7 +99,7 @@ def clone_github_project(githubdir: str, author: str, project: str) -> None:
 ### specific installers
 
 def _install_git() -> None:
-    if subprocess.call(['git', '--version']) == 0:
+    if safe_call(['git', '--version']):
         info('git found, no need to download and install git')
     else:
         info('git not found, need to download and install git')

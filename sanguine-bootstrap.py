@@ -6,8 +6,8 @@ import sys
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
-from sanguine.install.install_helpers import run_installer, download_file_nice_name, message_box, input_box, \
-    clone_github_project
+from sanguine.install.install_helpers import (run_installer, download_file_nice_name,
+                                              message_box, input_box, clone_github_project, safe_call)
 from sanguine.install.simple_download import pattern_from_url
 
 critical('This will install sanguine-rose from scratch, including, if necessary, installing python.')
@@ -17,7 +17,7 @@ if choice == 'no':
     sys.exit()
 
 ### download and install python
-if subprocess.call(['py', '--version']) == 0:
+if safe_call(['py', '--version'], shell=True):
     info('py found, no need to download and install python')
 else:
     info('py not found, need to download and install python')
