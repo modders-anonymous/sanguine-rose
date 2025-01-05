@@ -55,22 +55,23 @@ def safe_call(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bo
 def safe_call_with_double_check(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
     if safe_call(cmd, shell=shell, cwd=cwd):
         return True
-    
+
     warn('Cannot run {} using current PATH, will try looking for PATH in registry'.format(cmd[0]))
-    out = subprocess.check_output(['reg','query','HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment','/v','PATH'])
+    out = subprocess.check_output(
+        ['reg', 'query', 'HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment', '/v', 'PATH'])
     out = out.decode('ascii')
-    #print('out:'+out+'\n')
-    m = re.search(r'\s*PATH\s*REG_EXPAND_SZ\s*(.*)',out)
+    # print('out:'+out+'\n')
+    m = re.search(r'\s*PATH\s*REG_EXPAND_SZ\s*(.*)', out)
     if not m:
         return False
-    
+
     reg_path = m.group(1).lower()
-    #print(reg_path+'\n')
+    # print(reg_path+'\n')
     for e in os.environ.keys():
-        subst = '%'+e.lower()+'%'
-        #print(subst+'->'+os.environ[e])
-        reg_path = reg_path.replace(subst,os.environ[e])
-    #print(reg_path+'\n')
+        subst = '%' + e.lower() + '%'
+        # print(subst+'->'+os.environ[e])
+        reg_path = reg_path.replace(subst, os.environ[e])
+    # print(reg_path+'\n')
     reg_path_split = reg_path.split(';')
     reg_path_split = [p.strip().lower() for p in reg_path_split]
     env_path = os.environ['PATH'].lower()
@@ -84,8 +85,8 @@ def safe_call_with_double_check(cmd: list[str], shell: bool = False, cwd: str | 
         info('Found recently appended PATH in registry: {}'.format(d))
         if not d.endswith('\\'):
             d += '\\'
-        cmd1 = [d+cmd[0]]+cmd[1:]
-        #print(cmd1)
+        cmd1 = [d + cmd[0]] + cmd[1:]
+        # print(cmd1)
         if safe_call(cmd1, shell=shell, cwd=cwd):
             return True
     return False
