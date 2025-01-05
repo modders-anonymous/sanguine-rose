@@ -43,6 +43,7 @@ def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
         return default
     return got
 
+
 def confirm_box(prompt: str, level: int = logging.ERROR) -> None:
     log_with_level(level, prompt)
     input()
@@ -89,7 +90,7 @@ def find_command_location(cmd: list[str], shell: bool = False) -> str | None:
                 d += '\\'
             cmd1 = [d + cmd[0]] + cmd[1:]
             # print(cmd1)
-            if safe_call(cmd1, shell=shell, cwd=cwd):
+            if safe_call(cmd1, shell=shell):
                 return cmd1[0]
 
     # last resort: direct search in Program Files
@@ -100,7 +101,7 @@ def find_command_location(cmd: list[str], shell: bool = False) -> str | None:
             fname, fext = os.path.splitext(f)
             if fname == cmd[0] and (fext == '.exe' or fext == '.bat'):
                 cmd1 = [curdir + '\\' + cmd[0]] + cmd[1:]
-                if safe_call(cmd1, shell=shell, cwd=cwd):
+                if safe_call(cmd1, shell=shell):
                     return cmd1[0]
     return None
 
@@ -140,17 +141,18 @@ def download_file_nice_name(url: str) -> str:
     return new_fname
 
 
-def clone_github_project(gitexe: str, githubdir: str, author: str, project: str, adjustpermissions: bool=False) -> None:
+def clone_github_project(gitexe: str, githubdir: str, author: str, project: str,
+                         adjustpermissions: bool = False) -> None:
     if not githubdir.endswith('\\'):
         githubdir += '\\'
     targetdir = githubdir + author
     abort_if_not(not os.path.exists(targetdir + '\\' + project))
 
-    createddir = None # we need it to adjust permissions properly
+    createddir = None  # we need it to adjust permissions properly
     if not os.path.isdir(targetdir):
         createddir = targetdir
         while True:
-            spl = os.path.split(createddir)[0]     
+            spl = os.path.split(createddir)[0]
             if not os.path.isdir(spl):
                 break
             createddir = spl
@@ -162,16 +164,19 @@ def clone_github_project(gitexe: str, githubdir: str, author: str, project: str,
         ok = safe_call([gitexe, 'clone', url], cwd=targetdir, shell=True)
         if ok:
             break
-        alert('git clone failed, retrying ({}/{})...'.format(retries+1,_MAX_RETRIES))
+        alert('git clone failed, retrying ({}/{})...'.format(retries + 1, _MAX_RETRIES))
     abort_if_not(ok)
     info('{} successfully cloned'.format(author, targetdir))
     if createddir and adjustpermissions:
-       user = os.environ['userdomain']+'\\'+os.environ['username']
-       cmd2 = ['icacls', createddir, '/setowner', user, '/t', '/l']
-       info('Adjusting permissions of {}...'.format(createddir))
-       ok = safe_call(cmd2,shell=True)
-       if not ok:
-           alert('Cannot adjust permissions on created folder {} (error in command {}), you may need to deal with it yourself'.format(createddir,str(cmd2)))
+        user = os.environ['userdomain'] + '\\' + os.environ['username']
+        cmd2 = ['icacls', createddir, '/setowner', user, '/t', '/l']
+        info('Adjusting permissions of {}...'.format(createddir))
+        ok = safe_call(cmd2, shell=True)
+        if not ok:
+            alert(
+                'Cannot adjust permissions on created folder {} (error in command {}), you may need to deal with it yourself'.format(
+                    createddir, str(cmd2)))
+
 
 ### specific installers
 
@@ -210,7 +215,7 @@ def _install_vs_build_tools() -> None:
 
 def install_sanguine_prerequisites() -> None:
     gitexe = find_command_location(['git', '--version'])
-    abort_if_not(gitexe)
+    abort_if_not(gitexe is not None)
     _install_vs_build_tools()  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:
