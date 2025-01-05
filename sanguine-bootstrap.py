@@ -8,7 +8,7 @@ sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 from sanguine.install.install_common import *
 from sanguine.install.install_helpers import (run_installer, download_file_nice_name,
                                               message_box, input_box, clone_github_project, safe_call,
-                                              safe_call_with_double_check)
+                                              find_command_location)
 from sanguine.install.simple_download import pattern_from_url
 
 safe_call(['echo', 'Starting', sys.argv[0], '...'],
@@ -21,7 +21,8 @@ if choice == 'no':
     sys.exit()
 
 ### download and install python
-if safe_call(['py', '--version'], shell=True):
+pyexe = find_command_location(['py', '--version'], shell=True)
+if pyexe:
     info('py found, no need to download and install python')
 else:
     info('py not found, will try to download and install python')
@@ -33,13 +34,16 @@ else:
     run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
                   'Installing python... Installer runs in silent mode and may take up to 5 minutes.')
     info('Python installer finished.')
-    abort_if_not(safe_call_with_double_check(['py', '--version'], shell=True))
+
+    pyexe = find_command_location(['py', '--version'], shell=True)
+    abort_if_not(pyexe)
     info('Python is available now.')
 
-if safe_call_with_double_check(['git', '--version']):
-    info('git found, no need to download and install git')
+gitexe = find_command_location(['git', '--version'])
+if gitexe:
+    info('git found, no need to download and install it')
 else:
-    info('git not found, need to download and install git')
+    info('git not found, will try to download and install it')
     tags = pattern_from_url('https://gitforwindows.org/',
                             r'https://github.com/git-for-windows/git/releases/tag/([a-zA-Z0-9.]*)"')
     abort_if_not(len(tags) == 1)
@@ -53,7 +57,8 @@ else:
     run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com',
                   'Installing git... Installer runs in silent mode and may take up to 5 minutes.')
     info('Git installer finished.')
-    abort_if_not(safe_call_with_double_check(['git', '--version'], shell=True))
+    gitexe = find_command_location(['git', '--version'], shell=True)
+    abort_if_not(gitexe)
     info('Git is available now.')
 
 skiprepo = False
@@ -77,7 +82,7 @@ while True:
 
 sanguinedir = githubdir + '\\modders-anonymous\\sanguine-rose'
 if not skiprepo:
-    clone_github_project(githubdir, 'modders-anonymous', 'sanguine-rose')
+    clone_github_project(gitexe, githubdir, 'modders-anonymous', 'sanguine-rose')
 
 info(
     'Bootstrapping completed. Now you do not need {} anymore, and should use scripts in {} instead.'.format(sys.argv[0],
@@ -90,4 +95,4 @@ if choice == 'no':
 else:
     cmd = '{}\\sanguine-install-dependencies.py'.format(sanguinedir)
     info('Running {}...'.format(cmd))
-    ok = safe_call_with_double_check(['py', cmd], shell=True)
+    ok = safe_call([pyexe, cmd], shell=True)
