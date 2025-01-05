@@ -52,6 +52,15 @@ def safe_call(cmd: list[str], shell: bool = False) -> bool:
         return False
 
 
+def safe_call_with_double_check(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
+    if safe_call(cmd, shell=shell):
+        return True
+    try:
+        return subprocess.call(['start', '/I'] + cmd, shell=True, cwd=cwd) == 0
+    except OSError:
+        return False
+
+
 ### install
 
 def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
@@ -93,7 +102,8 @@ def clone_github_project(githubdir: str, author: str, project: str) -> None:
     if not os.path.isdir(targetdir):
         os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
-    subprocess.check_call(['git', 'clone', url], cwd=targetdir,shell=True)
+    err = safe_call_with_double_check(['git', 'clone', url], cwd=targetdir, shell=True)
+    abort_if_not(err == 0)
     info('{} successfully cloned'.format(author, targetdir))
 
 

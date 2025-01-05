@@ -8,10 +8,12 @@ sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
 from sanguine.install.install_helpers import (run_installer, download_file_nice_name,
-                                              message_box, input_box, clone_github_project, safe_call)
+                                              message_box, input_box, clone_github_project, safe_call,
+                                              safe_call_with_double_check)
 from sanguine.install.simple_download import pattern_from_url
 
-safe_call(['sanguine.nonexistent'])  # for a mystical reason, it solves console color issues
+safe_call(['echo', 'Starting {}...'.format(sys.argv[0])],
+          shell=True)  # for a mystical reason, it solves console color issues
 
 critical('This will install sanguine-rose from scratch, including, if necessary, installing python.')
 choice = message_box('Do you want to proceed?', ['Yes', 'no'])
@@ -52,7 +54,7 @@ else:
     run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com',
                   'Installing git... It runs in silent mode and may take up to 5 minutes.')
     info('Git installer finished.')
-    abort_if_not(safe_call(['git', '--version'], shell=True))
+    abort_if_not(safe_call_with_double_check(['git', '--version'], shell=True))
     info('Git is available now.')
 
 skiprepo = False
