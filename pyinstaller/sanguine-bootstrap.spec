@@ -2,7 +2,7 @@
 
 
 a = Analysis(
-    ['..\\..\\sanguine-bootstrap.py'],
+    ['..\\sanguine-bootstrap.py'],
     pathex=[],
     binaries=[],
     datas=[],

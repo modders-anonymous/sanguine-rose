@@ -1,0 +1,1 @@
+pyinstaller ..\sanguine-bootstrap.py
