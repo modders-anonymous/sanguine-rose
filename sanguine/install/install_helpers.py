@@ -140,12 +140,20 @@ def download_file_nice_name(url: str) -> str:
     return new_fname
 
 
-def clone_github_project(gitexe: str, githubdir: str, author: str, project: str) -> None:
+def clone_github_project(gitexe: str, githubdir: str, author: str, project: str, adjustpermissions: bool=False) -> None:
     if not githubdir.endswith('\\'):
         githubdir += '\\'
     targetdir = githubdir + author
     abort_if_not(not os.path.exists(targetdir + '\\' + project))
+
+    createddir = None # we need it to adjust permissions properly
     if not os.path.isdir(targetdir):
+        createddir = targetdir
+        while True:
+            spl = os.path.split(createddir)[0]     
+            if not os.path.isdir(spl):
+                break
+            createddir = spl
         os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
     _MAX_RETRIES = 3
@@ -157,7 +165,13 @@ def clone_github_project(gitexe: str, githubdir: str, author: str, project: str)
         alert('git clone failed, retrying ({}/{})...'.format(retries+1,_MAX_RETRIES))
     abort_if_not(ok)
     info('{} successfully cloned'.format(author, targetdir))
-
+    if createddir and adjustpermissions:
+       user = os.environ['userdomain']+'\\'+os.environ['username']
+       cmd2 = ['icacls', createddir, '/setowner', user, '/t', '/l']
+       info('Adjusting permissions of {}...'.format(createddir))
+       ok = safe_call(cmd2,shell=True)
+       if not ok:
+           alert('Cannot adjust permissions on created folder {} (error in command {}), you may need to deal with it yourself'.format(createddir,str(cmd2)))
 
 ### specific installers
 

@@ -14,6 +14,7 @@ from sanguine.install.simple_download import pattern_from_url
 safe_call(['echo', 'Starting', sys.argv[0], '...'],
           shell=True)  # for a mystical reason, launching an external process which prints something to the screen, solves console color issues
 
+
 critical('This will install sanguine-rose from scratch, including, if necessary, installing python and/or git.')
 choice = message_box('Do you want to proceed?', ['Yes', 'no'])
 if choice == 'no':
@@ -82,7 +83,7 @@ while True:
 
 sanguinedir = githubdir + '\\modders-anonymous\\sanguine-rose'
 if not skiprepo:
-    clone_github_project(gitexe, githubdir, 'modders-anonymous', 'sanguine-rose')
+    clone_github_project(gitexe, githubdir, 'modders-anonymous', 'sanguine-rose',adjustpermissions=True)
 
 info(
     'Bootstrapping completed. Now you do not need {} anymore, and should use scripts in {} instead.'.format(sys.argv[0],
