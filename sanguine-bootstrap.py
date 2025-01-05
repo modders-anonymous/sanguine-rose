@@ -26,7 +26,9 @@ else:
     abort_if_not(len(dlurl) == 1)
     info('Downloading {}...'.format(dlurl[0]))
     pyinstallexe = download_file_nice_name(dlurl[0])
-    run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org', '')
+    run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
+                  'Make sure to find permission request window in your taskbar and allow proceeding with installation.\n'
+                  + '    Afterwards, install may take up to 5 minutes.')
 
 skiprepo = False
 while True:
