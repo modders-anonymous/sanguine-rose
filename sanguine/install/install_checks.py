@@ -50,10 +50,11 @@ def report_hostile_programs() -> None:
                 'It seems that you have Norton antivirus running. It was reported to cause severe problems with modding.')
             critical('It is STRONGLY suggested to quit, uninstall Norton antivirus, reboot, and re-launch {}.'.format(
                 sys.argv[0]))
+            alert('After removing Norton antivirus, you may want to enable Windows Defender.')
             choice = message_box('Are you ok with this suggestion?',
                                  ['Yes', 'no'], level=logging.CRITICAL)
             if choice != 'no':
-                alert('Exiting.')
+                alert('Exiting. Please uninstall Norton antivirus, reboot, optionally enable Windows Defender, and re-launch {}.'.format(sys.argv[0]))
                 sys.exit(1)
 
 
