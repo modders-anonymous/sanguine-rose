@@ -1,6 +1,7 @@
 import re
 import subprocess
 import sys
+import time
 
 import sanguine.install.simple_download as simple_download
 from sanguine.install.install_checks import (REQUIRED_PIP_MODULES, check_sanguine_prerequisites,
@@ -15,10 +16,8 @@ from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkEr
 
 ### install helpers
 
-def install_pip_module(module: str, pyexe:str|None = None) -> None:
-    if pyexe is None:
-        pyexe = sys.executable
-    subprocess.check_call([pyexe, '-m', 'pip', 'install', module])
+def install_pip_module(module: str) -> None:
+    subprocess.check_call(['py', '-m', 'pip', 'install', module])
 
 
 ### install
@@ -121,7 +120,7 @@ def _install_vs_build_tools() -> None:
     os._exit(0)
 
 
-def install_sanguine_prerequisites() -> None:
+def install_sanguine_prerequisites(freshinstall: bool = False) -> None:
     gitok = find_command_and_add_to_path(['git', '--version'])
     abort_if_not(gitok)
     _install_vs_build_tools()  # should run before installing pip modules
@@ -130,4 +129,16 @@ def install_sanguine_prerequisites() -> None:
         install_pip_module(m)
         info('pip module {} successfully installed.'.format(m))
 
-    check_sanguine_prerequisites(True)
+    nleft = 3 if freshinstall else 1
+    dt = 1.
+    while True:
+        try:
+            check_sanguine_prerequisites(True)
+            break
+        except Exception as e:
+            nleft -= 1
+            if nleft == 0:
+                raise e
+            warn('Exception: {}, will wait {:1f}s'.format(e, dt))
+            time.sleep(dt)
+            dt *= 2.

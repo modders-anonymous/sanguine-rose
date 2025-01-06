@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import subprocess
 import sys
 
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
@@ -12,7 +13,7 @@ from sanguine.install.simple_download import pattern_from_url, download_temp
 from sanguine.install.install_checks import report_hostile_programs
 from sanguine.install.install_ui import message_box, input_box, confirm_box, BoxUINetworkErrorHandler, set_silent_mode
 
-__version__ = '0.1.2a'
+__version__ = '0.1.2b'
 
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
@@ -62,7 +63,7 @@ try:
         abort_if_not(pyok)
         info('Python is available now.')
 
-    install_pip_module('certifi',pyexe='py')  # we need it as a part of bootstrapping
+    install_pip_module('certifi')  # we need it as a part of bootstrapping
     # otherwise sanguine-install-dependencies won't run because of dependency of simplle_download on certifi
 
     gitok = find_command_and_add_to_path(['git', '--version'])
@@ -123,7 +124,7 @@ try:
     else:
         cmd = '{}\\sanguine-install-dependencies.py'.format(sanguinedir)
         info('Running {}...'.format(cmd))
-        ok = safe_call(['py', cmd] + sys.argv[1:], shell=True)
+        ok = subprocess.check_call(['py', cmd] + sys.argv[1:])
 except Exception as e:
     critical('Exception: {}'.format(e))
     alert(traceback.format_exc())
