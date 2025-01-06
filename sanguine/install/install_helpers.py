@@ -15,8 +15,10 @@ from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkEr
 
 ### install helpers
 
-def install_pip_module(module: str) -> None:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
+def install_pip_module(module: str, pyexe:str|None = None) -> None:
+    if pyexe is None:
+        pyexe = sys.executable
+    subprocess.check_call([pyexe, '-m', 'pip', 'install', module])
 
 
 ### install

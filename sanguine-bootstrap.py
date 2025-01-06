@@ -12,7 +12,7 @@ from sanguine.install.simple_download import pattern_from_url, download_temp
 from sanguine.install.install_checks import report_hostile_programs
 from sanguine.install.install_ui import message_box, input_box, confirm_box, BoxUINetworkErrorHandler, set_silent_mode
 
-__version__ = '0.1.2'
+__version__ = '0.1.2a'
 
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
@@ -62,7 +62,7 @@ try:
         abort_if_not(pyok)
         info('Python is available now.')
 
-    install_pip_module('certifi')  # we need it as a part of bootstrapping
+    install_pip_module('certifi',pyexe='py')  # we need it as a part of bootstrapping
     # otherwise sanguine-install-dependencies won't run because of dependency of simplle_download on certifi
 
     gitok = find_command_and_add_to_path(['git', '--version'])
