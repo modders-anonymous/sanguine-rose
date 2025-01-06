@@ -5,7 +5,7 @@ import shutil
 import tempfile
 import urllib.request
 
-from sanguine.install.install_common import abort_if_not
+from sanguine.install.install_common import abort_if_not, alert, NetworkErrorHandler
 
 # simple_download is used by _install_helpers, which means that we cannot use any files with non-guaranteed dependencies, so we:
 #                 1. may use only those Python modules installed by default, and
@@ -26,25 +26,35 @@ def pattern_from_url(url: str, pattern: str, encoding: str = 'utf-8') -> list[st
         return re.findall(pattern, html, re.IGNORECASE)
 
 
-def _download_temp(url: str) -> str:
+def _download_temp(url: str, errhandler: NetworkErrorHandler | None) -> str:
     wf, tfname = tempfile.mkstemp()
-    rq = urllib.request.Request(url=url)
-    with urllib.request.urlopen(rq) as rf:
-        while True:
-            b: bytes = rf.read(1048576)
-            if not b:
-                break
-            os.write(wf, b)
-    os.close(wf)
+    while True:
+        try:
+            rq = urllib.request.Request(url=url)
+            with urllib.request.urlopen(rq) as rf:
+                while True:
+                    b: bytes = rf.read(1048576)
+                    if not b:
+                        break
+                    os.write(wf, b)
+            os.close(wf)
+            return tfname
+        except OSError as e:
+            alert('Exception {} while downloading {}'.format(e, url))
+            os.close(wf)
 
-    return tfname
+            if errhandler is not None and errhandler.handle_error('Downloading {}'.format(url), e.errno):
+                wf = open(tfname, 'wb')
+                continue
+
+            raise e
 
 
-def download_temp(url: str) -> str:
+def download_temp(url: str, errhandler: NetworkErrorHandler | None) -> str:
     """
     Tries to preserve file name from url
     """
-    tfname = _download_temp(url)
+    tfname = _download_temp(url, errhandler)
     assert os.path.isfile(tfname)
     desired_fname = url.split('/')[-1]
     for i in range(9):

@@ -6,9 +6,9 @@ import sys
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
-from sanguine.install.install_helpers import (run_installer,
-                                              message_box, input_box, confirm_box, clone_github_project,
-                                              safe_call, find_command_and_add_to_path, set_silent_mode)
+from sanguine.install.install_helpers import (run_installer, safe_call, clone_github_project,
+                                              message_box, input_box, confirm_box, BoxUINetworkErrorHandler,
+                                              find_command_and_add_to_path, set_silent_mode)
 from sanguine.install.simple_download import pattern_from_url, download_temp
 
 try:
@@ -36,7 +36,7 @@ try:
                                  r'(https://www\.python\.org/ftp/python/3\.[0-9.]*/python-3\.[0-9.]*-amd64.exe)')
         abort_if_not(len(dlurl) == 1)
         info('Downloading {}...'.format(dlurl[0]))
-        pyinstallexe = download_temp(dlurl[0])
+        pyinstallexe = download_temp(dlurl[0], BoxUINetworkErrorHandler(2))
         run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
                       'Installing python... Installer runs in silent mode and may take up to 5 minutes.')
         info('Python installer finished.')
@@ -59,7 +59,7 @@ try:
         ver = m.group(1)
         url = 'https://github.com/git-for-windows/git/releases/download/{}/Git-{}-64-bit.exe'.format(tag, ver)
         info('Downloading {}...'.format(url))
-        gitinstallexe = download_temp(url)
+        gitinstallexe = download_temp(url, BoxUINetworkErrorHandler(2))
         run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com',
                       'Installing git... Installer runs in silent mode and may take up to 5 minutes.')
         info('Git installer finished.')
@@ -88,7 +88,8 @@ try:
 
     sanguinedir = githubdir + '\\modders-anonymous\\sanguine-rose'
     if not skiprepo:
-        clone_github_project(githubdir, 'modders-anonymous', 'sanguine-rose', adjustpermissions=True)
+        clone_github_project(githubdir, 'modders-anonymous', 'sanguine-rose',
+                             BoxUINetworkErrorHandler(2), adjustpermissions=True)
 
     info(
         'Bootstrapping completed. Now you do not need {} anymore, and should use scripts in {} instead.'.format(

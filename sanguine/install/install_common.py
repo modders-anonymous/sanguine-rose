@@ -22,6 +22,12 @@ from sanguine.install.install_logging import (debug, info, perf_warn, warn, aler
 
 ### error-handling related
 
+class NetworkErrorHandler:
+    @abstractmethod
+    def handle_error(self, op: str, errno: int) -> bool:
+        pass
+
+
 class SanguinicError(Exception):
     pass
 

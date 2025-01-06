@@ -7,16 +7,12 @@ import sanguine.install.simple_download as simple_download
 from sanguine.install._install_checks import REQUIRED_PIP_MODULES, check_sanguine_prerequisites
 from sanguine.install.install_common import *
 
-
 # for _install_helpers we cannot use any files with non-guaranteed dependencies, so we:
 #                     1. may use only those Python modules installed by default, and
 #                     2. may use only those sanguine modules which are specifically designated as install-friendly
 
 
-### helpers
-
-def _install_pip_module(module: str) -> None:
-    subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
+### 'UI' helpers
 
 
 _silent_mode: bool = False
@@ -43,7 +39,7 @@ def message_box(prompt: str, spec: list[str], level: int = logging.ERROR) -> str
                 return spec[i]
 
 
-def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
+def input_box(prompt: str, default: str, level: int = logging.ERROR) -> str:
     global _silent_mode
     log_with_level(level, '{} [{}]'.format(prompt, default))
     got = '' if _silent_mode else input()
@@ -58,6 +54,30 @@ def confirm_box(prompt: str, level: int = logging.ERROR) -> None:
     log_with_level(level, prompt)
     if not _silent_mode:
         input()
+
+
+class BoxUINetworkErrorHandler(NetworkErrorHandler):
+    initial_retries: int
+    remaining_retries: int
+
+    def __init__(self, retries: int) -> None:
+        self.initial_retries = retries
+        self.remaining_retries = retries
+
+    def handle_error(self, op: str, errno: int) -> bool:
+        self.remaining_retries -= 1
+        if self.remaining_retries <= 0:
+            choice = message_box('{} failed. Please check your Internet connection. Do you want to retry?'.format(op),
+                                 ['Yes', 'no'])
+            return choice != 'no'
+        else:
+            return True
+
+
+### install helpers
+
+def _install_pip_module(module: str) -> None:
+    subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
 
 
 def safe_call(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
@@ -132,7 +152,7 @@ def _tools_dir() -> str:
 
 
 def clone_github_project(githubdir: str, author: str, project: str,
-                         adjustpermissions: bool = False) -> None:
+                         errhandler: NetworkErrorHandler | None, adjustpermissions: bool = False) -> None:
     if not githubdir.endswith('\\'):
         githubdir += '\\'
     targetdir = githubdir + author
@@ -148,14 +168,15 @@ def clone_github_project(githubdir: str, author: str, project: str,
             createddir = spl
         os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
-    _MAX_RETRIES = 3
-    ok = False
-    for retries in range(_MAX_RETRIES):
+    while True:
         ok = safe_call(['git', 'clone', url], cwd=targetdir, shell=True)
         if ok:
             break
-        alert('git clone failed, retrying ({}/{})...'.format(retries + 1, _MAX_RETRIES))
-    abort_if_not(ok)
+        alert('git clone of {} failed'.format(url))
+        if errhandler and errhandler.handle_error('Cloning {}'.format(url), 99999):
+            continue
+        raise SanguinicError('Cloning of {} failed:'.format(url))
+
     info('{} successfully cloned'.format(author, targetdir))
     if createddir and adjustpermissions:
         user = os.environ['userdomain'] + '\\' + os.environ['username']
@@ -193,7 +214,7 @@ def _install_vs_build_tools() -> None:
     assert len(urls) == 1
     url = urls[0]
     info('Downloading {}...'.format(url))
-    exe = simple_download.download_temp(url)
+    exe = simple_download.download_temp(url, BoxUINetworkErrorHandler(2))
     info('Download complete.')
     run_installer([exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
     info('Visual C++ build tools install started.')
