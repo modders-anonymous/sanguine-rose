@@ -15,7 +15,7 @@ from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkEr
 
 ### install helpers
 
-def _install_pip_module(module: str) -> None:
+def install_pip_module(module: str) -> None:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
 
 
@@ -125,7 +125,7 @@ def install_sanguine_prerequisites() -> None:
     _install_vs_build_tools()  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:
-        _install_pip_module(m)
+        install_pip_module(m)
         info('pip module {} successfully installed.'.format(m))
 
     check_sanguine_prerequisites(True)
