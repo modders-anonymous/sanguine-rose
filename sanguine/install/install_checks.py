@@ -10,7 +10,7 @@ import sys
 from sanguine.install.install_common import *
 from sanguine.install.install_ui import message_box
 
-REQUIRED_PIP_MODULES = ['json5', 'bethesda-structs', 'pywin32', 'pyinstaller']
+REQUIRED_PIP_MODULES = ['json5', 'bethesda-structs', 'pywin32', 'certifi', 'pyinstaller']
 PIP2PYTHON_MODULE_NAME_REMAPPING = {'bethesda-structs': 'bethesda_structs', 'pywin32': ['win32api', 'win32file'],
                                     'pyinstaller': []}
 

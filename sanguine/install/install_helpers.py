@@ -72,7 +72,7 @@ def clone_github_project(githubdir: str, author: str, project: str,
             continue
         raise SanguinicError('Cloning of {} failed:'.format(url))
 
-    info('{} successfully cloned'.format(author, targetdir))
+    info('{}/{} successfully cloned'.format(author, targetdir))
     if createddir and adjustpermissions:
         user = os.environ['userdomain'] + '\\' + os.environ['username']
         cmd2 = ['icacls', createddir, '/setowner', user, '/t', '/l']

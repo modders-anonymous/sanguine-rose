@@ -1,11 +1,13 @@
 import gzip
-import os
 import re
 import shutil
+import ssl
 import tempfile
 import urllib.request
 
-from sanguine.install.install_common import abort_if_not, alert, NetworkErrorHandler
+import certifi  # some boxes won't work without it :(
+
+from sanguine.install.install_common import *
 
 # simple_download is used by _install_helpers, which means that we cannot use any files with non-guaranteed dependencies, so we:
 #                 1. may use only those Python modules installed by default, and
@@ -15,9 +17,14 @@ from sanguine.install.install_common import abort_if_not, alert, NetworkErrorHan
 _MAX_PAGE_SIZE = 1000000
 
 
+def get_url(url: str):
+    rq = urllib.request.Request(url)
+    ctx = ssl.create_default_context(cafile=certifi.where())
+    return urllib.request.urlopen(rq, context=ctx)
+
+
 def pattern_from_url(url: str, pattern: str, encoding: str = 'utf-8') -> list[str]:
-    rq = urllib.request.Request(url=url)
-    with urllib.request.urlopen(rq) as f:
+    with get_url(url) as f:
         b: bytes = f.read(_MAX_PAGE_SIZE)
         assert len(b) < _MAX_PAGE_SIZE
         if f.getheader('content-encoding') == 'gzip':
@@ -30,8 +37,7 @@ def _download_temp(url: str, errhandler: NetworkErrorHandler | None) -> str:
     wf, tfname = tempfile.mkstemp()
     while True:
         try:
-            rq = urllib.request.Request(url=url)
-            with urllib.request.urlopen(rq) as rf:
+            with get_url(url) as rf:
                 while True:
                     b: bytes = rf.read(1048576)
                     if not b:
