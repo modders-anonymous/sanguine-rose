@@ -51,7 +51,7 @@ def clone_github_project(githubdir: str, author: str, project: str,
     targetdir = githubdir + author
     abort_if_not(not os.path.exists(targetdir + '\\' + project))
 
-    createddir = None  # we need it to adjust permissions properly
+    createddir = targetdir + '\\' + project  # we need it to adjust permissions properly
     if not os.path.isdir(targetdir):
         createddir = targetdir
         while True:
