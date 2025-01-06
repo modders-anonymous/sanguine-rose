@@ -1,8 +1,11 @@
 import gzip
 import os
 import re
+import shutil
 import tempfile
 import urllib.request
+
+from sanguine.install.install_common import abort_if_not
 
 # simple_download is used by _install_helpers, which means that we cannot use any files with non-guaranteed dependencies, so we:
 #                 1. may use only those Python modules installed by default, and
@@ -23,7 +26,7 @@ def pattern_from_url(url: str, pattern: str, encoding: str = 'utf-8') -> list[st
         return re.findall(pattern, html, re.IGNORECASE)
 
 
-def download_temp(url: str) -> str:
+def _download_temp(url: str) -> str:
     wf, tfname = tempfile.mkstemp()
     rq = urllib.request.Request(url=url)
     with urllib.request.urlopen(rq) as rf:
@@ -35,3 +38,26 @@ def download_temp(url: str) -> str:
     os.close(wf)
 
     return tfname
+
+
+def download_temp(url: str) -> str:
+    """
+    Tries to preserve file name from url
+    """
+    tfname = _download_temp(url)
+    assert os.path.isfile(tfname)
+    desired_fname = url.split('/')[-1]
+    for i in range(9):
+        new_fname = os.path.split(tfname)[0] + '\\' + desired_fname
+        if i > 0:
+            new_fname += ' (' + str(i) + ')'
+        if os.path.exists(new_fname):
+            continue
+        try:
+            shutil.move(tfname, new_fname)
+            if os.path.isfile(new_fname):
+                return new_fname
+        except OSError:
+            continue
+
+        abort_if_not(os.path.isfile(tfname))

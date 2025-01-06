@@ -6,10 +6,10 @@ import sys
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
-from sanguine.install.install_helpers import (run_installer, download_file_nice_name,
+from sanguine.install.install_helpers import (run_installer,
                                               message_box, input_box, confirm_box, clone_github_project,
                                               safe_call, find_command_and_add_to_path, set_silent_mode)
-from sanguine.install.simple_download import pattern_from_url
+from sanguine.install.simple_download import pattern_from_url, download_temp
 
 try:
     safe_call(['echo', 'Starting'] + sys.argv + ['...'],
@@ -36,7 +36,7 @@ try:
                                  r'(https://www\.python\.org/ftp/python/3\.[0-9.]*/python-3\.[0-9.]*-amd64.exe)')
         abort_if_not(len(dlurl) == 1)
         info('Downloading {}...'.format(dlurl[0]))
-        pyinstallexe = download_file_nice_name(dlurl[0])
+        pyinstallexe = download_temp(dlurl[0])
         run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
                       'Installing python... Installer runs in silent mode and may take up to 5 minutes.')
         info('Python installer finished.')
@@ -59,7 +59,7 @@ try:
         ver = m.group(1)
         url = 'https://github.com/git-for-windows/git/releases/download/{}/Git-{}-64-bit.exe'.format(tag, ver)
         info('Downloading {}...'.format(url))
-        gitinstallexe = download_file_nice_name(url)
+        gitinstallexe = download_temp(url)
         run_installer([gitinstallexe, '/SP-', '/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART'], 'github.com',
                       'Installing git... Installer runs in silent mode and may take up to 5 minutes.')
         info('Git installer finished.')

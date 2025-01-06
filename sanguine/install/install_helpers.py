@@ -1,6 +1,5 @@
 import logging
 import re
-import shutil
 import subprocess
 import sys
 
@@ -132,16 +131,6 @@ def _tools_dir() -> str:
     return os.path.abspath(os.path.split(os.path.abspath(__file__))[0] + '\\..\\tools')
 
 
-def download_file_nice_name(url: str) -> str:
-    tfname = simple_download.download_temp(url)
-    desired_fname = url.split('/')[-1]
-    new_fname = os.path.split(tfname)[0] + '\\' + desired_fname
-    assert os.path.isfile(tfname)
-    shutil.move(tfname, new_fname)
-    assert os.path.isfile(new_fname)
-    return new_fname
-
-
 def clone_github_project(githubdir: str, author: str, project: str,
                          adjustpermissions: bool = False) -> None:
     if not githubdir.endswith('\\'):
@@ -204,7 +193,7 @@ def _install_vs_build_tools() -> None:
     assert len(urls) == 1
     url = urls[0]
     info('Downloading {}...'.format(url))
-    exe = download_file_nice_name(url)
+    exe = simple_download.download_temp(url)
     info('Download complete.')
     run_installer([exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
     info('Visual C++ build tools install started.')
