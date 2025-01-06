@@ -69,9 +69,14 @@ def safe_call(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bo
         return False
 
 
-def find_command_location(cmd: list[str], shell: bool = False) -> str | None:
+def find_command_and_add_to_path(cmd: list[str], shell: bool = False) -> bool:
+    """
+    adjusts PATH environment variable to include a command if necessary
+    it will be inherited by child processes too
+    :return: success
+    """
     if safe_call(cmd, shell=shell):
-        return cmd[0]
+        return True
 
     warn('Cannot run {} using current PATH, will try looking for PATH in registry...'.format(cmd[0]))
     out = subprocess.check_output(
@@ -79,43 +84,27 @@ def find_command_location(cmd: list[str], shell: bool = False) -> str | None:
     out = out.decode('ascii')
     # print('out:'+out+'\n')
     m = re.search(r'\s*PATH\s*REG_EXPAND_SZ\s*(.*)', out)
-    if m:
-        reg_path = m.group(1).lower()
-        # print(reg_path+'\n')
-        for e in os.environ.keys():
-            subst = '%' + e.lower() + '%'
-            # print(subst+'->'+os.environ[e])
-            reg_path = reg_path.replace(subst, os.environ[e])
-        # print(reg_path+'\n')
-        reg_path_split = reg_path.split(';')
-        reg_path_split = [p.strip().lower() for p in reg_path_split]
-        env_path = os.environ['PATH'].lower()
-        env_path_split = env_path.split(';')
-        env_path_split = [p.strip() for p in env_path_split]
-        remainder = []
-        for d in reg_path_split:
-            if d not in env_path_split:
-                remainder.append(d)
-        for d in remainder:
-            info('Found recently appended PATH in registry: {}'.format(d))
-            if not d.endswith('\\'):
-                d += '\\'
-            cmd1 = [d + cmd[0]] + cmd[1:]
-            # print(cmd1)
-            if safe_call(cmd1, shell=shell):
-                return cmd1[0]
+    if m and len(m.group(1)) > len(os.environ['PATH']):
+        info('registry PATH was recently changed, trying with registry PATH')
+        os.environ['PATH'] = m.group(1)
+        if safe_call(cmd, shell=shell):
+            info('registry PATH did the trick')
+            return True
 
     # last resort: direct search in Program Files
     warn('Cannot run {} using registry PATH, will try looking for executable in Program Files...'.format(cmd[0]))
-    pf = os.environ['ProgramFiles']
-    for curdir, _, files in os.walk(pf):
-        for f in files:
-            fname, fext = os.path.splitext(f)
-            if fname == cmd[0] and (fext == '.exe' or fext == '.bat'):
-                cmd1 = [curdir + '\\' + cmd[0]] + cmd[1:]
-                if safe_call(cmd1, shell=shell):
-                    return cmd1[0]
-    return None
+    for pf in [os.environ['ProgramFiles'], os.environ['ProgramFiles(x86)']]:
+        for curdir, _, files in os.walk(pf):
+            for f in files:
+                fname, fext = os.path.splitext(f)
+                if fname == cmd[0] and (fext == '.exe' or fext == '.bat'):
+                    info('found {} in {}, prepending it to PATH...'.format(cmd[0], pf))
+                    os.environ['PATH'] = curdir + ';' + os.environ['PATH']
+                    if safe_call(cmd, shell=shell):
+                        info('Adding {} to PATH did the trick'.format(curdir))
+                        return True
+    warn('My heuristics exhausted, cannot find {} to run'.format(cmd[0]))
+    return False
 
 
 ### install
@@ -153,7 +142,7 @@ def download_file_nice_name(url: str) -> str:
     return new_fname
 
 
-def clone_github_project(gitexe: str, githubdir: str, author: str, project: str,
+def clone_github_project(githubdir: str, author: str, project: str,
                          adjustpermissions: bool = False) -> None:
     if not githubdir.endswith('\\'):
         githubdir += '\\'
@@ -173,7 +162,7 @@ def clone_github_project(gitexe: str, githubdir: str, author: str, project: str,
     _MAX_RETRIES = 3
     ok = False
     for retries in range(_MAX_RETRIES):
-        ok = safe_call([gitexe, 'clone', url], cwd=targetdir, shell=True)
+        ok = safe_call(['git', 'clone', url], cwd=targetdir, shell=True)
         if ok:
             break
         alert('git clone failed, retrying ({}/{})...'.format(retries + 1, _MAX_RETRIES))
@@ -226,8 +215,8 @@ def _install_vs_build_tools() -> None:
 
 
 def install_sanguine_prerequisites() -> None:
-    gitexe = find_command_location(['git', '--version'])
-    abort_if_not(gitexe is not None)
+    gitok = find_command_and_add_to_path(['git', '--version'])
+    abort_if_not(gitok)
     _install_vs_build_tools()  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:
