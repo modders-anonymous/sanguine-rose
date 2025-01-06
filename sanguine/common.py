@@ -6,7 +6,7 @@ from bisect import bisect_right
 from stat import S_ISREG, S_ISLNK
 
 # noinspection PyUnresolvedReferences, PyProtectedMember
-from sanguine.install._install_checks import check_sanguine_prerequisites
+from sanguine.install.install_checks import check_sanguine_prerequisites
 from sanguine.install.install_common import *
 
 

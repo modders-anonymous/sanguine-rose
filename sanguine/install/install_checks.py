@@ -1,10 +1,14 @@
 import importlib
+import logging
+import re
 import subprocess
+import sys
 
 # for install_checks we cannot use any files with non-guaranteed dependencies, so we:
 #                    1. may use only those Python modules installed by default, and
 #                    2. may use only those sanguine modules which are specifically designated as install-friendly
 from sanguine.install.install_common import *
+from sanguine.install.install_ui import message_box
 
 REQUIRED_PIP_MODULES = ['json5', 'bethesda-structs', 'pywin32', 'pyinstaller']
 PIP2PYTHON_MODULE_NAME_REMAPPING = {'bethesda-structs': 'bethesda_structs', 'pywin32': ['win32api', 'win32file'],
@@ -31,7 +35,33 @@ def _check_module(m: str) -> None:
         _not_installed('Module {} is not installed.'.format(m))
 
 
+def report_hostile_programs() -> None:
+    try:
+        tasklist = subprocess.check_output(['tasklist'])
+        tasklist = tasklist.decode('ascii')
+    except OSError:
+        alert('Cannot run tasklist: hostile program detection may not work')
+        tasklist = None
+
+    if tasklist:
+        norton = re.search('nortonsecurity.exe', tasklist, re.IGNORECASE)
+        if norton:
+            critical(
+                'It seems that you have Norton antivirus running. It was reported to cause severe problems with modding.')
+            critical('It is STRONGLY suggested to quit, uninstall Norton antivirus, reboot, and re-launch {}.'.format(
+                sys.argv[0]))
+            choice = message_box('Are you ok with this suggestion?',
+                                 ['Yes', 'no'], level=logging.CRITICAL)
+            if choice != 'no':
+                alert('Exiting.')
+                sys.exit(1)
+
+
 def check_sanguine_prerequisites(frominstall: bool = False) -> None:
+    if not sys.version_info >= (3, 10):
+        critical('Sorry, sanguine-rose needs at least Python 3.10')
+        sys.exit(1)
+
     # we don't really need to check for MSVC being installed, as without it some of the pip modules won't be available
 
     for m in REQUIRED_PIP_MODULES:
@@ -53,5 +83,7 @@ def check_sanguine_prerequisites(frominstall: bool = False) -> None:
             ))
         # noinspection PyProtectedMember, PyUnresolvedReferences
         os._exit(1)
+
+    report_hostile_programs()
 
     info('All sanguine prerequisites are ok.')

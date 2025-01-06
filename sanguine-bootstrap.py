@@ -7,15 +7,18 @@ sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
 from sanguine.install.install_helpers import (run_installer, safe_call, clone_github_project,
-                                              message_box, input_box, confirm_box, BoxUINetworkErrorHandler,
-                                              find_command_and_add_to_path, set_silent_mode)
+                                              find_command_and_add_to_path)
 from sanguine.install.simple_download import pattern_from_url, download_temp
+from sanguine.install.install_checks import report_hostile_programs
+from sanguine.install.install_ui import message_box, input_box, confirm_box, BoxUINetworkErrorHandler, set_silent_mode
 
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
 
     safe_call(['echo', 'Starting'] + sys.argv + ['...'],
               shell=True)  # for a mystical reason, launching an external process which prints something to the screen, solves console color issues
+
+    report_hostile_programs()
 
     for arg in sys.argv[1:]:
         if arg.lower() == '/silent':
