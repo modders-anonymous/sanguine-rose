@@ -162,10 +162,9 @@ def clone_github_project(githubdir: str, author: str, project: str,
     if not os.path.isdir(targetdir):
         createddir = targetdir
         while True:
-            spl = os.path.split(createddir)[0]
-            if not os.path.isdir(spl):
+            createddir = os.path.split(createddir)[0]
+            if not os.path.isdir(createddir):
                 break
-            createddir = spl
         os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
     while True:

@@ -142,13 +142,17 @@ _ex_logging: bool = False
 def add_file_logging(fpath: str) -> None:
     global _logger, _logger_file_handler
     assert _logger_file_handler is None
-    _logger_file_handler = _HtmlFileHandler(fpath)
-    _logger_file_handler.setLevel(logging.DEBUG if __debug__ else logging.INFO)
-    _logger_file_handler.setFormatter(_SanguineHtmlFileFormatter())
-    if _ex_logging:
-        assert isinstance(_logger_file_handler.formatter, _SanguineHtmlFileFormatter)
-        _logger_file_handler.formatter.enable_ex_logging()
-    _logger.addHandler(_logger_file_handler)
+    try:
+        _logger_file_handler = _HtmlFileHandler(fpath)
+        _logger_file_handler.setLevel(logging.DEBUG if __debug__ else logging.INFO)
+        _logger_file_handler.setFormatter(_SanguineHtmlFileFormatter())
+        if _ex_logging:
+            assert isinstance(_logger_file_handler.formatter, _SanguineHtmlFileFormatter)
+            _logger_file_handler.formatter.enable_ex_logging()
+        _logger.addHandler(_logger_file_handler)
+    except OSError as e:
+        alert('Exception {} while trying to enable file logging, will continue without file logging'.format(e))
+        _logger_file_handler = None
 
 
 def enable_ex_logging() -> None:

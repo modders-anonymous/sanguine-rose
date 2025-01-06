@@ -12,6 +12,8 @@ from sanguine.install.install_helpers import (run_installer, safe_call, clone_gi
 from sanguine.install.simple_download import pattern_from_url, download_temp
 
 try:
+    add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
+
     safe_call(['echo', 'Starting'] + sys.argv + ['...'],
               shell=True)  # for a mystical reason, launching an external process which prints something to the screen, solves console color issues
 
