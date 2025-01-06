@@ -20,13 +20,22 @@ def _install_pip_module(module: str) -> None:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
 
 
-def message_box(prompt: str, spec: list[str], level: int = logging.CRITICAL) -> str:
+_silent_mode: bool = False
+
+
+def set_silent_mode() -> None:
+    global _silent_mode
+    _silent_mode = True
+
+
+def message_box(prompt: str, spec: list[str], level: int = logging.ERROR) -> str:
+    global _silent_mode
     assert len(spec) > 0
     assert len(set([s[0].lower() for s in spec])) == len(spec)
     specstr = '/'.join(spec)
     while True:
         log_with_level(level, '{} ({})'.format(prompt, specstr))
-        got = input().lower().strip()
+        got = '' if _silent_mode else input().lower().strip()
         if got == '':
             log_with_level(level, spec[0])
             return spec[0]
@@ -36,8 +45,9 @@ def message_box(prompt: str, spec: list[str], level: int = logging.CRITICAL) -> 
 
 
 def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
+    global _silent_mode
     log_with_level(level, '{} [{}]'.format(prompt, default))
-    got = input()
+    got = '' if _silent_mode else input()
     if got.strip() == '':
         log_with_level(level, default)
         return default
@@ -45,8 +55,10 @@ def input_box(prompt: str, default: str, level: int = logging.CRITICAL) -> str:
 
 
 def confirm_box(prompt: str, level: int = logging.ERROR) -> None:
+    global _silent_mode
     log_with_level(level, prompt)
-    input()
+    if not _silent_mode:
+        input()
 
 
 def safe_call(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
@@ -109,11 +121,11 @@ def find_command_location(cmd: list[str], shell: bool = False) -> str | None:
 ### install
 
 def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
-    critical("We're about to run the following installer: {}".format(cmd[0]))
-    warn("It was downloaded from {}".format(sitefrom))
-    warn("Feel free to run it through your favorite virus checker,")
-    warn("     but when, after entering 'Y' below, Windows will ask you stupid questions,")
-    critical("     please make sure to tell Windows that you're ok with it")
+    alert("We're about to run the following installer: {}".format(cmd[0]))
+    info("It was downloaded from {}".format(sitefrom))
+    info("Feel free to run it through your favorite virus checker,")
+    info("     but when, after entering 'Y' below, Windows will ask you stupid questions,")
+    alert("     please make sure to tell Windows that you're ok with it")
 
     choice = message_box('Do you want to proceed?', ['Yes', 'no'])
     if choice == 'no':
@@ -122,7 +134,7 @@ def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
         os._exit(1)
 
     if msg:
-        critical(msg)
+        alert(msg)
 
     subprocess.check_call(cmd, shell=True)
 
