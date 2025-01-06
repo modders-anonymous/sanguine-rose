@@ -3,7 +3,8 @@ import subprocess
 import sys
 
 import sanguine.install.simple_download as simple_download
-from sanguine.install.install_checks import REQUIRED_PIP_MODULES, check_sanguine_prerequisites
+from sanguine.install.install_checks import (REQUIRED_PIP_MODULES, check_sanguine_prerequisites,
+                                             safe_call, find_command_and_add_to_path)
 from sanguine.install.install_common import *
 from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkErrorHandler
 
@@ -16,52 +17,6 @@ from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkEr
 
 def _install_pip_module(module: str) -> None:
     subprocess.check_call([sys.executable, '-m', 'pip', 'install', module])
-
-
-def safe_call(cmd: list[str], shell: bool = False, cwd: str | None = None) -> bool:
-    try:
-        ret = subprocess.call(cmd, shell=shell, cwd=cwd)
-        return ret == 0
-    except OSError:
-        return False
-
-
-def find_command_and_add_to_path(cmd: list[str], shell: bool = False) -> bool:
-    """
-    adjusts PATH environment variable to include a command if necessary
-    it will be inherited by child processes too
-    :return: success
-    """
-    if safe_call(cmd, shell=shell):
-        return True
-
-    warn('Cannot run {} using current PATH, will try looking for PATH in registry...'.format(cmd[0]))
-    out = subprocess.check_output(
-        ['reg', 'query', 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\Environment', '/v', 'PATH'])
-    out = out.decode('ascii')
-    # print('out:'+out+'\n')
-    m = re.search(r'\s*PATH\s*REG_EXPAND_SZ\s*(.*)', out)
-    if m and len(m.group(1)) > len(os.environ['PATH']):
-        info('registry PATH was recently changed, trying with registry PATH')
-        os.environ['PATH'] = m.group(1)
-        if safe_call(cmd, shell=shell):
-            info('registry PATH did the trick')
-            return True
-
-    # last resort: direct search in Program Files
-    warn('Cannot run {} using registry PATH, will try looking for executable in Program Files...'.format(cmd[0]))
-    for pf in [os.environ['ProgramFiles'], os.environ['ProgramFiles(x86)']]:
-        for curdir, _, files in os.walk(pf):
-            for f in files:
-                fname, fext = os.path.splitext(f)
-                if fname == cmd[0] and (fext == '.exe' or fext == '.bat'):
-                    info('found {} in {}, prepending it to PATH...'.format(cmd[0], pf))
-                    os.environ['PATH'] = curdir + ';' + os.environ['PATH']
-                    if safe_call(cmd, shell=shell):
-                        info('Adding {} to PATH did the trick'.format(curdir))
-                        return True
-    warn('My heuristics exhausted, cannot find {} to run'.format(cmd[0]))
-    return False
 
 
 ### install
@@ -100,13 +55,16 @@ def clone_github_project(githubdir: str, author: str, project: str,
     if not os.path.isdir(targetdir):
         createddir = targetdir
         while True:
-            createddir = os.path.split(createddir)[0]
-            if not os.path.isdir(createddir):
+            spl = os.path.split(createddir)[0]
+            if os.path.isdir(spl):
                 break
+            createddir = spl
         os.makedirs(targetdir)
     url = 'https://github.com/{}/{}.git'.format(author, project)
+    cmd = ['git', 'clone', url]
+    info(' '.join(cmd))
     while True:
-        ok = safe_call(['git', 'clone', url], cwd=targetdir, shell=True)
+        ok = safe_call(cmd, cwd=targetdir, shell=True)
         if ok:
             break
         alert('git clone of {} failed'.format(url))
