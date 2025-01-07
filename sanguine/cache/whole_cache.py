@@ -1,3 +1,8 @@
+import sys
+import os
+sys.path.append(os.path.split(os.path.abspath(__file__))[0]+'\\..\\..')
+
+
 import sanguine.tasks as tasks
 from sanguine.cache.available_files import FileRetriever, AvailableFiles
 from sanguine.cache.folder_cache import FileOnDisk, FolderCache
@@ -77,14 +82,20 @@ class WholeCache:
 if __name__ == '__main__':
     import sys
     import time
+    from sanguine.install.install_helpers import clone_github_project
+    from sanguine.install.install_ui import BoxUINetworkErrorHandler
 
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
         ttmppath = normalize_dir_path('../../../sanguine.tmp\\')
+        if not os.path.isdir(ttmppath):
+            os.makedirs(ttmppath)
+        if not os.path.isdir('../../../KTAGirl/KTA'):
+            clone_github_project('../../..','KTAGirl','KTA',BoxUINetworkErrorHandler(2))
         add_file_logging(ttmppath + 'sanguine.log.html')
         enable_ex_logging()
         check_sanguine_prerequisites()
 
-        cfgfname = normalize_file_path('../../../KTA\\KTA.json5')
+        cfgfname = normalize_file_path('../../../KTAGirl/KTA\\KTA.json5')
         cfg = ProjectConfig(cfgfname)
 
         wcache = WholeCache('KTAGirl', cfg)
