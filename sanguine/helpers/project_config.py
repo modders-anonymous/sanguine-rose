@@ -4,6 +4,8 @@ import json5
 
 from sanguine.common import *
 from sanguine.helpers.plugin_handler import load_plugins
+from sanguine.install.install_helpers import github_project_dir, clone_github_project, github_project_exists
+from sanguine.install.install_ui import BoxUINetworkErrorHandler
 
 
 def _normalize_config_dir_path(path: str, configdir: str) -> str:  # relative to config dir
@@ -148,6 +150,8 @@ class ProjectConfig:
     download_dirs: list[str]
     cache_dir: str
     tmp_dir: str
+    github_root_dir: str
+    game_root_dir: str
     github_folders: list[GithubFolder]
     own_mod_names: list[str]
 
@@ -202,9 +206,23 @@ class ProjectConfig:
             abort_if_not(isinstance(gh, list),
                          lambda: "'gh' in config must be a string or a list, got " + repr(gh))
             self.github_folders = [_load_github_folder(gf) for gf in gh]
-            assert 'githubroot' in jsonconfig
-            self.github_root = config_dir_path(jsonconfig['githubroot'], self.config_dir, jsonconfig)
-
+            self.github_root_dir = config_dir_path(jsonconfig.get('githubroot', '..\\..\\'), self.config_dir,
+                                                   jsonconfig)
+            abort_if_not('gameroot' in jsonconfig)
+            gameroot = jsonconfig['gameroot'].split('/')
+            abort_if_not(len(gameroot) == 2)
+            self.game_root_dir = github_project_dir(self.github_root_dir, gameroot[0], gameroot[1])
+            ok = github_project_exists(self.github_root_dir, gameroot[0], gameroot[1])
+            if ok == 1:
+                pass
+            elif ok == 0:
+                clone_github_project(self.github_root_dir, gameroot[0], gameroot[1], BoxUINetworkErrorHandler(2))
+            else:
+                assert ok == -1
+                critical(
+                    'Fatal error: folder {} exists, but does not contain {}/{}'.format(self.game_root_dir, gameroot[0],
+                                                                                       gameroot[1]))
+                abort_if_not(False)
             self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
 
     '''

@@ -7,17 +7,22 @@ import sys
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
-from sanguine.install.install_helpers import (run_installer, safe_call, clone_github_project,
+from sanguine.install.install_helpers import (run_installer, safe_call,
+                                              github_project_dir, github_project_exists, clone_github_project,
                                               find_command_and_add_to_path)
 from sanguine.install.simple_download import pattern_from_url, download_temp
 from sanguine.install.install_checks import report_hostile_programs
-from sanguine.install.install_ui import message_box, input_box, confirm_box, BoxUINetworkErrorHandler, set_silent_mode
+from sanguine.install.install_ui import (message_box, input_box, confirm_box,
+                                         BoxUINetworkErrorHandler, set_silent_mode)
 
-__version__ = '0.1.3a'
+__version__ = '0.1.3b'
 # TODO: eat pre-prompt input using msvcrt.kbhit()
 # TODO: progress or at least "I'm alive" pseudo-progress while downloading/installing
 # TODO: consider [optional] install of GitHub Desktop (to install-dependencies.py?)
 # TODO: icacls replacement (apparently, icacls is not always available); try https://stackoverflow.com/a/27500472/28537706
+
+_MODDERS_ANONYMOUS = 'modders-anonymous'
+_SANGUINE_ROSE = 'sanguine-rose'
 
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
@@ -84,32 +89,33 @@ try:
 
     skiprepo = False
     while True:
-        githubdir = input_box('Where do you want to install Github projects (including sanguine-rose)?',
+        githubdir = input_box('Where do you want to keep your Github projects (including sanguine-rose)?',
                               'C:\\Modding\\GitHub', level=logging.ERROR)
         if os.path.isdir(githubdir):
-            sanguinedir = githubdir + '\\modders-anonymous\\sanguine-rose'
-            sanguinelitmusdir = sanguinedir + '\\sanguine'
-            if os.path.isdir(sanguinelitmusdir):
+            ok = github_project_exists(githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE)
+            if ok == 1:
                 info(
-                    'It seems that you already have sanguine-rose cloned. Will proceed without cloning sanguine-rose.')
+                    'It seems that you already have {} cloned. Will proceed without cloning {}.'.format(_SANGUINE_ROSE,
+                                                                                                        _SANGUINE_ROSE))
                 skiprepo = True
                 break
-            if os.path.isdir(sanguinedir):
-                alert('Folder {} already exists. Please choose another folder for GitHub projects.')
+            if ok == -1:
+                alert('Folder {}\\{}\\{} already exists. Please choose another folder for GitHub projects.'.format(
+                    githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE))
             else:
+                assert ok == 0
                 break
         else:
             break
 
-    sanguinedir = githubdir + '\\modders-anonymous\\sanguine-rose'
     if not skiprepo:
-        clone_github_project(githubdir, 'modders-anonymous', 'sanguine-rose',
+        clone_github_project(githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE,
                              BoxUINetworkErrorHandler(2), adjustpermissions=True)
 
+    sanguinedir = github_project_dir(githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE)
     info(
         'Bootstrapping completed. Now you do not need {} anymore, and should use scripts in {} instead.'.format(
-            sys.argv[0],
-            sanguinedir))
+            sys.argv[0], sanguinedir))
     info('You still need to run {}\\sanguine-install-dependencies.py'.format(sanguinedir))
     choice = message_box('Do you want to run it now?', ['Yes', 'no'], level=logging.ERROR)
     if choice == 'no':

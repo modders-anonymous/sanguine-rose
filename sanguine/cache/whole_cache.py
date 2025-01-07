@@ -1,7 +1,5 @@
-import sys
 import os
-sys.path.append(os.path.split(os.path.abspath(__file__))[0]+'\\..\\..')
-
+import sys
 
 import sanguine.tasks as tasks
 from sanguine.cache.available_files import FileRetriever, AvailableFiles
@@ -28,7 +26,7 @@ class WholeCache:
         except Exception as e:
             warn('WholeCache: cannot load cachedata from {}: {}'.format(self.cache_data_fname, e))
             self.cache_data = {}
-        self.available = AvailableFiles(by, projectcfg.cache_dir, projectcfg.tmp_dir, projectcfg.github_root,
+        self.available = AvailableFiles(by, projectcfg.cache_dir, projectcfg.tmp_dir, projectcfg.game_root_dir,
                                         projectcfg.download_dirs, projectcfg.github_folders, self.cache_data)
 
         folderstocache: FolderListToCache = projectcfg.active_vfs_folders()
@@ -90,7 +88,7 @@ if __name__ == '__main__':
         if not os.path.isdir(ttmppath):
             os.makedirs(ttmppath)
         if not os.path.isdir('../../../../KTAGirl/KTA'):
-            clone_github_project('../../../../','KTAGirl','KTA',BoxUINetworkErrorHandler(2))
+            clone_github_project('../../../../', 'KTAGirl', 'KTA', BoxUINetworkErrorHandler(2))
         add_file_logging(ttmppath + 'sanguine.log.html')
         enable_ex_logging()
         check_sanguine_prerequisites()
