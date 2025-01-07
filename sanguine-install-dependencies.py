@@ -9,8 +9,12 @@ from sanguine.install.install_helpers import install_sanguine_prerequisites
 from sanguine.install.install_ui import confirm_box, set_silent_mode
 from sanguine.install.install_logging import info, critical, alert, add_file_logging
 
+__version__ = '0.1.0'
+
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
+
+    info('sanguine-install-dependencies.py version {}...'.format(__version__))
 
     for arg in sys.argv[1:]:
         if arg.lower() == '/silent':
