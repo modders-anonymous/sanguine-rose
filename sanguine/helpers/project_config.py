@@ -185,10 +185,10 @@ class ProjectConfig:
 
             self.mod_manager_config.parse_config_section(mmc_config, self.config_dir, jsonconfig, self.download_dirs)
 
-            self.cache_dir = config_dir_path(jsonconfig.get('cache', self.config_dir + '..\\sanguine.cache\\'),
+            self.cache_dir = config_dir_path(jsonconfig.get('cache', self.config_dir + '..\\..\\sanguine.cache\\'),
                                              self.config_dir,
                                              jsonconfig)
-            self.tmp_dir = config_dir_path(jsonconfig.get('tmp', self.config_dir + '..\\sanguine.tmp\\'),
+            self.tmp_dir = config_dir_path(jsonconfig.get('tmp', self.config_dir + '..\\..\\sanguine.tmp\\'),
                                            self.config_dir,
                                            jsonconfig)
 
