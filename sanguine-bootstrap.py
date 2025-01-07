@@ -8,12 +8,12 @@ sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
 from sanguine.install.install_helpers import (run_installer, safe_call, clone_github_project,
-                                              find_command_and_add_to_path, install_pip_module)
+                                              find_command_and_add_to_path)
 from sanguine.install.simple_download import pattern_from_url, download_temp
 from sanguine.install.install_checks import report_hostile_programs
 from sanguine.install.install_ui import message_box, input_box, confirm_box, BoxUINetworkErrorHandler, set_silent_mode
 
-__version__ = '0.1.2b'
+__version__ = '0.1.3'
 
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
@@ -23,13 +23,6 @@ try:
 
     info('Sanguine bootstrapper version {}...'.format(__version__))
     info('Bootstrapper .exe Python version: {}'.format(sys.version))
-    # info(str(ssl.get_default_verify_paths()))
-
-    # rq = urllib.request.Request(url='https://python.org/')
-    # with urllib.request.urlopen(rq) as f:
-    #    pass
-    # with get_url('https://python.org/'):
-    #    pass
 
     report_hostile_programs()
 
@@ -62,9 +55,6 @@ try:
         pyok = find_command_and_add_to_path(['py', '--version'], shell=True)
         abort_if_not(pyok)
         info('Python is available now.')
-
-    install_pip_module('certifi')  # we need it as a part of bootstrapping
-    # otherwise sanguine-install-dependencies won't run because of dependency of simplle_download on certifi
 
     gitok = find_command_and_add_to_path(['git', '--version'])
     if gitok:
@@ -124,7 +114,8 @@ try:
     else:
         cmd = '{}\\sanguine-install-dependencies.py'.format(sanguinedir)
         info('Running {}...'.format(cmd))
-        ok = subprocess.check_call(['py', cmd] + sys.argv[1:])
+        ok = subprocess.check_call(
+            ['py', cmd] + sys.argv[1:])  # should not use shell=True here, seems to cause trouble on the very first run
 except Exception as e:
     critical('Exception: {}'.format(e))
     alert(traceback.format_exc())

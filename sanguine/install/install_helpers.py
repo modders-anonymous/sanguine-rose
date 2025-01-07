@@ -1,11 +1,8 @@
 import re
 import subprocess
 import sys
-import time
 
-import sanguine.install.simple_download as simple_download
-from sanguine.install.install_checks import (REQUIRED_PIP_MODULES, check_sanguine_prerequisites,
-                                             safe_call, find_command_and_add_to_path)
+from sanguine.install.install_checks import (REQUIRED_PIP_MODULES, safe_call, find_command_and_add_to_path)
 from sanguine.install.install_common import *
 from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkErrorHandler
 
@@ -16,7 +13,7 @@ from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkEr
 
 ### install helpers
 
-def install_pip_module(module: str) -> None:
+def _install_pip_module(module: str) -> None:
     subprocess.check_call(['py', '-m', 'pip', 'install', module])
 
 
@@ -88,6 +85,9 @@ def clone_github_project(githubdir: str, author: str, project: str,
 ### specific installers
 
 def _install_vs_build_tools() -> None:
+    import sanguine.install.simple_download as simple_download
+    # importing only here, not at the beginning, to ensure that we already have certifi installed
+
     # trying to find one
     programfiles = os.environ['ProgramFiles(x86)']
     vswhere = os.path.join(programfiles, 'Microsoft Visual Studio\\Installer\\vswhere.exe')
@@ -120,25 +120,18 @@ def _install_vs_build_tools() -> None:
     os._exit(0)
 
 
-def install_sanguine_prerequisites(freshinstall: bool = False) -> None:
+def install_sanguine_prerequisites() -> None:
     gitok = find_command_and_add_to_path(['git', '--version'])
     abort_if_not(gitok)
+
+    info('Installing certifi...')
+    _install_pip_module('certifi')  # needed to run simple_download within _install_vs_build_tools()
+    info('certifi installed.')
+
     _install_vs_build_tools()  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:
-        install_pip_module(m)
+        _install_pip_module(m)
         info('pip module {} successfully installed.'.format(m))
 
-    nleft = 3 if freshinstall else 1
-    dt = 1.
-    while True:
-        try:
-            check_sanguine_prerequisites(True)
-            break
-        except Exception as e:
-            nleft -= 1
-            if nleft == 0:
-                raise e
-            warn('Exception: {}, will wait {:1f}s'.format(e, dt))
-            time.sleep(dt)
-            dt *= 2.
+    # check_sanguine_prerequisites(True) - should not call check_sanguine_prerequisites() here, seems to fail if called right after install
