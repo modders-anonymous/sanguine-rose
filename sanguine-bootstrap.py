@@ -13,7 +13,11 @@ from sanguine.install.simple_download import pattern_from_url, download_temp
 from sanguine.install.install_checks import report_hostile_programs
 from sanguine.install.install_ui import message_box, input_box, confirm_box, BoxUINetworkErrorHandler, set_silent_mode
 
-__version__ = '0.1.3'
+__version__ = '0.1.3a'
+# TODO: eat pre-prompt input using msvcrt.kbhit()
+# TODO: progress or at least "I'm alive" pseudo-progress while downloading/installing
+# TODO: consider [optional] install of GitHub Desktop (to install-dependencies.py?)
+# TODO: icacls replacement (apparently, icacls is not always available); try https://stackoverflow.com/a/27500472/28537706
 
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
@@ -22,7 +26,7 @@ try:
               shell=True)  # for a mystical reason, launching an external process which prints something to the screen, solves console color issues
 
     info('Sanguine bootstrapper version {}...'.format(__version__))
-    info('Bootstrapper .exe Python version: {}'.format(sys.version))
+    info('Bootstrapper .exe bundled Python version: {}'.format(sys.version))
 
     report_hostile_programs()
 

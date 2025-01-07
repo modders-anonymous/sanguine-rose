@@ -61,6 +61,7 @@ def find_command_and_add_to_path(cmd: list[str], shell: bool = False) -> bool:
     if m and len(m.group(1)) > len(os.environ['PATH']):
         info('registry PATH was recently changed, trying with registry PATH')
         os.environ['PATH'] = m.group(1)
+        info('new PATH='.format(os.environ['PATH']))
         if safe_call(cmd, shell=shell):
             info('registry PATH did the trick')
             return True
@@ -74,6 +75,7 @@ def find_command_and_add_to_path(cmd: list[str], shell: bool = False) -> bool:
                 if fname == cmd[0] and (fext == '.exe' or fext == '.bat'):
                     info('found {} in {}, prepending it to PATH...'.format(cmd[0], pf))
                     os.environ['PATH'] = curdir + ';' + os.environ['PATH']
+                    info('new PATH='.format(os.environ['PATH']))
                     if safe_call(cmd, shell=shell):
                         info('Adding {} to PATH did the trick'.format(curdir))
                         return True
