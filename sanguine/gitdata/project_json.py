@@ -75,10 +75,9 @@ class _GitRetrievedFileReadHandler(GitDataReadHandler):
         pass
 
     @staticmethod
-    def init_base_file_retriever(fr: FileRetriever, common_param: tuple[str, int, bytes]) -> None:
-        assert type(fr) == FileRetriever  # should be exactly FileRetriever, not a subclass
+    def _common_param_to_base_retriever_param(common_param: tuple[str, int, bytes]) -> FileRetriever.BaseRetrieverParam:
         (p, s, h) = common_param
-        fr.__init__(filehash=h, filesize=s)
+        return h, s
 
     @staticmethod
     def rel_path(common_param: tuple[str, int, bytes]) -> str:
@@ -101,7 +100,7 @@ class _GitRetrievedZeroFileReadHandler(_GitRetrievedFileReadHandler):
 
     def decompress(self, common_param: tuple[str | int, ...], specific_param: tuple) -> None:
         assert len(specific_param) == 0
-        (p, s, h) = common_param  # not using init_base_file_retriever as we've overrridden h with None
+        (p, s, h) = common_param
         assert h is None and s == 0
         self.retrieved_files.append((p, ZeroFileRetriever((ZeroFileRetriever.ZEROHASH, 0))))
 
@@ -133,7 +132,7 @@ class _GitRetrievedGithubFileReadHandler(_GitRetrievedFileReadHandler):
 
     def decompress(self, common_param: tuple[str, int, bytes], specific_param: tuple[str, str, str]) -> None:
         (g, a, p) = specific_param
-        fr = GithubFileRetriever(lambda fr2: _GitRetrievedFileReadHandler.init_base_file_retriever(fr2, common_param),
+        fr = GithubFileRetriever(_GitRetrievedFileReadHandler._common_param_to_base_retriever_param(common_param),
                                  a, p, g)
         self.retrieved_files.append((_GitRetrievedFileReadHandler.rel_path(common_param), fr))
 
@@ -171,11 +170,11 @@ class _GitRetrievedArchiveFileReadHandler(_GitRetrievedFileReadHandler):
         (i, a, x) = specific_param
         (h, s) = _GitRetrievedFileReadHandler.hash_and_size(common_param)
         fr = ArchiveFileRetriever(
-            lambda fr2: _GitRetrievedFileReadHandler.init_base_file_retriever(fr2, common_param),
+            _GitRetrievedFileReadHandler._common_param_to_base_retriever_param(common_param),
             [ArchiveFileRetrieverHelper((h, s), a, x, FileInArchive(h, s, i))])
         while fr.single_archive_retrievers[0].archive_hash in self.intermediate_archives:
             fr = ArchiveFileRetriever(
-                lambda fr2: _GitRetrievedFileReadHandler.init_base_file_retriever(fr2, common_param),
+                _GitRetrievedFileReadHandler._common_param_to_base_retriever_param(common_param),
                 fr.constructor_parameter_prepending_parent(
                     self.intermediate_archives[fr.single_archive_retrievers[0].archive_hash])
             )

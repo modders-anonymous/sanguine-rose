@@ -82,12 +82,16 @@ if __name__ == '__main__':
 
                 case 'togithub':
                     possible_retrievers: list[tuple[bytes, list[FileRetriever]]] = []
+                    nzero = 0
                     for f in wcache.all_vfs_files():
-                        retr:list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
-                        assert len(retr) > 0
-                        possible_retrievers.append((f.file_hash, retr))
+                        retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
+                        if len(retr) == 0:
+                            nzero += 1
+                        else:
+                            possible_retrievers.append((f.file_hash, retr))
 
-                    stats= {}
+                    warn('did not find retrievers for {} files'.format(nzero))
+                    stats = {}
                     for r in possible_retrievers:
                         n = len(r[1])
                         if n not in stats:
@@ -97,7 +101,7 @@ if __name__ == '__main__':
                     for n in sorted(stats.keys()):
                         info('{} -> {}'.format(n, stats[n]))
 
-                    choose_retrievers(possible_retrievers,{})
+                    choose_retrievers(possible_retrievers, {})
 
                 case 'h' | 'help' | '' | _:
                     info('commands:')
@@ -107,5 +111,5 @@ if __name__ == '__main__':
                     info('-> togithub')
 
         except Exception as e:
-            alert('Exception {}: {!r}'.format(type(e),e.args))
+            alert('Exception {}: {!r}'.format(type(e), e.args))
             warn(traceback.format_exc())

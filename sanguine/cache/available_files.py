@@ -163,6 +163,8 @@ class AvailableFiles:
 
             out.append(GithubFileRetriever((h, gh.file_size), author, projectname, intrapath))
 
+        return out
+
     # private functions
 
     def _starthashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:
