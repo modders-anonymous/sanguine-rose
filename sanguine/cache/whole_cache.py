@@ -1,6 +1,3 @@
-import os
-import sys
-
 import sanguine.tasks as tasks
 from sanguine.cache.available_files import FileRetriever, AvailableFiles
 from sanguine.cache.folder_cache import FileOnDisk, FolderCache

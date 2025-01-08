@@ -14,6 +14,8 @@ from sanguine.install.install_ui import input_box
 from sanguine.helpers.project_config import ProjectConfig
 import sanguine.tasks as tasks
 from sanguine.cache.whole_cache import WholeCache
+from sanguine.helpers.file_retriever import FileRetriever
+from sanguine.choose_retrievers import choose_retrievers
 
 
 def _usage() -> None:
@@ -52,6 +54,7 @@ if __name__ == '__main__':
     while True:
         cmd = input_box('Enter Command:', '')
         try:
+            info(cmd)
             command: list[str] = cmd.split(' ')
             if len(command) == 0:
                 command = ['h']
@@ -59,6 +62,7 @@ if __name__ == '__main__':
                 case 'x' | 'exit':
                     info('Exiting...')
                     sys.exit(0)
+
                 case 'github.install':
                     if len(command) < 3:
                         alert('wrong number of parameters, use help to ask for syntax')
@@ -76,11 +80,32 @@ if __name__ == '__main__':
                             info('Cloning {}...'.format(pd))
                             clone_github_project(cfg.github_root_dir, author, project, BoxUINetworkErrorHandler(2))
 
+                case 'togithub':
+                    possible_retrievers: list[tuple[bytes, list[FileRetriever]]] = []
+                    for f in wcache.all_vfs_files():
+                        retr:list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
+                        assert len(retr) > 0
+                        possible_retrievers.append((f.file_hash, retr))
+
+                    stats= {}
+                    for r in possible_retrievers:
+                        n = len(r[1])
+                        if n not in stats:
+                            stats[n] = 1
+                        else:
+                            stats[n] += 1
+                    for n in sorted(stats.keys()):
+                        info('{} -> {}'.format(n, stats[n]))
+
+                    choose_retrievers(possible_retrievers,{})
+
                 case 'h' | 'help' | '' | _:
                     info('commands:')
                     info('-> h|help')
                     info('-> x|exit')
                     info('-> github.install <author> <project>')
+                    info('-> togithub')
 
         except Exception as e:
-            alert('Exception: {}'.format(e))
+            alert('Exception {}: {!r}'.format(type(e),e.args))
+            warn(traceback.format_exc())
