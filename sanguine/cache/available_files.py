@@ -101,9 +101,10 @@ class AvailableFiles:
         zero = ZeroFileRetriever.make_retriever_if(h)
         if zero is not None:
             return [zero]  # if it is zero file, we won't even try looking elsewhere
-        archived = self._archived_file_retrievers_by_hash(h)
         github = self._github_file_retrievers_by_hash(h)
-        return archived + github
+        if len(github) > 0:
+            return github
+        return self._archived_file_retrievers_by_hash(h)
 
     ### lists of file retrievers
     def _single_archive_retrievers(self, h: bytes) -> list[ArchiveFileRetrieverHelper]:

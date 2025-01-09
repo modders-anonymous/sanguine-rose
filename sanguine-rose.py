@@ -94,7 +94,10 @@ if __name__ == '__main__':
                             else:
                                 possible_retrievers[f.file_hash] = retr
 
-                    warn('found {} duplicate files, did not find retrievers for {} files'.format(ndup, nzero))
+                    info('found {} duplicate files'.format(ndup))
+                    if nzero > 0:
+                        warn('did not find retrievers for {} files'.format(nzero))
+                    info('stats (nretrievers->ntimes):')
                     stats = {}
                     for r in possible_retrievers.items():
                         n = len(r[1])
