@@ -81,18 +81,22 @@ if __name__ == '__main__':
                             clone_github_project(cfg.github_root_dir, author, project, BoxUINetworkErrorHandler(2))
 
                 case 'togithub':
-                    possible_retrievers: list[tuple[bytes, list[FileRetriever]]] = []
+                    possible_retrievers: dict[bytes, list[FileRetriever]] = {}
                     nzero = 0
+                    ndup = 0
                     for f in wcache.all_vfs_files():
-                        retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
-                        if len(retr) == 0:
-                            nzero += 1
+                        if f.file_hash in possible_retrievers:
+                            ndup += 1
                         else:
-                            possible_retrievers.append((f.file_hash, retr))
+                            retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
+                            if len(retr) == 0:
+                                nzero += 1
+                            else:
+                                possible_retrievers[f.file_hash] = retr
 
-                    warn('did not find retrievers for {} files'.format(nzero))
+                    warn('found {} duplicate files, did not find retrievers for {} files'.format(ndup, nzero))
                     stats = {}
-                    for r in possible_retrievers:
+                    for r in possible_retrievers.items():
                         n = len(r[1])
                         if n not in stats:
                             stats[n] = 1
@@ -101,7 +105,7 @@ if __name__ == '__main__':
                     for n in sorted(stats.keys()):
                         info('{} -> {}'.format(n, stats[n]))
 
-                    choose_retrievers(possible_retrievers, {})
+                    choose_retrievers(list(possible_retrievers.items()), {})
 
                 case 'h' | 'help' | '' | _:
                     info('commands:')
