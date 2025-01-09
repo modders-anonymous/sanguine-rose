@@ -1,7 +1,109 @@
+from sanguine.cache.whole_cache import WholeCache
+from sanguine.common import *
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
 
 
+def togithub(wcache: WholeCache) -> None:
+    info('Stage 0: collecting retrievers')
+    possibleretrievers: dict[bytes, list[FileRetriever]] = {}
+    nzero = 0
+    ndup = 0
+    for f in wcache.all_vfs_files():
+        if f.file_hash in possibleretrievers:
+            ndup += 1
+        else:
+            retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
+            if len(retr) == 0:
+                nzero += 1
+            else:
+                possibleretrievers[f.file_hash] = retr
+
+    info('found {} duplicate files'.format(ndup))
+    if nzero > 0:
+        warn('did not find retrievers for {} files'.format(nzero))
+    info('stats (nretrievers->ntimes):')
+    stats = {}
+    for r in possibleretrievers.items():
+        n = len(r[1])
+        if n not in stats:
+            stats[n] = 1
+        else:
+            stats[n] += 1
+    for n in sorted(stats.keys()):
+        info('{} -> {}'.format(n, stats[n]))
+
+    ### got all known retrievers, now processing
+    retrievers: list[tuple[bytes, FileRetriever]] = []
+
+    ### processing unique retrievers
+    info('Stage 1: processing unique files')
+    archives: dict[bytes, int] = {}  # for now, it is archives for unique files
+    remainingretrievers: list[tuple[bytes, list[FileRetriever]]] = []
+    for r in possibleretrievers.items():
+        assert len(r[1]) > 0
+        rr0 = r[1][0]
+        if isinstance(rr0, ZeroFileRetriever) or isinstance(rr0, GithubFileRetriever):
+            retrievers.append((r[0], rr0))
+        elif len(r[1]) == 1:
+            assert isinstance(rr0, ArchiveFileRetriever)
+            remainingretrievers.append(r)
+            if rr0.archive_hash() not in archives:
+                archives[rr0.archive_hash()] = 1
+            else:
+                archives[rr0.archive_hash()] += 1
+        else:
+            assert isinstance(rr0, ArchiveFileRetriever)
+            remainingretrievers.append(r)
+    assert len(possibleretrievers) == len(remainingretrievers) + len(retrievers)
+
+    info('Stage 1: {} files from Zero and Github:'.format(len(retrievers)))
+    info('Stage 1: {} archives necessary to cover unique files'.format(len(archives)))
+
+    remainingretrievers2: list[tuple[bytes, list[FileRetriever]]] = []
+    for r in remainingretrievers:
+        assert len(r[1]) > 0
+        bestar = None
+        bestarn = -1
+        for rr in r[1]:
+            if not isinstance(rr, ArchiveFileRetriever):
+                assert False
+            # assert isinstance(rr, ArchiveFileRetriever)
+            rah = rr.archive_hash()
+            if rah in archives and archives[rah] > bestarn:
+                bestar = rr
+                bestarn = archives[rah]
+
+        if bestar is not None:
+            assert bestarn > 0
+            retrievers.append((r[0], bestar))
+            assert isinstance(bestar, ArchiveFileRetriever)
+            archives[bestar.archive_hash()] += 1
+        else:
+            remainingretrievers2.append(r)
+
+    if __debug__:
+        assert len(possibleretrievers) == len(remainingretrievers2) + len(retrievers)
+        for r in retrievers:
+            retr: FileRetriever = r[1]
+            assert isinstance(retr, ArchiveFileRetriever) or isinstance(retr, GithubFileRetriever) or isinstance(retr,
+                                                                                                                 ZeroFileRetriever)
+            if isinstance(retr, ArchiveFileRetriever):
+                assert retr.archive_hash() in archives
+
+    info('Stage 2: accounted for unique files with {} archives, remaining {} files'.format(len(archives),
+                                                                                           len(remainingretrievers2)))
+    arusage = sorted(archives.items(), key=lambda x: x[1])
+    info('Stage 2: archives with minimum usage:')
+    for i in range(min(len(arusage), 10)):
+        info('-> h={} n={}'.format(to_json_hash(truncate_file_hash(arusage[i][0])), arusage[i][1]))
+
+    if len(remainingretrievers2) != 0:
+        raise SanguinicError(
+            'handling of non-unique retrievers is NOT IMPLEMENTED YET')  # TODO! - this is possible, when encounter - will need to process
+
+
+'''
 def _filter_with_used(inlist: list[tuple[bytes, list[ArchiveFileRetriever]]],
                       out: list[tuple[bytes, ArchiveFileRetriever | None]],
                       used_archives: dict[bytes, int]) -> list[tuple[bytes, list[ArchiveFileRetriever]]]:
@@ -154,7 +256,7 @@ def _retriever_key(fr: FileRetriever, archive_weights: dict[bytes, int]) -> str:
         assert False
 
 
-def choose_retrievers(inlist0: list[tuple[bytes, list[FileRetriever]]], archive_weights: dict[bytes, int]) -> list[
+def _choose_retrievers(inlist0: list[tuple[bytes, list[FileRetriever]]], archive_weights: dict[bytes, int]) -> list[
     tuple[bytes, FileRetriever | None]]:
     out: list[tuple[bytes, FileRetriever | None]] = []
 
@@ -250,3 +352,4 @@ def choose_retrievers(inlist0: list[tuple[bytes, list[FileRetriever]]], archive_
         _full_search_retrievers(out, cluster, cluster_archives, archive_weights)
 
     return out
+'''

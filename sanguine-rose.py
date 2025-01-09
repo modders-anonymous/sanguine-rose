@@ -14,8 +14,7 @@ from sanguine.install.install_ui import input_box
 from sanguine.helpers.project_config import ProjectConfig
 import sanguine.tasks as tasks
 from sanguine.cache.whole_cache import WholeCache
-from sanguine.helpers.file_retriever import FileRetriever
-from sanguine.choose_retrievers import choose_retrievers
+from sanguine.commands.togithub import togithub
 
 
 def _usage() -> None:
@@ -81,34 +80,7 @@ if __name__ == '__main__':
                             clone_github_project(cfg.github_root_dir, author, project, BoxUINetworkErrorHandler(2))
 
                 case 'togithub':
-                    possible_retrievers: dict[bytes, list[FileRetriever]] = {}
-                    nzero = 0
-                    ndup = 0
-                    for f in wcache.all_vfs_files():
-                        if f.file_hash in possible_retrievers:
-                            ndup += 1
-                        else:
-                            retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
-                            if len(retr) == 0:
-                                nzero += 1
-                            else:
-                                possible_retrievers[f.file_hash] = retr
-
-                    info('found {} duplicate files'.format(ndup))
-                    if nzero > 0:
-                        warn('did not find retrievers for {} files'.format(nzero))
-                    info('stats (nretrievers->ntimes):')
-                    stats = {}
-                    for r in possible_retrievers.items():
-                        n = len(r[1])
-                        if n not in stats:
-                            stats[n] = 1
-                        else:
-                            stats[n] += 1
-                    for n in sorted(stats.keys()):
-                        info('{} -> {}'.format(n, stats[n]))
-
-                    choose_retrievers(list(possible_retrievers.items()), {})
+                    togithub(wcache)
 
                 case 'h' | 'help' | '' | _:
                     info('commands:')
