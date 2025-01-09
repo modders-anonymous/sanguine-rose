@@ -88,7 +88,7 @@ class ArchiveFileRetrieverHelper(FileRetriever):
     def __init__(self, base_retriever_param: FileRetriever.BaseRetrieverParam,
                  archive_hash: bytes, archive_size: int, file_in_archive: FileInArchive) -> None:
         super().__init__(base_retriever_param)
-        assert self.file_hash == file_in_archive.file_hash
+        assert truncate_file_hash(self.file_hash) == file_in_archive.file_hash
         assert self.file_size == file_in_archive.file_size
         self.archive_hash = archive_hash
         self.archive_size = archive_size

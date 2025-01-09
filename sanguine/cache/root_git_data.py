@@ -460,7 +460,7 @@ class RootGitData:
 
     def archived_file_by_hash(self, h: bytes) -> list[tuple[Archive, FileInArchive]] | None:
         assert self._ar_is_ready == 2
-        return self._archived_files_by_hash.get(h)
+        return self._archived_files_by_hash.get(truncate_file_hash(h))
 
     def archive_by_hash(self, arh: bytes, partialok: bool = False) -> Archive | None:
         assert (self._ar_is_ready >= 1) if partialok else (self._ar_is_ready >= 2)
