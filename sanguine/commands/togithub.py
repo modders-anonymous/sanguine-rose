@@ -37,14 +37,16 @@ def togithub(wcache: WholeCache) -> None:
     retrievers: list[tuple[bytes, FileRetriever]] = []
 
     ### processing unique retrievers
-    info('Stage 1: processing unique files')
+    info('Stage 1: processing Zero, GitHub, and unique files in Archives')
     archives: dict[bytes, int] = {}  # for now, it is archives for unique files
     remainingretrievers: list[tuple[bytes, list[FileRetriever]]] = []
+    nzerogithub = 0
     for r in possibleretrievers.items():
         assert len(r[1]) > 0
         rr0 = r[1][0]
         if isinstance(rr0, ZeroFileRetriever) or isinstance(rr0, GithubFileRetriever):
             retrievers.append((r[0], rr0))
+            nzerogithub += 1
         elif len(r[1]) == 1:
             assert isinstance(rr0, ArchiveFileRetriever)
             retrievers.append((r[0], rr0))
@@ -57,8 +59,10 @@ def togithub(wcache: WholeCache) -> None:
             remainingretrievers.append(r)
     assert len(possibleretrievers) == len(remainingretrievers) + len(retrievers)
 
-    info('Stage 1: {} files from Zero and Github:'.format(len(retrievers)))
+    info('Stage 1: {} files from Zero and Github; {} unique files in Archives'.format(nzerogithub,
+                                                                                      len(retrievers) - nzerogithub))
     info('Stage 1: {} archives necessary to cover unique files'.format(len(archives)))
+    info('Stage 1: {} files remaining'.format(len(remainingretrievers)))
 
     remainingretrievers2: list[tuple[bytes, list[FileRetriever]]] = []
     for r in remainingretrievers:
@@ -89,8 +93,8 @@ def togithub(wcache: WholeCache) -> None:
             if isinstance(retr, ArchiveFileRetriever):
                 assert retr.archive_hash() in archives
 
-    info('Stage 2: accounted for unique files with {} archives, remaining {} files'.format(len(archives),
-                                                                                           len(remainingretrievers2)))
+    info('Stage 2: accounted for already required {} archives, remaining {} files'.format(len(archives),
+                                                                                          len(remainingretrievers2)))
 
     arstats = wcache.archive_stats()
     arusage: list[tuple[bytes, int, int]] = []
@@ -104,7 +108,7 @@ def togithub(wcache: WholeCache) -> None:
         if aru[1] / aru[2] > 0.1:
             break
         warn('-> h={} n={}/{} ({:.1f}%)'.format(to_json_hash(truncate_file_hash(aru[0])),
-                                               aru[1], aru[2], aru[1] / aru[2] * 100))
+                                                aru[1], aru[2], aru[1] / aru[2] * 100))
 
     if len(remainingretrievers2) != 0:
         raise SanguinicError(
