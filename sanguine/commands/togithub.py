@@ -47,7 +47,7 @@ def togithub(wcache: WholeCache) -> None:
             retrievers.append((r[0], rr0))
         elif len(r[1]) == 1:
             assert isinstance(rr0, ArchiveFileRetriever)
-            remainingretrievers.append(r)
+            retrievers.append((r[0], rr0))
             if rr0.archive_hash() not in archives:
                 archives[rr0.archive_hash()] = 1
             else:
@@ -66,9 +66,7 @@ def togithub(wcache: WholeCache) -> None:
         bestar = None
         bestarn = -1
         for rr in r[1]:
-            if not isinstance(rr, ArchiveFileRetriever):
-                assert False
-            # assert isinstance(rr, ArchiveFileRetriever)
+            assert isinstance(rr, ArchiveFileRetriever)
             rah = rr.archive_hash()
             if rah in archives and archives[rah] > bestarn:
                 bestar = rr
@@ -105,7 +103,7 @@ def togithub(wcache: WholeCache) -> None:
     for aru in arusage:
         if aru[1] / aru[2] > 0.1:
             break
-        warn('-> h={} n={}/{} ({:1f}%)'.format(to_json_hash(truncate_file_hash(aru[0])),
+        warn('-> h={} n={}/{} ({:.1f}%)'.format(to_json_hash(truncate_file_hash(aru[0])),
                                                aru[1], aru[2], aru[1] / aru[2] * 100))
 
     if len(remainingretrievers2) != 0:
