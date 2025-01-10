@@ -2,8 +2,7 @@ import re
 import subprocess
 import sys
 
-from sanguine.common import open_3rdparty_txt_file
-from sanguine.install.install_checks import (REQUIRED_PIP_MODULES, safe_call, find_command_and_add_to_path)
+from sanguine.install.install_checks import (REQUIRED_PIP_MODULES, find_command_and_add_to_path)
 from sanguine.install.install_common import *
 from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkErrorHandler
 
@@ -41,77 +40,6 @@ def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
 
 def _tools_dir() -> str:
     return os.path.abspath(os.path.split(os.path.abspath(__file__))[0] + '\\..\\tools')
-
-
-def github_project_dir(githubdir: str, author: str, project: str) -> str:
-    if not githubdir.endswith('\\'):
-        githubdir += '\\'
-    return githubdir + author + '\\' + project + '\\'
-
-
-def github_project_exists(githubdir: str, author: str, project: str) -> int:
-    """
-    returns 0 if target dir doesn't exist, -1 if folder exists but is not an expected GitHub project, 1 if folder is already a proper GitHub project
-    """
-    targetdir = github_project_dir(githubdir, author, project)
-    if os.path.exists(targetdir):
-        config = targetdir + '\\.git\\config'
-        pattern = re.compile(r'\s*url\s*=\s*https://github.com/([^/]*)/(.*)\.git')
-        if os.path.isfile(config):
-            with open_3rdparty_txt_file(config) as f:
-                for ln in f:
-                    m = pattern.match(ln.strip())
-                    if m:
-                        cfgauthor = m.group(1)
-                        cfgproject = m.group(2)
-                        if author == cfgauthor and project == cfgproject:
-                            return 1
-                        else:
-                            return -1
-                # no GitHub url is found in config
-                return -1
-        else:
-            return -1
-    else:
-        return 0
-
-
-def clone_github_project(githubdir: str, author: str, project: str,
-                         errhandler: NetworkErrorHandler | None, adjustpermissions: bool = False) -> None:
-    targetdir = os.path.split(github_project_dir(githubdir, author, project))[0]
-    abort_if_not(not os.path.exists(targetdir + '\\' + project))
-
-    createddir = targetdir + '\\' + project  # we need it to adjust permissions properly
-    if not os.path.isdir(targetdir):
-        createddir = targetdir
-        while True:
-            spl = os.path.split(createddir)[0]
-            if os.path.isdir(spl):
-                break
-            createddir = spl
-        os.makedirs(targetdir)
-    url = 'https://github.com/{}/{}.git'.format(author, project)
-    cmd = ['git', 'clone', url]
-    info(' '.join(cmd))
-    while True:
-        ok = safe_call(cmd, cwd=targetdir, shell=True)
-        if ok:
-            break
-        alert('git clone of {} failed'.format(url))
-        if errhandler and errhandler.handle_error('Cloning {}'.format(url), 99999):
-            continue
-        raise SanguinicError('Cloning of {} failed:'.format(url))
-
-    info('{}/{} successfully cloned'.format(targetdir, project))
-    if createddir and adjustpermissions:
-        user = os.environ['userdomain'] + '\\' + os.environ['username']
-        cmd2 = ['icacls', createddir, '/setowner', user, '/t', '/l']
-        info('Adjusting permissions of {}...'.format(createddir))
-        ok = safe_call(cmd2, shell=True)
-        if not ok:
-            alert(
-                'Cannot adjust permissions on created folder {} (error in command {}), you may need to deal with it yourself'.format(
-                    createddir, str(cmd2)))
 
 
 ### specific installers

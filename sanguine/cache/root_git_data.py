@@ -5,7 +5,7 @@ from sanguine.common import *
 from sanguine.gitdata.file_origin import (FileOrigin, GitTentativeArchiveNames,
                                           file_origin_plugins, file_origin_plugin_by_name, FileOriginPluginBase)
 from sanguine.gitdata.root_git_archives import GitArchivesJson
-from sanguine.helpers.archives import Archive, FileInArchive
+from sanguine.helpers.archives import Archive, FileInArchive, normalize_archive_intra_path
 from sanguine.helpers.archives import ArchivePluginBase, all_archive_plugins_extensions, archive_plugin_for
 from sanguine.helpers.tmp_path import TmpPath
 

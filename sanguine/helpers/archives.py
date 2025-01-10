@@ -69,3 +69,8 @@ def archive_plugin_for(path: str) -> ArchivePluginBase:
 def all_archive_plugins_extensions() -> list[str]:
     global _archive_exts
     return _archive_exts
+
+
+def normalize_archive_intra_path(fpath: str):
+    assert is_short_file_path(fpath.lower())
+    return fpath.lower()

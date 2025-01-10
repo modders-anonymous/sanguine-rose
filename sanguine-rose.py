@@ -6,12 +6,13 @@ import time
 
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
-from sanguine.install.install_helpers import github_project_exists, github_project_dir, clone_github_project
+from sanguine.install.install_github import github_project_exists, clone_github_project
 from sanguine.install.install_ui import BoxUINetworkErrorHandler
 from sanguine.common import *
 from sanguine.install.install_checks import check_sanguine_prerequisites
 from sanguine.install.install_ui import input_box
-from sanguine.helpers.project_config import ProjectConfig
+from sanguine.helpers.project_config import LocalProjectConfig
+from sanguine.install.install_github import GithubFolder
 import sanguine.tasks as tasks
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.commands.togithub import togithub
@@ -27,7 +28,7 @@ if __name__ == '__main__':
     argv = sys.argv[1:]
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
         if not os.path.isdir('../../KTAGirl/KTA'):
-            clone_github_project('../../', 'KTAGirl', 'KTA', BoxUINetworkErrorHandler(2))
+            clone_github_project('../../', GithubFolder('KTAGirl/KTA'), BoxUINetworkErrorHandler(2))
         argv = ['../../KTAGirl/KTA\\KTA.json5']
 
     if len(argv) != 1:
@@ -39,11 +40,11 @@ if __name__ == '__main__':
     cfgfname = argv[0]
     abort_if_not(os.path.isfile(cfgfname))
     cfgfname = normalize_file_path(cfgfname)
-    cfg = ProjectConfig(cfgfname)
+    cfg = LocalProjectConfig(cfgfname)
     add_file_logging(cfg.tmp_dir + 'sanguine.log.html')
     enable_ex_logging()
 
-    wcache = WholeCache('KTAGirl', cfg)
+    wcache = WholeCache(cfg)
     with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=False) as tparallel:
         t0 = time.perf_counter()
         wcache.start_tasks(tparallel)
@@ -63,13 +64,13 @@ if __name__ == '__main__':
                     sys.exit(0)
 
                 case 'github.install':
-                    if len(command) < 3:
+                    if len(command) < 2:
                         alert('wrong number of parameters, use help to ask for syntax')
                     else:
-                        author = command[1]
-                        project = command[2]
-                        ok = github_project_exists(cfg.github_root_dir, author, project)
-                        pd = github_project_dir(cfg.github_root_dir, author, project)
+                        authorproject = command[1]
+                        gf = GithubFolder(authorproject)
+                        ok = github_project_exists(cfg.github_root_dir, gf)
+                        pd = gf.folder(cfg.github_root_dir)
                         if ok == 1:
                             info('Project {} already exists'.format(pd))
                         elif ok == -1:
@@ -77,7 +78,7 @@ if __name__ == '__main__':
                         else:
                             assert ok == 0
                             info('Cloning {}...'.format(pd))
-                            clone_github_project(cfg.github_root_dir, author, project, BoxUINetworkErrorHandler(2))
+                            clone_github_project(cfg.github_root_dir, gf, BoxUINetworkErrorHandler(2))
 
                 case 'togithub':
                     togithub(wcache)

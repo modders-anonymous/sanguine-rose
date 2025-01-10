@@ -3,7 +3,7 @@ from sanguine.cache.available_files import FileRetriever, AvailableFiles
 from sanguine.cache.folder_cache import FileOnDisk, FolderCache
 from sanguine.common import *
 from sanguine.common import SanguineJsonEncoder
-from sanguine.helpers.project_config import ProjectConfig
+from sanguine.helpers.project_config import LocalProjectConfig, GithubModpack
 
 
 class WholeCache:
@@ -15,7 +15,7 @@ class WholeCache:
     _available: AvailableFiles
     _SYNCOWNTASKNAME: str = 'sanguine.wholecache.sync'
 
-    def __init__(self, by: str, projectcfg: ProjectConfig) -> None:
+    def __init__(self, projectcfg: LocalProjectConfig) -> None:
         self._cache_data_fname = projectcfg.cache_dir + 'wholecache.cachedata.json'
         try:
             with open(self._cache_data_fname, 'r') as f:
@@ -23,8 +23,11 @@ class WholeCache:
         except Exception as e:
             warn('WholeCache: cannot load cachedata from {}: {}'.format(self._cache_data_fname, e))
             self._cache_data = {}
-        self._available = AvailableFiles(by, projectcfg.cache_dir, projectcfg.tmp_dir, projectcfg.game_root_dir,
-                                         projectcfg.download_dirs, projectcfg.github_folders, self._cache_data)
+
+        rootmodpackdir = GithubModpack(projectcfg.root_modpack).folder(projectcfg.github_root_dir)
+        self._available = AvailableFiles(projectcfg.github_username, projectcfg.cache_dir, projectcfg.tmp_dir,
+                                         projectcfg.github_root_dir, rootmodpackdir,
+                                         projectcfg.download_dirs, projectcfg.github_folders(), self._cache_data)
 
         folderstocache: FolderListToCache = projectcfg.active_vfs_folders()
         self._vfscache = FolderCache(projectcfg.cache_dir, 'vfs', folderstocache)
@@ -76,7 +79,7 @@ class WholeCache:
 if __name__ == '__main__':
     import sys
     import time
-    from sanguine.install.install_helpers import clone_github_project
+    from sanguine.install.install_github import clone_github_project, GithubFolder
     from sanguine.install.install_ui import BoxUINetworkErrorHandler
 
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
@@ -84,15 +87,15 @@ if __name__ == '__main__':
         if not os.path.isdir(ttmppath):
             os.makedirs(ttmppath)
         if not os.path.isdir('../../../../KTAGirl/KTA'):
-            clone_github_project('../../../../', 'KTAGirl', 'KTA', BoxUINetworkErrorHandler(2))
+            clone_github_project('../../../../', GithubFolder('KTAGirl/KTA'), BoxUINetworkErrorHandler(2))
         add_file_logging(ttmppath + 'sanguine.log.html')
         enable_ex_logging()
         check_sanguine_prerequisites()
 
-        cfgfname = normalize_file_path('../../../../KTAGirl/KTA\\KTA.json5')
-        cfg = ProjectConfig(cfgfname)
+        cfgfname = normalize_file_path('../../../../local-sanguine-project.json5')
+        cfg = LocalProjectConfig(cfgfname)
 
-        wcache = WholeCache('KTAGirl', cfg)
+        wcache = WholeCache(cfg)
         with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=False) as tparallel:
             t0 = time.perf_counter()
             wcache.start_tasks(tparallel)

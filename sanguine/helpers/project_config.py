@@ -4,7 +4,7 @@ import json5
 
 from sanguine.common import *
 from sanguine.helpers.plugin_handler import load_plugins
-from sanguine.install.install_helpers import github_project_dir, clone_github_project, github_project_exists
+from sanguine.install.install_github import GithubFolder, clone_github_project, github_project_exists
 from sanguine.install.install_ui import BoxUINetworkErrorHandler
 
 
@@ -125,35 +125,51 @@ def _all_configs_string() -> str:
     return out
 
 
-def _load_github_folder(dirpath: str) -> GithubFolder:
-    assert is_normalized_dir_path(dirpath)
-    abort_if_not(os.path.isfile(dirpath + '.git\\config'), lambda: '{}.git\\config not found'.format(dirpath))
-    pattern = re.compile(r'\s*url\s*=\s*https://github.com/([^/]*)/([^\n]*)')
-    with open_3rdparty_txt_file(dirpath + '.git\\config') as f:
-        author = None
-        project = None
-        for line in f:
-            m = pattern.match(line)
-            if m:
-                author = m.group(1)
-                prj = m.group(2)
-                if prj.endswith('.git'):
-                    project = prj[:-len('.git')]
-        abort_if_not(author is not None and project is not None, 'author or project not found for {}'.format(dirpath))
+class GithubModpack(GithubFolder):
+    subfolder: str
 
-        return GithubFolder(author, project, dirpath)
+    def __init__(self, combined2or3: str) -> None:
+        spl = GithubFolder.ghsplit(combined2or3)
+        super().__init__(spl[0])
+        self.subfolder = spl[1]
+
+    @staticmethod
+    def is_ok(combined2or3: str) -> bool:
+        return GithubFolder.ghsplit(combined2or3) is not None
+
+    def mpfolder(self, rootgitdir: str) -> str:
+        parentdir = self.folder(rootgitdir)
+        return parentdir if self.subfolder == '' else parentdir + self.subfolder + '\\'
+
+    def mpto_str(self) -> str:
+        parent = self.to_str()
+        return parent if self.subfolder == '' else parent + '/' + self.subfolder
 
 
-class ProjectConfig:
+class GithubModpackConfig:
+    is_root: bool
+    dependencies: list[GithubModpack]
+    own_mod_names: list[str]
+
+    def __init__(self, jsonconfig: dict[str, any]) -> None:
+        is_root = jsonconfig.get('is_root', 0)
+        abort_if_not(is_root == 1 or is_root == 0)
+        self.is_root = is_root != 0
+        self.dependencies = [GithubModpack(d) for d in jsonconfig['dependencies']]
+        self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
+
+
+class LocalProjectConfig:
     config_dir: str
     mod_manager_config: ModManagerConfig
     download_dirs: list[str]
     cache_dir: str
     tmp_dir: str
     github_root_dir: str
-    game_root_dir: str
-    github_folders: list[GithubFolder]
-    own_mod_names: list[str]
+    all_modpack_configs: dict[str, GithubModpackConfig]
+    this_modpack: str
+    root_modpack: str | None
+    github_username: str | None
 
     # TODO: check that sanguine-rose itself, cache_dir, and tmp_dir don't overlap with any of the dirs
     def __init__(self, jsonconfigfname: str) -> None:
@@ -196,59 +212,55 @@ class ProjectConfig:
                                            self.config_dir,
                                            jsonconfig)
 
-            gh = None
-            if 'github' not in jsonconfig:
-                gh = [self.config_dir]
-            else:
-                gh = jsonconfig['github']
-            if isinstance(gh, str):
-                gh = [gh]
-            abort_if_not(isinstance(gh, list),
-                         lambda: "'gh' in config must be a string or a list, got " + repr(gh))
-            self.github_folders = [_load_github_folder(gf) for gf in gh]
-            self.github_root_dir = config_dir_path(jsonconfig.get('githubroot', '..\\..\\'), self.config_dir,
+            self.github_root_dir = config_dir_path(jsonconfig.get('githubroot', '.\\'), self.config_dir,
                                                    jsonconfig)
-            abort_if_not('gameroot' in jsonconfig)
-            gameroot = jsonconfig['gameroot'].split('/')
-            abort_if_not(len(gameroot) == 2)
-            self.game_root_dir = github_project_dir(self.github_root_dir, gameroot[0], gameroot[1])
-            ok = github_project_exists(self.github_root_dir, gameroot[0], gameroot[1])
-            if ok == 1:
-                pass
-            elif ok == 0:
-                clone_github_project(self.github_root_dir, gameroot[0], gameroot[1], BoxUINetworkErrorHandler(2))
-            else:
-                assert ok == -1
-                critical(
-                    'Fatal error: folder {} exists, but does not contain {}/{}'.format(self.game_root_dir, gameroot[0],
-                                                                                       gameroot[1]))
-                abort_if_not(False)
-            self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
 
-    '''
-    def normalize_config_dir_path(self, path: str) -> str:
-        return _normalize_config_dir_path(path, self.config_dir)
+            abort_if_not('ghproject' in jsonconfig)
+            ghproject = jsonconfig['ghproject']
+            abort_if_not(isinstance(ghproject, str) and GithubFolder.is_ok(ghproject))
 
-    def normalize_config_file_path(self, path: str) -> str:
-        spl = os.path.split(path)
-        return _normalize_config_dir_path(spl[0], self.config_dir) + spl[1]
+            self.all_modpack_configs = {}
+            self.this_modpack = ghproject
+            self.root_modpack = None
+            self._load_andor_clone(ghproject)
+            abort_if_not(self.root_modpack is not None)
 
-    def file_path_to_short_path(self, fpath: str) -> str:
-        assert is_normalized_file_path(fpath)
-        return to_short_path(self.mo2_dir, fpath)
-
-    def dir_path_to_short_path(self, dirpath: str) -> str:
-        assert is_normalized_dir_path(dirpath)
-        return to_short_path(self.mo2_dir, dirpath)
-
-    def short_file_path_to_path(self, fpath: str) -> str:
-        assert is_short_file_path(fpath)
-        return self.mo2_dir + fpath
-
-    def short_dir_path_to_path(self, dirpath: str) -> str:
-        assert is_short_dir_path(dirpath)
-        return self.mo2_dir + dirpath
-    '''
+            self.github_username = jsonconfig.get('github_username')
 
     def active_vfs_folders(self) -> FolderListToCache:
         return self.mod_manager_config.active_vfs_folders()
+
+    def github_folders(self) -> list[GithubFolder]:
+        return [GithubModpack(mp) for mp in self.all_modpack_configs.keys()]
+
+    # private functions
+
+    def _load_andor_clone(self, ghproject: str) -> None:
+        if ghproject in self.all_modpack_configs:
+            return
+
+        gh = GithubModpack(ghproject)
+        ok = github_project_exists(self.github_root_dir, gh)
+        if ok == -1:
+            critical(
+                'Fatal error: folder {} exists, but does not contain {}/{}'.format(gh.folder(self.github_root_dir),
+                                                                                   gh.author, gh.project))
+            abort_if_not(False)
+
+        if ok == 0:
+            info('Cloning GitHub project: {}'.format(ghproject))
+            clone_github_project(self.github_root_dir, gh, BoxUINetworkErrorHandler(2))
+            info('GitHub project {} cloned successfully'.format(ghproject))
+
+        assert ok == 1
+        with open_3rdparty_txt_file(gh.mpfolder(self.github_root_dir)) as rf:
+            jsonconfig = json5.load(rf)
+            mpcfg = GithubModpackConfig(jsonconfig)
+            self.all_modpack_configs[ghproject] = mpcfg
+
+            if mpcfg.is_root:
+                abort_if_not(self.root_modpack is None)
+                self.root_modpack = ghproject
+
+            for d in mpcfg.dependencies:
+                self._load_andor_clone(d.mpto_str())

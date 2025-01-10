@@ -9,6 +9,7 @@ from sanguine.helpers.archives import all_archive_plugins_extensions
 from sanguine.helpers.file_retriever import (FileRetriever, ZeroFileRetriever, GithubFileRetriever,
                                              ArchiveFileRetriever, ArchiveFileRetrieverHelper)
 from sanguine.helpers.tmp_path import TmpPath
+from sanguine.install.install_github import GithubFolder
 
 
 def _file_origins_task_func(param: tuple[list[bytes, str]]) -> tuple[
@@ -28,6 +29,7 @@ def _file_origins_task_func(param: tuple[list[bytes, str]]) -> tuple[
 
 
 class AvailableFiles:
+    _root_git_dir: str
     _github_cache: FolderCache
     _github_cache_by_hash: dict[bytes, list[FileOnDisk]] | None
     _downloads_cache: FolderCache
@@ -38,8 +40,9 @@ class AvailableFiles:
     _is_ready: bool
     _hash_remapping_plugins: list[FileOriginPluginBase]
 
-    def __init__(self, by: str, cachedir: str, tmpdir: str, rootgitdir: str, downloads: list[str],
+    def __init__(self, by: str, cachedir: str, tmpdir: str, rootgitdir: str, rootmodpackdir: str, downloads: list[str],
                  github_folders: list[GithubFolder], cache_data: dict[str, any]) -> None:
+        self._root_git_dir = rootgitdir
         self._hash_remapping_plugins = []
         extrahashfactories = []
         for plugin in file_origin_plugins():
@@ -54,10 +57,11 @@ class AvailableFiles:
                                             FolderListToCache([FolderToCache(d, []) for d in downloads]),
                                             extrahashfactories=extrahashfactories)
         self._github_cache = FolderCache(cachedir, 'github',
-                                         FolderListToCache([FolderToCache(g.local_folder, []) for g in github_folders]))
+                                         FolderListToCache(
+                                             [FolderToCache(g.folder(rootgitdir), []) for g in github_folders]))
         self._github_cache_by_hash = None
         self._github_folders = github_folders
-        self._root_data = RootGitData(by, rootgitdir, cachedir, tmpdir, cache_data)
+        self._root_data = RootGitData(by, rootmodpackdir, cachedir, tmpdir, cache_data)
         self._is_ready = False
 
     # public interface
@@ -157,13 +161,14 @@ class AvailableFiles:
             projectname = None
             intrapath = None
             for d in self._github_folders:
-                if fpath.startswith(d.local_folder):
+                dlocal = d.folder(self._root_git_dir)
+                if fpath.startswith(dlocal):
                     assert author is None
                     assert projectname is None
                     assert intrapath is None
                     author = d.author
-                    projectname = d.project_name
-                    intrapath = fpath[len(d.local_folder):]
+                    projectname = d.project
+                    intrapath = fpath[len(dlocal):]
                     if not __debug__:
                         break
 
@@ -284,10 +289,10 @@ if __name__ == '__main__':
             tavailable = AvailableFiles('KTAGirl',
                                         normalize_dir_path('../../../sanguine.cache\\'),
                                         ttmpdir.tmp_dir(),
+                                        normalize_dir_path('../..'),
                                         normalize_dir_path('../../../sanguine-skyrim-root\\'),
                                         [normalize_dir_path('../../../../MO2/downloads')],
-                                        [GithubFolder('KTAGirl', 'KTA',
-                                                      normalize_dir_path('../../../KTA\\'))], {})
+                                        [GithubFolder('KTAGirl/KTA')], {})
             with tasks.Parallel(None, dbg_serialize=False,
                                 taskstatsofinterest=tavailable.stats_of_interest()) as tparallel:
                 tavailable.start_tasks(tparallel)

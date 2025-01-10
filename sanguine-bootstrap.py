@@ -8,8 +8,8 @@ sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.install.install_common import *
 from sanguine.install.install_helpers import (run_installer, safe_call,
-                                              github_project_dir, github_project_exists, clone_github_project,
                                               find_command_and_add_to_path)
+from sanguine.install.install_github import github_project_exists, clone_github_project, GithubFolder
 from sanguine.install.simple_download import pattern_from_url, download_temp
 from sanguine.install.install_checks import report_hostile_programs
 from sanguine.install.install_ui import (message_box, input_box, confirm_box,
@@ -23,6 +23,8 @@ __version__ = '0.1.3b'
 
 _MODDERS_ANONYMOUS = 'modders-anonymous'
 _SANGUINE_ROSE = 'sanguine-rose'
+
+_GHFOLDER = GithubFolder(_MODDERS_ANONYMOUS + '/' + _SANGUINE_ROSE)
 
 try:
     add_file_logging(os.path.splitext(sys.argv[0])[0] + '.log.html')
@@ -92,7 +94,7 @@ try:
         githubdir = input_box('Where do you want to keep your Github projects (including sanguine-rose)?',
                               'C:\\Modding\\GitHub', level=logging.ERROR)
         if os.path.isdir(githubdir):
-            ok = github_project_exists(githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE)
+            ok = github_project_exists(githubdir, _GHFOLDER)
             if ok == 1:
                 info(
                     'It seems that you already have {} cloned. Will proceed without cloning {}.'.format(_SANGUINE_ROSE,
@@ -101,7 +103,7 @@ try:
                 break
             if ok == -1:
                 alert('Folder {}\\{}\\{} already exists. Please choose another folder for GitHub projects.'.format(
-                    githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE))
+                    githubdir, _GHFOLDER.author, _GHFOLDER.project))
             else:
                 assert ok == 0
                 break
@@ -109,10 +111,10 @@ try:
             break
 
     if not skiprepo:
-        clone_github_project(githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE,
+        clone_github_project(githubdir, _GHFOLDER,
                              BoxUINetworkErrorHandler(2), adjustpermissions=True)
 
-    sanguinedir = github_project_dir(githubdir, _MODDERS_ANONYMOUS, _SANGUINE_ROSE)
+    sanguinedir = _GHFOLDER.folder(githubdir)
     info(
         'Bootstrapping completed. Now you do not need {} anymore, and should use scripts in {} instead.'.format(
             sys.argv[0], sanguinedir))
