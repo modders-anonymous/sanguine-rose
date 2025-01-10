@@ -106,7 +106,16 @@ class AvailableFiles:
             return github
         return self._archived_file_retrievers_by_hash(h)
 
-    ### lists of file retrievers
+    def archive_stats(self) -> dict[bytes, tuple[int, int]]:  # hash -> (n,total_size)
+        return self._root_data.archive_stats()
+
+    def stats_of_interest(self) -> list[str]:
+        return (self._downloads_cache.stats_of_interest() + self._github_cache.stats_of_interest()
+                + self._root_data.stats_of_interest()
+                + ['sanguine.available.own', 'sanguine.available.fileorigins', 'sanguine.available.'])
+
+    ### private functions
+    # lists of file retrievers
     def _single_archive_retrievers(self, h: bytes) -> list[ArchiveFileRetrieverHelper]:
         found = self._root_data.archived_file_by_hash(h)
         if found is None:
@@ -166,7 +175,7 @@ class AvailableFiles:
 
         return out
 
-    # private functions
+    # own tasks
 
     def _starthashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:
         return tasks.TaskDataDependencies(
@@ -259,11 +268,6 @@ class AvailableFiles:
         for f in self._github_cache.all_files():
             add_to_dict_of_lists(self._github_cache_by_hash, f.file_hash, f)
         self._is_ready = True
-
-    def stats_of_interest(self) -> list[str]:
-        return (self._downloads_cache.stats_of_interest() + self._github_cache.stats_of_interest()
-                + self._root_data.stats_of_interest()
-                + ['sanguine.available.own', 'sanguine.available.fileorigins', 'sanguine.available.'])
 
 
 if __name__ == '__main__':

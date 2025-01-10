@@ -93,10 +93,20 @@ def togithub(wcache: WholeCache) -> None:
 
     info('Stage 2: accounted for unique files with {} archives, remaining {} files'.format(len(archives),
                                                                                            len(remainingretrievers2)))
-    arusage = sorted(archives.items(), key=lambda x: x[1])
-    info('Stage 2: archives with minimum usage:')
-    for i in range(min(len(arusage), 10)):
-        info('-> h={} n={}'.format(to_json_hash(truncate_file_hash(arusage[i][0])), arusage[i][1]))
+
+    arstats = wcache.archive_stats()
+    arusage: list[tuple[bytes, int, int]] = []
+    for arh, arn in archives.items():
+        assert arh in arstats
+        arusage.append((arh, arn, arstats[arh][0]))
+
+    arusage.sort(key=lambda x: x[1] / x[2])
+    warn('Stage 2: archives with usage <= 10%:')
+    for aru in arusage:
+        if aru[1] / aru[2] > 0.1:
+            break
+        warn('-> h={} n={}/{} ({:1f}%)'.format(to_json_hash(truncate_file_hash(aru[0])),
+                                               aru[1], aru[2], aru[1] / aru[2] * 100))
 
     if len(remainingretrievers2) != 0:
         raise SanguinicError(

@@ -230,7 +230,7 @@ class RootGitData:
     _tmp_dir: str
     _cache_data: dict[str, any]
     _archives_by_hash: dict[bytes, Archive] | None
-    _archived_files_by_hash: dict[bytes, list[tuple[Archive, FileInArchive]]] | None
+    _archived_files_by_hash: dict[bytes, list[tuple[Archive, FileInArchive]]] | None  # all (ar,fi) pairs for given hash
     _archived_files_by_name: dict[str, list[tuple[Archive, FileInArchive]]] | None
     _tentative_archive_names: dict[bytes, list[str]] | None
     _nhashes_requested: int  # number of hashes already requested; used to make name of tmp dir
@@ -259,79 +259,6 @@ class RootGitData:
         self._dirty_fo = False
         self._ar_is_ready = 0
         self._fo_is_ready = 0
-
-    def _loadar_owntask_datadeps(self) -> tasks.TaskDataDependencies:
-        return tasks.TaskDataDependencies(
-            [],
-            ['sanguine.rootgit.done_hashing()'],
-            ['sanguine.rootgit._archives_by_hash',
-             'sanguine.rootgit._archived_files_by_hash',
-             'sanguine.rootgit._archived_files_by_name'])
-
-    def _load_archives_own_task_func(self, out: tuple[dict, dict, dict, dict[str, any]]) -> None:
-        (archives_by_hash, archived_files_by_hash, archived_files_by_name, cacheoverrides) = out
-        assert self._archives_by_hash is None
-        assert self._archived_files_by_hash is None
-        self._archives_by_hash = archives_by_hash
-        self._archived_files_by_hash = archived_files_by_hash
-        self._archived_files_by_name = archived_files_by_name
-        self._cache_data |= cacheoverrides
-        assert self._ar_is_ready == 0
-        self._ar_is_ready = 1
-
-    def _arhashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:
-        return tasks.TaskDataDependencies(
-            ['sanguine.rootgit._archives_by_hash',
-             'sanguine.rootgit._archived_files_by_hash',
-             'sanguine.rootgit._archived_files_by_name'],
-            ['sanguine.rootgit.done_hashing()'],
-            [])
-
-    def _archive_hashing_own_task_func(self, out: tuple[list[Archive]]):
-        assert self._ar_is_ready == 1
-        (archives,) = out
-        for ar in archives:
-            _append_archive(self._archives_by_hash, self._archived_files_by_hash, self._archived_files_by_name, ar)
-        self._dirty_ar = True
-
-    def _done_hashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:
-        return tasks.TaskDataDependencies(
-            ['sanguine.rootgit._archives_by_hash',
-             'sanguine.rootgit._archived_files_by_hash',
-             'sanguine.rootgit._archived_files_by_name'],
-            [],
-            ['sanguine.rootgit.done_hashing()'])
-
-    def _done_hashing_own_task_func(self, parallel: tasks.Parallel) -> None:
-        assert self._ar_is_ready == 1
-        self._ar_is_ready = 2
-        if self._dirty_ar:
-            savetaskname = 'sanguine.rootgit.savear'
-            savetask = tasks.Task(savetaskname, _save_archives_task_func,
-                                  (self._root_git_dir, list(self._archives_by_hash.values())), [])
-            parallel.add_task(savetask)
-
-    def _loadtan_owntask_datadeps(self) -> tasks.TaskDataDependencies:
-        return tasks.TaskDataDependencies(
-            [],
-            [],
-            ['sanguine.rootgit._tentative_archive_names'])
-
-    def _load_tentative_names_own_task_func(self, out: tuple[dict[bytes, list[str]], dict[str, any]]) -> None:
-        assert self._fo_is_ready == 0
-        self._fo_is_ready = 1
-        (tanames, cacheoverrides) = out
-        assert self._tentative_archive_names is None
-        self._tentative_archive_names = tanames
-        self._cache_data |= cacheoverrides
-
-    def _load_own_plugin_data_task_func(self, out: tuple[any, dict[str, any]]) -> None:
-        assert self._fo_is_ready == 0
-        (loadret, cacheoverrides) = out
-        (name, plugindata) = loadret
-        plugin = file_origin_plugin_by_name(name)
-        plugin.got_loaded_data(plugindata)
-        self._cache_data |= cacheoverrides
 
     def start_tasks(self, parallel: tasks.Parallel) -> None:
         loadtaskname = 'sanguine.rootgit.loadar'
@@ -466,6 +393,22 @@ class RootGitData:
         assert (self._ar_is_ready >= 1) if partialok else (self._ar_is_ready >= 2)
         return self._archives_by_hash.get(arh)
 
+    def archive_stats(self) -> dict[bytes, tuple[int, int]]:  # hash -> (n,total_size)
+        assert self._ar_is_ready == 2
+        out: dict[bytes, tuple[int, int]] = {}
+        for arh, ar in self._archives_by_hash.items():
+            assert ar.archive_hash == arh
+            assert arh not in out
+            out[arh] = (0, 0)
+        for fh, arfilist in self._archived_files_by_hash.items():
+            for ar, fina in arfilist:
+                assert ar.archive_hash in out
+                out[ar.archive_hash] = (out[ar.archive_hash][0] + 1, out[ar.archive_hash][1] + fina.file_size)
+        for stats in out.values():
+            assert stats[0] != 0
+
+        return out
+
     def stats_of_interest(self) -> list[str]:
         return ['sanguine.rootgit.savear', 'sanguine.rootgit.loadar',
                 'sanguine.rootgit.loadtan', 'sanguine.rootgit.savetan',
@@ -473,3 +416,79 @@ class RootGitData:
                 'sanguine.rootgit.hash.', 'sanguine.rootgit.ownhash.'
                                           'sanguine.rootgit.donehashing',
                 'sanguine.rootgit.']
+
+    ### private functions
+    # own tasks with helpers
+
+    def _loadar_owntask_datadeps(self) -> tasks.TaskDataDependencies:
+        return tasks.TaskDataDependencies(
+            [],
+            ['sanguine.rootgit.done_hashing()'],
+            ['sanguine.rootgit._archives_by_hash',
+             'sanguine.rootgit._archived_files_by_hash',
+             'sanguine.rootgit._archived_files_by_name'])
+
+    def _load_archives_own_task_func(self, out: tuple[dict, dict, dict, dict[str, any]]) -> None:
+        (archives_by_hash, archived_files_by_hash, archived_files_by_name, cacheoverrides) = out
+        assert self._archives_by_hash is None
+        assert self._archived_files_by_hash is None
+        self._archives_by_hash = archives_by_hash
+        self._archived_files_by_hash = archived_files_by_hash
+        self._archived_files_by_name = archived_files_by_name
+        self._cache_data |= cacheoverrides
+        assert self._ar_is_ready == 0
+        self._ar_is_ready = 1
+
+    def _arhashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:
+        return tasks.TaskDataDependencies(
+            ['sanguine.rootgit._archives_by_hash',
+             'sanguine.rootgit._archived_files_by_hash',
+             'sanguine.rootgit._archived_files_by_name'],
+            ['sanguine.rootgit.done_hashing()'],
+            [])
+
+    def _archive_hashing_own_task_func(self, out: tuple[list[Archive]]):
+        assert self._ar_is_ready == 1
+        (archives,) = out
+        for ar in archives:
+            _append_archive(self._archives_by_hash, self._archived_files_by_hash, self._archived_files_by_name, ar)
+        self._dirty_ar = True
+
+    def _done_hashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:
+        return tasks.TaskDataDependencies(
+            ['sanguine.rootgit._archives_by_hash',
+             'sanguine.rootgit._archived_files_by_hash',
+             'sanguine.rootgit._archived_files_by_name'],
+            [],
+            ['sanguine.rootgit.done_hashing()'])
+
+    def _done_hashing_own_task_func(self, parallel: tasks.Parallel) -> None:
+        assert self._ar_is_ready == 1
+        self._ar_is_ready = 2
+        if self._dirty_ar:
+            savetaskname = 'sanguine.rootgit.savear'
+            savetask = tasks.Task(savetaskname, _save_archives_task_func,
+                                  (self._root_git_dir, list(self._archives_by_hash.values())), [])
+            parallel.add_task(savetask)
+
+    def _loadtan_owntask_datadeps(self) -> tasks.TaskDataDependencies:
+        return tasks.TaskDataDependencies(
+            [],
+            [],
+            ['sanguine.rootgit._tentative_archive_names'])
+
+    def _load_tentative_names_own_task_func(self, out: tuple[dict[bytes, list[str]], dict[str, any]]) -> None:
+        assert self._fo_is_ready == 0
+        self._fo_is_ready = 1
+        (tanames, cacheoverrides) = out
+        assert self._tentative_archive_names is None
+        self._tentative_archive_names = tanames
+        self._cache_data |= cacheoverrides
+
+    def _load_own_plugin_data_task_func(self, out: tuple[any, dict[str, any]]) -> None:
+        assert self._fo_is_ready == 0
+        (loadret, cacheoverrides) = out
+        (name, plugindata) = loadret
+        plugin = file_origin_plugin_by_name(name)
+        plugin.got_loaded_data(plugindata)
+        self._cache_data |= cacheoverrides
