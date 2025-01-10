@@ -155,8 +155,12 @@ class GithubModpackConfig:
         is_root = jsonconfig.get('is_root', 0)
         abort_if_not(is_root == 1 or is_root == 0)
         self.is_root = is_root != 0
-        self.dependencies = [GithubModpack(d) for d in jsonconfig['dependencies']]
-        self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
+        if self.is_root:
+            self.dependencies = []
+            self.own_mod_names = []
+        else:
+            self.dependencies = [GithubModpack(d) for d in jsonconfig['dependencies']]
+            self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
 
 
 class LocalProjectConfig:
@@ -205,10 +209,10 @@ class LocalProjectConfig:
 
             self.mod_manager_config.parse_config_section(mmc_config, self.config_dir, jsonconfig, self.download_dirs)
 
-            self.cache_dir = config_dir_path(jsonconfig.get('cache', self.config_dir + '..\\..\\sanguine.cache\\'),
+            self.cache_dir = config_dir_path(jsonconfig.get('cache', self.config_dir + '.\\sanguine.cache\\'),
                                              self.config_dir,
                                              jsonconfig)
-            self.tmp_dir = config_dir_path(jsonconfig.get('tmp', self.config_dir + '..\\..\\sanguine.tmp\\'),
+            self.tmp_dir = config_dir_path(jsonconfig.get('tmp', self.config_dir + '.\\sanguine.tmp\\'),
                                            self.config_dir,
                                            jsonconfig)
 
@@ -253,7 +257,7 @@ class LocalProjectConfig:
             info('GitHub project {} cloned successfully'.format(ghproject))
 
         assert ok == 1
-        with open_3rdparty_txt_file(gh.mpfolder(self.github_root_dir)) as rf:
+        with open_3rdparty_txt_file(gh.mpfolder(self.github_root_dir)+'sanguine.json5') as rf:
             jsonconfig = json5.load(rf)
             mpcfg = GithubModpackConfig(jsonconfig)
             self.all_modpack_configs[ghproject] = mpcfg
