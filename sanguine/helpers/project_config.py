@@ -139,7 +139,7 @@ class GithubModpack(GithubFolder):
 
     def mpfolder(self, rootgitdir: str) -> str:
         parentdir = self.folder(rootgitdir)
-        return parentdir if self.subfolder == '' else parentdir + self.subfolder + '\\'
+        return parentdir if self.subfolder == '' else parentdir + self.subfolder.lower() + '\\'
 
     def mpto_str(self) -> str:
         parent = self.to_str()
@@ -219,15 +219,16 @@ class LocalProjectConfig:
             self.github_root_dir = config_dir_path(jsonconfig.get('githubroot', '.\\'), self.config_dir,
                                                    jsonconfig)
 
-            abort_if_not('ghproject' in jsonconfig)
-            ghproject = jsonconfig['ghproject']
-            abort_if_not(isinstance(ghproject, str) and GithubFolder.is_ok(ghproject))
+            abort_if_not('modpack' in jsonconfig)
+            ghmodpack = jsonconfig['modpack']
+            abort_if_not(isinstance(ghmodpack, str) and GithubModpack.is_ok(ghmodpack))
 
             self.all_modpack_configs = {}
-            self.this_modpack = ghproject
+            self.this_modpack = ghmodpack
             self.root_modpack = None
-            self._load_andor_clone(ghproject)
+            self._load_andor_clone(ghmodpack)
             abort_if_not(self.root_modpack is not None)
+            abort_if_not(self.root_modpack != self.this_modpack)
 
             self.github_username = jsonconfig.get('github_username')
 
@@ -257,7 +258,7 @@ class LocalProjectConfig:
             info('GitHub project {} cloned successfully'.format(ghproject))
 
         assert ok == 1
-        with open_3rdparty_txt_file(gh.mpfolder(self.github_root_dir)+'sanguine.json5') as rf:
+        with open_3rdparty_txt_file(gh.mpfolder(self.github_root_dir) + 'sanguine.json5') as rf:
             jsonconfig = json5.load(rf)
             mpcfg = GithubModpackConfig(jsonconfig)
             self.all_modpack_configs[ghproject] = mpcfg

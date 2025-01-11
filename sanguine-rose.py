@@ -27,8 +27,6 @@ def _usage() -> None:
 if __name__ == '__main__':
     argv = sys.argv[1:]
     if len(sys.argv) == 2 and sys.argv[1] == 'test':
-        if not os.path.isdir('../../KTAGirl/KTA'):
-            clone_github_project('../../', GithubFolder('KTAGirl/KTA'), BoxUINetworkErrorHandler(2))
         argv = ['../../local-sanguine-project.json5']
 
     if len(argv) != 1:

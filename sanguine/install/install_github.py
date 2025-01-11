@@ -33,7 +33,7 @@ class GithubFolder:
 
     def folder(self, rootgitdir: str) -> str:
         assert is_normalized_dir_path(rootgitdir)
-        return rootgitdir + self.author + '\\' + self.project + '\\'
+        return rootgitdir + self.author.lower() + '\\' + self.project.lower() + '\\'
 
     def to_str(self) -> str:
         return self.author + '/' + self.project
