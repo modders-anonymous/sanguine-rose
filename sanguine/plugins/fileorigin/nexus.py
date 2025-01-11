@@ -273,6 +273,7 @@ class NexusFileOriginPlugin(FileOriginPluginBase):
         return 'nexus'
 
     def config(self, cfg: dict[str, any]) -> None:
+        unused_config_warning('origins.nexus', cfg, ['gameids'])
         if 'gameids' in cfg:
             gameids = cfg['gameids']
             if isinstance(gameids, int):

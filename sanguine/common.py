@@ -210,6 +210,18 @@ class FastSearchOverPartialStrings:
                 return prev[0], prev[2]
 
 
+def unused_config_warning(where: str, cfg: dict[str, any], known: list[str]) -> None:
+    known2 = {key: 1 for key in known}
+    errstr = ''
+    for k in cfg.keys():
+        if k not in known2:
+            if errstr != '':
+                errstr += ','
+            errstr += k
+    if errstr != '':
+        alert('Unused config keys in {}: {}'.format(where, errstr))
+
+
 ### JSON-related
 
 def to_json_hash(h: bytes) -> str:

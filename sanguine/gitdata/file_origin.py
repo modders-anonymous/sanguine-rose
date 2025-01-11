@@ -127,7 +127,7 @@ def file_origin_plugin_by_name(name: str) -> FileOriginPluginBase:
 
 def _config_file_origin_plugins(cfg: dict[str, any], _: None) -> None:
     global _file_origin_plugins
-    alert('_config_file_origin_plugins')
+    unused_config_warning('file_origin_plugins',cfg,[p.name() for p in _file_origin_plugins.values()])
     for p in _file_origin_plugins.values():
         if p.name() in cfg:
             p.config(cfg[p.name()])

@@ -120,6 +120,11 @@ def _find_config(name: str) -> ModManagerConfig | None:
     return None
 
 
+def _all_config_names() -> list[str]:
+    global _modmanager_plugins
+    return [mm.mod_manager_name() for mm in _modmanager_plugins]
+
+
 def _all_configs_string() -> str:
     global _modmanager_plugins
     out = ''
@@ -165,10 +170,12 @@ class GithubModpackConfig:
         abort_if_not(is_root == 1 or is_root == 0)
         self.is_root = is_root != 0
         if self.is_root:
+            unused_config_warning('ModpackConfig', jsonconfig, ['is_root', 'origins'])
             self.origin_configs = jsonconfig.get('origins', {})
             self.dependencies = []
             self.own_mod_names = []
         else:
+            unused_config_warning('ModpackConfig', jsonconfig, ['is_root', 'dependencies', 'ownmods'])
             self.origin_configs = None
             self.dependencies = [GithubModpack(d) for d in jsonconfig['dependencies']]
             self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
@@ -191,6 +198,9 @@ class LocalProjectConfig:
         self.config_dir = normalize_dir_path(os.path.split(jsonconfigfname)[0])
         with (open_3rdparty_txt_file(jsonconfigfname) as f):
             jsonconfig = json5.loads(f.read())
+            unused_config_warning(jsonconfigfname, jsonconfig,
+                                  ['modmanager', 'downloads', 'cache', 'tmp', 'githubroot', 'modpack',
+                                   'github_username'] + _all_config_names())
 
             abort_if_not('modmanager' in jsonconfig, "'modmanager' must be present in config")
             modmanager = jsonconfig['modmanager']

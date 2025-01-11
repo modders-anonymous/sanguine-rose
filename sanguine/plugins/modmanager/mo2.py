@@ -28,6 +28,9 @@ class Mo2ProjectConfig(ModManagerConfig):
 
     def parse_config_section(self, section: dict[str, any], configdir: str, fullconfig: dict[str, any],
                              download_dirs: list[str]) -> None:
+        unused_config_warning('mo2', section,
+                              ['mo2dir', 'ignores', 'masterprofile', 'generatedprofiles'])
+
         abort_if_not('mo2dir' in section, "'mo2dir' must be present in config.mo2 for modmanager=mo2")
         mo2dir = config_dir_path(section['mo2dir'], configdir, fullconfig)
         abort_if_not(isinstance(mo2dir, str), 'config.mo2.mo2dir must be a string')
@@ -60,7 +63,7 @@ class Mo2ProjectConfig(ModManagerConfig):
 
         self.generated_profiles = section.get('generatedprofiles')
         abort_if_not(self.generated_profiles is not None and isinstance(self.generated_profiles, dict),
-                     lambda: "'genprofiles' in config must be a list, got " + repr(self.generated_profiles))
+                     lambda: "'generatedprofiles' in config must be a list, got " + repr(self.generated_profiles))
         for gp in self.generated_profiles.keys():
             abort_if_not(os.path.isdir(self.mo2dir.folder + 'profiles\\' + gp))
 
