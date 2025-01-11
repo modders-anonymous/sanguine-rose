@@ -79,7 +79,7 @@ if __name__ == '__main__':
                             clone_github_project(cfg.github_root_dir, gf, BoxUINetworkErrorHandler(2))
 
                 case 'togithub':
-                    togithub(wcache)
+                    togithub(cfg, wcache)
 
                 case 'h' | 'help' | '' | _:
                     info('commands:')

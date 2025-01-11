@@ -1,10 +1,12 @@
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
+from sanguine.gitdata.project_json import GitProjectJson
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
+from sanguine.helpers.project_config import LocalProjectConfig
 
 
-def togithub(wcache: WholeCache) -> None:
+def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('Stage 0: collecting retrievers')
     possibleretrievers: dict[bytes, list[FileRetriever]] = {}
     nzero = 0
@@ -34,7 +36,7 @@ def togithub(wcache: WholeCache) -> None:
         info('{} -> {}'.format(n, stats[n]))
 
     ### got all known retrievers, now processing
-    retrievers: list[tuple[bytes, FileRetriever]] = []
+    retrievers: dict[bytes, FileRetriever] = {}
 
     ### processing unique retrievers
     info('Stage 1: processing Zero, GitHub, and unique files in Archives')
@@ -45,11 +47,13 @@ def togithub(wcache: WholeCache) -> None:
         assert len(r[1]) > 0
         rr0 = r[1][0]
         if isinstance(rr0, ZeroFileRetriever) or isinstance(rr0, GithubFileRetriever):
-            retrievers.append((r[0], rr0))
+            assert r[0] not in retrievers
+            retrievers[r[0]] = rr0
             nzerogithub += 1
         elif len(r[1]) == 1:
             assert isinstance(rr0, ArchiveFileRetriever)
-            retrievers.append((r[0], rr0))
+            assert r[0] not in retrievers
+            retrievers[r[0]] = rr0
             if rr0.archive_hash() not in archives:
                 archives[rr0.archive_hash()] = 1
             else:
@@ -78,7 +82,8 @@ def togithub(wcache: WholeCache) -> None:
 
         if bestar is not None:
             assert bestarn > 0
-            retrievers.append((r[0], bestar))
+            assert r[0] not in retrievers
+            retrievers[r[0]] = bestar
             assert isinstance(bestar, ArchiveFileRetriever)
             archives[bestar.archive_hash()] += 1
         else:
@@ -86,7 +91,7 @@ def togithub(wcache: WholeCache) -> None:
 
     if __debug__:
         assert len(possibleretrievers) == len(remainingretrievers2) + len(retrievers)
-        for r in retrievers:
+        for r in retrievers.items():
             retr: FileRetriever = r[1]
             assert isinstance(retr, ArchiveFileRetriever) or isinstance(retr, GithubFileRetriever) or isinstance(retr,
                                                                                                                  ZeroFileRetriever)
@@ -113,6 +118,25 @@ def togithub(wcache: WholeCache) -> None:
     if len(remainingretrievers2) != 0:
         raise SanguinicError(
             'handling of non-unique retrievers is NOT IMPLEMENTED YET')  # TODO! - this is possible, when encounter - will need to process
+
+    retrievers_by_path: list[tuple[str, FileRetriever]] = []
+    vfsroot = cfg.vfs_root()
+    lvfsroot = len(vfsroot)
+    nzero2 = 0
+    for f in wcache.all_vfs_files():
+        fp = f.file_path
+        assert fp.startswith(vfsroot)
+        fp = fp[lvfsroot:]
+        if not f.file_hash in retrievers:
+            nzero2 += 1
+        else:
+            retrievers_by_path.append((fp, retrievers[f.file_hash]))
+    assert nzero2 == nzero
+
+    fname = cfg.this_modpack_folder() + 'project.json'
+    with open(fname, 'wt', encoding='utf-8') as f:
+        jsonwriter = GitProjectJson()
+        jsonwriter.write(f, retrievers_by_path)
 
 
 '''

@@ -68,7 +68,7 @@ class Mo2ProjectConfig(ModManagerConfig):
         self.master_modlist = ModList(
             normalize_dir_path(self.mo2dir.folder + 'profiles\\' + self.master_profile + '\\'))
 
-    def is_path_ignored(self,path:str) -> bool:
+    def is_path_ignored(self, path: str) -> bool:
         for ig in self.ignore_dirs:
             if path.startswith(ig):
                 return True
@@ -88,3 +88,6 @@ class Mo2ProjectConfig(ModManagerConfig):
 
     def default_download_dirs(self) -> list[str]:
         return ['{mo2.mo2dir}downloads\\']
+
+    def vfs_root(self) -> str:
+        return self.mo2dir.folder

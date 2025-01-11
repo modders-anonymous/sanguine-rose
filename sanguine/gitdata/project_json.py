@@ -106,6 +106,9 @@ class _GitRetrievedZeroFileReadHandler(_GitRetrievedFileReadHandler):
 
 
 class _GitRetrievedZeroFileWriteHandler(_GitRetrievedFileWriteHandler):
+    def __init__(self) -> None:
+        super().__init__(_GitRetrievedZeroFileReadHandler.SPECIFIC_FIELDS)
+
     def legend(self) -> str:
         return '[ nothing else if Zero ]'
 
@@ -124,7 +127,7 @@ class _GitRetrievedGithubFileReadHandler(_GitRetrievedFileReadHandler):
     SPECIFIC_FIELDS: list[GitDataParam] = [
         GitDataParam('g', GitDataType.Path, False),
         GitDataParam('a', GitDataType.Str),
-        GitDataParam('p', GitDataType.Str),
+        GitDataParam('r', GitDataType.Str),
     ]
 
     def __init__(self, files: list[tuple[str, FileRetriever]]) -> None:
@@ -138,6 +141,9 @@ class _GitRetrievedGithubFileReadHandler(_GitRetrievedFileReadHandler):
 
 
 class _GitRetrievedGithubFileWriteHandler(_GitRetrievedFileWriteHandler):
+    def __init__(self) -> None:
+        super().__init__(_GitRetrievedGithubFileReadHandler.SPECIFIC_FIELDS)
+
     def legend(self) -> str:
         return '[ g:github file path in project, a:github project author, p:github project name if Github ]'
 
@@ -182,6 +188,9 @@ class _GitRetrievedArchiveFileReadHandler(_GitRetrievedFileReadHandler):
 
 
 class _GitRetrievedArchiveFileWriteHandler(_GitRetrievedFileWriteHandler):
+    def __init__(self) -> None:
+        super().__init__(_GitRetrievedArchiveFileReadHandler.SPECIFIC_FIELDS)
+
     def legend(self) -> str:
         return '[ i:intra-archive path, a:archive hash, x:archive size if Archive ]'
 
@@ -193,7 +202,7 @@ class _GitRetrievedArchiveFileWriteHandler(_GitRetrievedFileWriteHandler):
         last = fr.single_archive_retrievers[-1]
         writer.write_line(self,
                           _GitRetrievedFileWriteHandler.common_values(rel_path, fr),
-                          (last.file_in_archive, last.archive_hash, last.archive_size))
+                          (last.file_in_archive.intra_path, last.archive_hash, last.archive_size))
 
 
 ### all write handlers

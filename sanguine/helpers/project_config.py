@@ -80,6 +80,10 @@ class ModManagerConfig:
     def active_vfs_folders(self) -> FolderListToCache:
         pass
 
+    @abstractmethod
+    def vfs_root(self) -> str:
+        pass
+
 
 class ModManagerPluginBase(ABC):
     def __init__(self) -> None:
@@ -237,6 +241,12 @@ class LocalProjectConfig:
 
     def github_folders(self) -> list[GithubFolder]:
         return [GithubModpack(mp) for mp in self.all_modpack_configs.keys()]
+
+    def this_modpack_folder(self) -> str:
+        return GithubModpack(self.this_modpack).mpfolder(self.github_root_dir)
+
+    def vfs_root(self) -> str:
+        return self.mod_manager_config.vfs_root()
 
     # private functions
 

@@ -76,10 +76,10 @@ class GitParamHashCompressor(GitParamCompressor):
         self.prev = None
 
     def compress(self, h: bytes) -> str:
-        assert isinstance(h, bytes)
         if h is None:
             assert self.can_skip
             return ''
+        assert isinstance(h, bytes)
         if self.can_skip and self.prev == h:
             return ''
         self.prev = h
@@ -128,7 +128,7 @@ class GitParamPathCompressor(GitParamCompressor):
             else:
                 break
 
-        assert 0 <= nmatch < lspl
+        assert 0 <= nmatch <= lspl
         processed = False
         if self.level >= 2 and lprev == lspl and nmatch == lspl - 1:
             # for 'a'-'f' codes explanation, see decompressor
@@ -452,7 +452,8 @@ class GitDataWriteList:
             if len(handlers) > 1:  # if there is only one handler, then there can be no problems distinguishing handlers,
                 # even if the only handler has no parameters whatsoever
                 for h in handlers:
-                    assert not h.specific_fields[0].can_skip  # otherwise regex parsing may become ambiguous
+                    assert len(h.specific_fields) == 0 or not h.specific_fields[
+                        0].can_skip  # otherwise regex parsing may become ambiguous
 
                 # handlers must distinguish by their first param (to avoid regex ambiguity)
                 first_param_names = [(h.specific_fields[0].name if len(h.specific_fields) > 0 else '') for h in
