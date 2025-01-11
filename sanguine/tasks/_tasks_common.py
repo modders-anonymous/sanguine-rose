@@ -1,6 +1,7 @@
 from sanguine.common import *
 
 _proc_num: int = -1  # number of child process
+_parallel_count: int = 0
 
 
 def current_proc_num() -> int:
@@ -11,6 +12,21 @@ def current_proc_num() -> int:
 def set_current_proc_num(proc_num: int) -> None:
     global _proc_num
     _proc_num = proc_num
+
+
+def increment_parallel_count() -> None:
+    global _parallel_count
+    _parallel_count += 1
+
+
+def decrement_parallel_count() -> None:
+    global _parallel_count
+    _parallel_count -= 1
+
+
+def _abort_if_parallel_running() -> None:
+    global _parallel_count
+    abort_if_not(_parallel_count == 0)
 
 
 def is_lambda(func: Callable) -> bool:
@@ -27,6 +43,23 @@ class LambdaReplacement:
 
     def call(self, param: any) -> any:
         return self.f(self.capture, param)
+
+
+_global_process_initializers: list[LambdaReplacement] = []
+
+
+def add_global_process_initializer(init: LambdaReplacement) -> None:
+    _abort_if_parallel_running()
+    _global_process_initializers.append(init)
+
+
+def get_global_process_initializers() -> list[LambdaReplacement]:
+    return _global_process_initializers
+
+
+def run_global_process_initializers(inits: list[LambdaReplacement]) -> None:
+    for init in inits:
+        init.call(None)
 
 
 class TaskDataDependencies:

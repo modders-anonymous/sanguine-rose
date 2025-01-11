@@ -12,15 +12,6 @@ from sanguine.install.install_common import *
 
 ### inter-file interfaces
 
-class GameUniverse(enum.Enum):
-    Skyrim = 0,
-    Fallout = 1
-
-
-def game_universe() -> GameUniverse:
-    return GameUniverse.Skyrim  # TODO: read from project config
-
-
 class FolderToCache:
     folder: str
     exdirs: list[str]

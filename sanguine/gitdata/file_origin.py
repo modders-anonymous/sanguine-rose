@@ -1,6 +1,7 @@
 import re
 
 import sanguine.gitdata.git_data_file as gitdatafile
+import sanguine.tasks as tasks
 from sanguine.common import *
 from sanguine.gitdata.git_data_file import GitDataParam, GitDataType, GitDataWriteHandler, GitDataReadHandler
 from sanguine.helpers.plugin_handler import load_plugins
@@ -40,6 +41,10 @@ class FileOriginPluginBase(ABC):
 
     @abstractmethod
     def name(self) -> str:
+        pass
+
+    @abstractmethod
+    def config(self, cfg: dict[str, any]) -> None:
         pass
 
     @abstractmethod
@@ -118,6 +123,20 @@ def file_origin_plugins() -> Iterable[FileOriginPluginBase]:
 def file_origin_plugin_by_name(name: str) -> FileOriginPluginBase:
     global _file_origin_plugins
     return _file_origin_plugins[name]
+
+
+def _config_file_origin_plugins(cfg: dict[str, any], _: None) -> None:
+    global _file_origin_plugins
+    alert('_config_file_origin_plugins')
+    for p in _file_origin_plugins.values():
+        if p.name() in cfg:
+            p.config(cfg[p.name()])
+
+
+def config_file_origin_plugins(cfg: dict[str, any]) -> None:
+    _config_file_origin_plugins(cfg, None)
+    init = tasks.LambdaReplacement(_config_file_origin_plugins, cfg)
+    tasks.add_global_process_initializer(init)
 
 
 ### known-tentative-archive-names.json5, GitTentativeArchiveNames

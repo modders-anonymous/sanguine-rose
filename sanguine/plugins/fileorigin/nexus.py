@@ -8,6 +8,16 @@ from sanguine.gitdata.git_data_file import GitDataParam, GitDataType, GitDataRea
 
 ### FileOrigin
 
+class _NexusGameUniverse:
+    game_ids = list[int]
+
+    def __init__(self, gameids: list[int]) -> None:
+        self.game_ids = gameids
+
+    def is_nexus_gameid_ok(self, nexusgameid: int) -> bool:
+        return nexusgameid in self.game_ids
+
+
 class NexusFileOrigin(FileOrigin):
     gameid: int  # nexus game #
     modid: int
@@ -20,12 +30,6 @@ class NexusFileOrigin(FileOrigin):
         self.gameid = gameid
         self.modid = modid
         self.fileid = fileid
-
-    @staticmethod
-    def is_nexus_gameid_ok(game: GameUniverse, nexusgameid: int) -> bool:
-        if game == GameUniverse.Skyrim:
-            return nexusgameid in [1704, 110]  # SE, LE
-        assert False
 
     def eq(self, b: "NexusFileOrigin") -> bool:
         return self.fileid == b.fileid and self.modid == b.modid and self.gameid == b.gameid
@@ -158,14 +162,16 @@ class NexusMetaFileParser(MetaFileParser):
     file_id: int | None
     url: str | None
     file_name: str
+    _universe: _NexusGameUniverse
 
-    def __init__(self, meta_file_path: str) -> None:
+    def __init__(self, universe: _NexusGameUniverse, meta_file_path: str) -> None:
         super().__init__(meta_file_path)
         self.game_id = None
         self.mod_id = None
         self.file_id = None
         self.url = None
         self.file_name = os.path.split(meta_file_path)[1]
+        self._universe = universe
 
     def take_ln(self, ln: str) -> None:
         m = NexusMetaFileParser.MOD_ID_PATTERN.match(ln)
@@ -189,7 +195,7 @@ class NexusMetaFileParser(MetaFileParser):
                 urlmodid = int(m2.group(2))
                 urlfname = m2.group(3)
                 urlmd5 = m2.group(4)
-                if NexusFileOrigin.is_nexus_gameid_ok(game_universe(), urlgameid):
+                if self._universe.is_nexus_gameid_ok(urlgameid):
                     if self.game_id is None:
                         self.game_id = urlgameid
                     elif self.game_id != urlgameid:
@@ -254,6 +260,7 @@ def _nexus_md5_factory() -> NexusMd5Hash:
 
 
 class NexusFileOriginPlugin(FileOriginPluginBase):
+    game_ids: list[int]
     nexus_hash_mapping: dict[bytes, bytes]
     nexus_file_origins: dict[bytes, list[NexusFileOrigin]]
 
@@ -265,8 +272,20 @@ class NexusFileOriginPlugin(FileOriginPluginBase):
     def name(self) -> str:
         return 'nexus'
 
+    def config(self, cfg: dict[str, any]) -> None:
+        if 'gameids' in cfg:
+            gameids = cfg['gameids']
+            if isinstance(gameids, int):
+                gameids = [gameids]
+            self.game_ids = gameids
+            abort_if_not(isinstance(self.game_ids, list))
+            for gid in self.game_ids:
+                abort_if_not(isinstance(gid, int))
+        else:
+            self.game_ids = []
+
     def meta_file_parser(self, metafilepath: str) -> MetaFileParser:
-        return NexusMetaFileParser(metafilepath)
+        return NexusMetaFileParser(_NexusGameUniverse(self.game_ids), metafilepath)
 
     ### reading and writing is split into two parts, to facilitate multiprocessing
     # reading, part 1 (to be run in a separate process)

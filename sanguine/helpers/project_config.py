@@ -3,6 +3,7 @@ import re
 import json5
 
 from sanguine.common import *
+from sanguine.gitdata.file_origin import config_file_origin_plugins
 from sanguine.helpers.plugin_handler import load_plugins
 from sanguine.install.install_github import GithubFolder, clone_github_project, github_project_exists
 from sanguine.install.install_ui import BoxUINetworkErrorHandler
@@ -152,6 +153,10 @@ class GithubModpack(GithubFolder):
 
 class GithubModpackConfig:
     is_root: bool
+    # for root:
+    origin_configs: dict[str, any] | None
+
+    # for non-root:
     dependencies: list[GithubModpack]
     own_mod_names: list[str]
 
@@ -160,9 +165,11 @@ class GithubModpackConfig:
         abort_if_not(is_root == 1 or is_root == 0)
         self.is_root = is_root != 0
         if self.is_root:
+            self.origin_configs = jsonconfig.get('origins', {})
             self.dependencies = []
             self.own_mod_names = []
         else:
+            self.origin_configs = None
             self.dependencies = [GithubModpack(d) for d in jsonconfig['dependencies']]
             self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
 
@@ -233,6 +240,8 @@ class LocalProjectConfig:
             self._load_andor_clone(ghmodpack)
             abort_if_not(self.root_modpack is not None)
             abort_if_not(self.root_modpack != self.this_modpack)
+            assert self.root_modpack in self.all_modpack_configs
+            config_file_origin_plugins(self.all_modpack_configs[self.root_modpack].origin_configs)
 
             self.github_username = jsonconfig.get('github_username')
 

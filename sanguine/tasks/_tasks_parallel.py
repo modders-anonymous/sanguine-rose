@@ -59,12 +59,13 @@ def _process_nonown_tasks(tasks: list[list], dwait: float | None) -> tuple[Excep
     return None, outtasks
 
 
-def _proc_func(proc_num: int, inq: PQueue, outq: PQueue, logq) -> None:
+def _proc_func(proc_num: int, globalinits: list[LambdaReplacement], inq: PQueue, outq: PQueue, logq) -> None:
     try:
         assert current_proc_num() == -1
         set_current_proc_num(proc_num)
 
         add_logging_handler(_ChildProcessLogHandler(logq))
+        run_global_process_initializers(globalinits)
 
         debug('Process started')
         outq.put(ProcessStarted(proc_num))
@@ -309,6 +310,7 @@ class Parallel:
         self._last_log_stats_str = None
 
     def __enter__(self) -> "Parallel":
+        increment_parallel_count()
         self._old_logging_hook = set_logging_hook(lambda rec: self._logq.put((-1, time.perf_counter(), rec)))
         self._processes = []
         self._process_requests = []
@@ -323,7 +325,7 @@ class Parallel:
         for i in range(self._nprocesses):
             inq = PQueue()
             self._inqueues.append(inq)
-            p = Process(target=_proc_func, args=(i, inq, self._outq, self._logq))
+            p = Process(target=_proc_func, args=(i, get_global_process_initializers(), inq, self._outq, self._logq))
             self._processes.append(p)
             p.start()
             self._process_requests.append([])
@@ -987,6 +989,7 @@ class Parallel:
 
     def __exit__(self, exceptiontype: Type[BaseException] | None, exceptionval: BaseException | None,
                  exceptiontraceback: TracebackType | None):
+        decrement_parallel_count()
         force = False
         if exceptiontype is not None:
             critical('Parallel: exception {}: {}'.format(str(exceptiontype), repr(exceptionval)))
