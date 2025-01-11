@@ -11,6 +11,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('Stage 0: collecting retrievers')
     possibleretrievers: dict[bytes, list[FileRetriever]] = {}
     nzero = 0
+    nzerostats = {}
     ndup = 0
     for f in wcache.all_vfs_files():
         if f.file_hash in possibleretrievers:
@@ -19,12 +20,22 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
             if len(retr) == 0:
                 nzero += 1
+                ext = os.path.splitext(f.file_path)[1]
+                if len(ext) > 6:
+                    ext = '.longer.'
+                if ext not in nzerostats:
+                    nzerostats[ext] = 1
+                else:
+                    nzerostats[ext] += 1
             else:
                 possibleretrievers[f.file_hash] = retr
 
     info('found {} duplicate files'.format(ndup))
     if nzero > 0:
         warn('did not find retrievers for {} files'.format(nzero))
+        for zext, zn in sorted(nzerostats.items(), key=lambda x: -x[1]):
+            warn('-> {} -> {}'.format(zext, zn))
+
     info('stats (nretrievers->ntimes):')
     stats = {}
     for r in possibleretrievers.items():
