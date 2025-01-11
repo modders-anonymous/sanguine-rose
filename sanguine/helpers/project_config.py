@@ -181,6 +181,44 @@ class GithubModpackConfig:
             self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
 
 
+def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
+                                             allmodpackconfigs: dict[str, any]) -> str | None:
+    rootmodpack: str | None = None
+    if ghproject in allmodpackconfigs:
+        return
+
+    gh = GithubModpack(ghproject)
+    ok = github_project_exists(githubrootdir, gh)
+    if ok == -1:
+        critical(
+            'Fatal error: folder {} exists, but does not contain {}/{}'.format(gh.folder(githubrootdir),
+                                                                               gh.author, gh.project))
+        abort_if_not(False)
+
+    if ok == 0:
+        info('Cloning GitHub project: {}'.format(ghproject))
+        clone_github_project(githubrootdir, gh, BoxUINetworkErrorHandler(2))
+        info('GitHub project {} cloned successfully'.format(ghproject))
+
+    assert ok == 1
+    with open_3rdparty_txt_file(gh.mpfolder(githubrootdir) + 'sanguine.json5') as rf:
+        jsonconfig = json5.load(rf)
+        mpcfg = GithubModpackConfig(jsonconfig)
+        allmodpackconfigs[ghproject] = mpcfg
+
+        if mpcfg.is_root:
+            abort_if_not(rootmodpack is None)
+            rootmodpack = ghproject
+
+        for d in mpcfg.dependencies:
+            rmp = install_github_project_with_dependencies(d.mpto_str(), githubrootdir, allmodpackconfigs)
+            abort_if_not(rmp is None or rootmodpack is None)
+            if rmp is not None:
+                rootmodpack = rmp
+
+    return rootmodpack
+
+
 class LocalProjectConfig:
     config_dir: str
     mod_manager_config: ModManagerConfig
@@ -246,8 +284,8 @@ class LocalProjectConfig:
 
             self.all_modpack_configs = {}
             self.this_modpack = ghmodpack
-            self.root_modpack = None
-            self._load_andor_clone(ghmodpack)
+            self.root_modpack = install_github_project_with_dependencies(ghmodpack, self.github_root_dir,
+                                                                         self.all_modpack_configs)
             abort_if_not(self.root_modpack is not None)
             abort_if_not(self.root_modpack != self.this_modpack)
             assert self.root_modpack in self.all_modpack_configs
@@ -268,33 +306,3 @@ class LocalProjectConfig:
         return self.mod_manager_config.vfs_root()
 
     # private functions
-
-    def _load_andor_clone(self, ghproject: str) -> None:
-        if ghproject in self.all_modpack_configs:
-            return
-
-        gh = GithubModpack(ghproject)
-        ok = github_project_exists(self.github_root_dir, gh)
-        if ok == -1:
-            critical(
-                'Fatal error: folder {} exists, but does not contain {}/{}'.format(gh.folder(self.github_root_dir),
-                                                                                   gh.author, gh.project))
-            abort_if_not(False)
-
-        if ok == 0:
-            info('Cloning GitHub project: {}'.format(ghproject))
-            clone_github_project(self.github_root_dir, gh, BoxUINetworkErrorHandler(2))
-            info('GitHub project {} cloned successfully'.format(ghproject))
-
-        assert ok == 1
-        with open_3rdparty_txt_file(gh.mpfolder(self.github_root_dir) + 'sanguine.json5') as rf:
-            jsonconfig = json5.load(rf)
-            mpcfg = GithubModpackConfig(jsonconfig)
-            self.all_modpack_configs[ghproject] = mpcfg
-
-            if mpcfg.is_root:
-                abort_if_not(self.root_modpack is None)
-                self.root_modpack = ghproject
-
-            for d in mpcfg.dependencies:
-                self._load_andor_clone(d.mpto_str())

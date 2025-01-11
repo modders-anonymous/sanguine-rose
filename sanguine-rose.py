@@ -6,13 +6,11 @@ import time
 
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
-from sanguine.install.install_github import github_project_exists, clone_github_project
-from sanguine.install.install_ui import BoxUINetworkErrorHandler
 from sanguine.common import *
 from sanguine.install.install_checks import check_sanguine_prerequisites
 from sanguine.install.install_ui import input_box
-from sanguine.helpers.project_config import LocalProjectConfig
-from sanguine.install.install_github import GithubFolder
+from sanguine.helpers.project_config import LocalProjectConfig, install_github_project_with_dependencies, \
+    GithubModpackConfig
 import sanguine.tasks as tasks
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.commands.togithub import togithub
@@ -65,18 +63,11 @@ if __name__ == '__main__':
                     if len(command) < 2:
                         alert('wrong number of parameters, use help to ask for syntax')
                     else:
-                        authorproject = command[1]
-                        gf = GithubFolder(authorproject)
-                        ok = github_project_exists(cfg.github_root_dir, gf)
-                        pd = gf.folder(cfg.github_root_dir)
-                        if ok == 1:
-                            info('Project {} already exists'.format(pd))
-                        elif ok == -1:
-                            alert('Folder {} already exists, but does not contain expected github project'.format(pd))
-                        else:
-                            assert ok == 0
-                            info('Cloning {}...'.format(pd))
-                            clone_github_project(cfg.github_root_dir, gf, BoxUINetworkErrorHandler(2))
+                        allmodpackconfigs: dict[
+                            str, GithubModpackConfig] = {}  # have to use temporary one to avoid changing our main cfg
+                        rootmodpack = install_github_project_with_dependencies(command[1], cfg.github_root_dir,
+                                                                               allmodpackconfigs)
+                        info('{} installed, root={}'.format(command[1], rootmodpack))
 
                 case 'togithub':
                     togithub(cfg, wcache)
