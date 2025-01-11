@@ -133,7 +133,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             retrievers_by_path.append((fp, retrievers[f.file_hash]))
     assert nzero2 == nzero
 
-    fname = cfg.this_modpack_folder() + 'project.json'
+    fname = cfg.this_modpack_folder() + 'project.json5'
     with open(fname, 'wt', encoding='utf-8') as f:
         jsonwriter = GitProjectJson()
         jsonwriter.write(f, retrievers_by_path)
