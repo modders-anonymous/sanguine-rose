@@ -39,12 +39,12 @@ def config_dir_path(path: str, configdir: str, config: dict[str, any]):
         return path
 
 
-def normalize_vfs_dir_path(path: str, vfsdir: str) -> str:  # relative to vfs dir
+def normalize_source_vfs_dir_path(path: str, rootvfsdir: str) -> str:  # relative to vfs dir
     if os.path.isabs(path):
         out = normalize_dir_path(path)
     else:
-        out = normalize_dir_path(vfsdir + path)
-    abort_if_not(out.startswith(vfsdir), lambda: 'expected path within vfs, got ' + repr(path))
+        out = normalize_dir_path(rootvfsdir + path)
+    abort_if_not(out.startswith(rootvfsdir), lambda: 'expected path within vfs, got ' + repr(path))
     return out
 
 
@@ -78,11 +78,11 @@ class ModManagerConfig:
         pass
 
     @abstractmethod
-    def active_vfs_folders(self) -> FolderListToCache:
+    def active_source_vfs_folders(self) -> FolderListToCache:
         pass
 
     @abstractmethod
-    def vfs_root(self) -> str:
+    def source_vfs_root(self) -> str:
         pass
 
 
@@ -293,8 +293,8 @@ class LocalProjectConfig:
 
             self.github_username = jsonconfig.get('github_username')
 
-    def active_vfs_folders(self) -> FolderListToCache:
-        return self.mod_manager_config.active_vfs_folders()
+    def active_source_vfs_folders(self) -> FolderListToCache:
+        return self.mod_manager_config.active_source_vfs_folders()
 
     def github_folders(self) -> list[GithubFolder]:
         return [GithubModpack(mp) for mp in self.all_modpack_configs.keys()]
@@ -302,7 +302,7 @@ class LocalProjectConfig:
     def this_modpack_folder(self) -> str:
         return GithubModpack(self.this_modpack).mpfolder(self.github_root_dir)
 
-    def vfs_root(self) -> str:
-        return self.mod_manager_config.vfs_root()
+    def source_vfs_root(self) -> str:
+        return self.mod_manager_config.source_vfs_root()
 
     # private functions

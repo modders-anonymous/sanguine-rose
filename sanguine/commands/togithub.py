@@ -13,7 +13,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     nzero = 0
     nzerostats = {}
     ndup = 0
-    for f in wcache.all_vfs_files():
+    for f in wcache.all_source_vfs_files():
         if f.file_hash in possibleretrievers:
             ndup += 1
         else:
@@ -132,10 +132,10 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             'handling of non-unique retrievers is NOT IMPLEMENTED YET')  # TODO! - this is possible, when encounter - will need to process
 
     retrievers_by_path: list[tuple[str, FileRetriever]] = []
-    vfsroot = cfg.vfs_root()
+    vfsroot = cfg.source_vfs_root()
     lvfsroot = len(vfsroot)
     nzero2 = 0
-    for f in wcache.all_vfs_files():
+    for f in wcache.all_source_vfs_files():
         fp = f.file_path
         assert fp.startswith(vfsroot)
         fp = fp[lvfsroot:]

@@ -11,7 +11,7 @@ class WholeCache:
     #             all the information is in-memory, so it can work incredibly fast
     _cache_data_fname: str
     _cache_data: dict[str, any]
-    _vfscache: FolderCache
+    _source_vfs_cache: FolderCache
     _available: AvailableFiles
     _SYNCOWNTASKNAME: str = 'sanguine.wholecache.sync'
 
@@ -29,16 +29,16 @@ class WholeCache:
                                          projectcfg.github_root_dir, rootmodpackdir,
                                          projectcfg.download_dirs, projectcfg.github_folders(), self._cache_data)
 
-        folderstocache: FolderListToCache = projectcfg.active_vfs_folders()
-        self._vfscache = FolderCache(projectcfg.cache_dir, 'vfs', folderstocache)
+        folderstocache: FolderListToCache = projectcfg.active_source_vfs_folders()
+        self._source_vfs_cache = FolderCache(projectcfg.cache_dir, 'vfs', folderstocache)
 
     def start_tasks(self, parallel: tasks.Parallel) -> None:
-        self._vfscache.start_tasks(parallel)
+        self._source_vfs_cache.start_tasks(parallel)
         self._available.start_tasks(parallel)
 
         syncowntask = tasks.OwnTask(WholeCache._SYNCOWNTASKNAME,
                                     lambda _, _1, _2: self._start_sync_own_task_func(), None,
-                                    [self._vfscache.ready_task_name(),
+                                    [self._source_vfs_cache.ready_task_name(),
                                      self._available.ready_task_name()])
         parallel.add_task(syncowntask)
 
@@ -46,8 +46,8 @@ class WholeCache:
     def ready_task_name() -> str:
         return WholeCache._SYNCOWNTASKNAME
 
-    def all_vfs_files(self) -> Iterable[FileOnDisk]:
-        return self._vfscache.all_files()
+    def all_source_vfs_files(self) -> Iterable[FileOnDisk]:
+        return self._source_vfs_cache.all_files()
 
     def file_retrievers_by_hash(self, h: bytes) -> list[FileRetriever]:  # resolved as fully as feasible
         return self._available.file_retrievers_by_hash(h)
@@ -56,7 +56,7 @@ class WholeCache:
         return self._available.archive_stats()
 
     def stats_of_interest(self) -> list[str]:
-        return (self._available.stats_of_interest() + self._vfscache.stats_of_interest()
+        return (self._available.stats_of_interest() + self._source_vfs_cache.stats_of_interest()
                 + ['sanguine.wholecache.'])
 
     def done(self) -> None:

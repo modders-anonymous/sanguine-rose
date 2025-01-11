@@ -1,7 +1,7 @@
 from sanguine.common import *
 from sanguine.helpers.modlist import ModList
 from sanguine.helpers.project_config import (ModManagerConfig, ModManagerPluginBase, config_dir_path,
-                                             normalize_vfs_dir_path)
+                                             normalize_source_vfs_dir_path)
 
 
 class Mo2Plugin(ModManagerPluginBase):
@@ -49,7 +49,7 @@ class Mo2ProjectConfig(ModManagerConfig):
                     'overwrite\\ShaderCache'
                 ]]
             else:
-                self.ignore_dirs.append(normalize_vfs_dir_path(ignore, mo2dir))
+                self.ignore_dirs.append(normalize_source_vfs_dir_path(ignore, mo2dir))
 
         assert self.mo2dir is None
         self.mo2dir = FolderToCache(mo2dir, self.ignore_dirs + [mo2dir + 'mods\\'] + download_dirs)
@@ -77,7 +77,7 @@ class Mo2ProjectConfig(ModManagerConfig):
                 return True
         return False
 
-    def active_vfs_folders(self) -> FolderListToCache:
+    def active_source_vfs_folders(self) -> FolderListToCache:
         out: FolderListToCache = FolderListToCache([self.mo2dir])
         modsdir = self.mo2dir.folder + 'mods\\'
         assert modsdir in self.mo2dir.exdirs
@@ -92,5 +92,5 @@ class Mo2ProjectConfig(ModManagerConfig):
     def default_download_dirs(self) -> list[str]:
         return ['{mo2.mo2dir}downloads\\']
 
-    def vfs_root(self) -> str:
+    def source_vfs_root(self) -> str:
         return self.mo2dir.folder
