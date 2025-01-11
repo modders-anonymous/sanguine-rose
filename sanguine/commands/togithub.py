@@ -1,5 +1,6 @@
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
+from sanguine.gitdata.git_data_file import open_git_data_file_for_writing
 from sanguine.gitdata.project_json import GitProjectJson
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
@@ -134,7 +135,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     assert nzero2 == nzero
 
     fname = cfg.this_modpack_folder() + 'project.json5'
-    with open(fname, 'wt', encoding='utf-8') as f:
+    with open_git_data_file_for_writing(fname) as f:
         jsonwriter = GitProjectJson()
         jsonwriter.write(f, retrievers_by_path)
 
