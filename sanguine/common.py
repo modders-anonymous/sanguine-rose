@@ -98,6 +98,27 @@ class FolderListToCache:
         return len(self.folders)
 
 
+class ResolvedVFS:
+    _source_to_target: dict[str, str]  # full path to relpath
+    _target_files: dict[str, list[FileOnDisk]]  # relpath to list of files
+
+    def __init__(self, sourcetotarget: dict[str, str], targetfiles: dict[str, list[FileOnDisk]]) -> None:
+        self._source_to_target = sourcetotarget
+        self._target_files = targetfiles
+
+    def all_source_files(self) -> any:  # effectively Iterable, but doesn't comply with it
+        return self._source_to_target.keys()
+
+    def all_target_files(self) -> any:  # effectively Iterable, but doesn't comply with it
+        return self._target_files.keys()
+
+    def source_to_target(self, path: str) -> str:
+        return self._source_to_target[path]
+
+    def target_files(self, relpath: str) -> list[FileOnDisk]:
+        return self._target_files[relpath]
+
+
 ### Hashing
 
 class ExtraHash(ABC):

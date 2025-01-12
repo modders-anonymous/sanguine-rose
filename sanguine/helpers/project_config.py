@@ -86,7 +86,7 @@ class ModManagerConfig:
         pass
 
     @abstractmethod
-    def target_vfs_to_source_vfs(self, sourcevfs: dict[str, FileOnDisk], relpath: str) -> list[FileOnDisk]:
+    def resolve_vfs(self, sourcevfs: Iterable[FileOnDisk]) -> ResolvedVFS:
         pass
 
     @abstractmethod
@@ -313,10 +313,10 @@ class LocalProjectConfig:
     def source_vfs_to_target_vfs(self, path: str) -> str | None:  # returns path relative to target vfs root
         return self.mod_manager_config.source_vfs_to_target_vfs(path)
 
-    def target_vfs_to_source_vfs(self, sourcevfs: dict[str, FileOnDisk], relpath: str) -> list[FileOnDisk]:
-        return self.mod_manager_config.target_vfs_to_source_vfs(sourcevfs, relpath)
-
     def source_vfs_to_relative_path(self, path: str) -> str:
         return self.mod_manager_config.source_vfs_to_relative_path(path)
+
+    def resolve_vfs(self, srcfiles: Iterable[FileOnDisk]) -> ResolvedVFS:
+        return self.mod_manager_config.resolve_vfs(srcfiles)
 
     # private functions

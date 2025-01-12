@@ -6,48 +6,6 @@ from sanguine.common import SanguineJsonEncoder
 from sanguine.helpers.project_config import LocalProjectConfig, GithubModpack
 
 
-class ResolvedVFS:
-    _source_to_target: dict[str, str]  # full path to relpath
-    _target_files: dict[str, list[FileOnDisk]]  # relpath to list of files
-
-    def __init__(self, cfg: LocalProjectConfig, files: Iterable[FileOnDisk]):
-        info('Starting resolving VFS...')
-        sourcevfs = {f.file_path: f for f in files}
-
-        self._source_to_target: dict[str, str] = {}
-        self._target_files: dict[str, list[FileOnDisk]] = {}
-        nfound = 0
-        nnotfound = 0
-        for f in files:
-            relpath = cfg.source_vfs_to_target_vfs(f.file_path)
-            if relpath is None:
-                nnotfound += 1
-                continue
-            nfound += 1
-            if relpath in self._target_files:
-                assert f.file_path in [fp.file_path for fp in self._target_files[relpath]]
-            else:
-                self._target_files[relpath] = cfg.target_vfs_to_source_vfs(sourcevfs, relpath)
-                assert f.file_path in [fp.file_path for fp in self._target_files[relpath]]
-            assert f.file_path not in self._source_to_target
-            self._source_to_target[f.file_path] = relpath
-        assert nfound == len(self._source_to_target)
-        info('ResolvedVFS: {} files omitted, {} resolved, with {} overrides'.format(nnotfound, nfound,
-                                                                                    nfound - len(self._target_files)))
-
-    def all_source_files(self) -> any:  # effectively Iterable, but doesn't comply with it
-        return self._source_to_target.keys()
-
-    def all_target_files(self) -> any:  # effectively Iterable, but doesn't comply with it
-        return self._target_files.keys()
-
-    def source_to_target(self, path: str) -> str:
-        return self._source_to_target[path]
-
-    def target_files(self, relpath: str) -> list[FileOnDisk]:
-        return self._target_files[relpath]
-
-
 class WholeCache:
     # WholeCache, once ready_task_name() is reached, contains whole information about the folders, and available files
     #             all the information is in-memory, so it can work incredibly fast
@@ -102,7 +60,7 @@ class WholeCache:
 
     def resolved_vfs(self) -> ResolvedVFS:
         if self._resolved_vfs is None:
-            self._resolved_vfs = ResolvedVFS(self._project_config, self.all_source_vfs_files())
+            self._resolved_vfs = self._project_config.mod_manager_config.resolve_vfs(self.all_source_vfs_files())
         return self._resolved_vfs
 
     def stats_of_interest(self) -> list[str]:

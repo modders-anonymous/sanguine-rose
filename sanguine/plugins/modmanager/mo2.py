@@ -112,10 +112,55 @@ class Mo2ProjectConfig(ModManagerConfig):
 
         return 'data\\' + relpath
 
+    def resolve_vfs(self, sourcevfs: Iterable[FileOnDisk]) -> ResolvedVFS:
+        info('MO2: Starting resolving VFS...')
+
+        allenabled = list(self.master_modlist.all_enabled())
+        modsrch = FastSearchOverPartialStrings(
+            [(self.mo2dir.folder + 'mods\\' + allenabled[i].lower() + '\\', i) for i in range(len(allenabled))])
+
+        source_to_target: dict[str, str] = {}
+        target_files0: dict[str, list[tuple[int, FileOnDisk]]] = {}
+        nfound = 0
+        nnotfound = 0
+        info('MO2.resolve_vfs(): starting main loop...')
+        for f in sourcevfs:
+            relpath = self.source_vfs_to_target_vfs(f.file_path)
+            if relpath is None:
+                nnotfound += 1
+                continue
+            nfound += 1
+
+            res = modsrch.find_val_for_str(f.file_path)
+            assert res is not None
+            _, modidx = res
+            assert isinstance(modidx, int)
+
+            if relpath not in target_files0:
+                target_files0[relpath] = []
+            target_files0[relpath].append((modidx, f))
+
+            assert f.file_path not in source_to_target
+            source_to_target[f.file_path] = relpath
+
+        assert nfound == len(source_to_target)
+
+        info('MO2.resolve_vfs(): starting final loop...')
+        target_files: dict[str, list[FileOnDisk]] = {}
+        for key, val in target_files0.items():
+            val = sorted(val, key=lambda x: x[0])
+            assert key not in target_files
+            target_files[key] = [f[1] for f in val]
+
+        info('MO2: ResolvedVFS: {} files omitted, {} resolved, with {} overrides'.format(nnotfound, nfound,
+                                                                                         nfound - len(target_files)))
+        return ResolvedVFS(source_to_target, target_files)
+
+    '''
     def target_vfs_to_source_vfs(self, sourcevfs: dict[str, FileOnDisk], relpath: str) -> list[FileOnDisk]:
         assert relpath.islower()
         out: list[FileOnDisk] = []
-
+    
         srcmods = self.mo2dir.folder + 'mods\\'
         if relpath.startswith('data\\'):
             slashrelpath = '\\' + relpath[len('data\\'):]
@@ -126,6 +171,7 @@ class Mo2ProjectConfig(ModManagerConfig):
             if p in sourcevfs:
                 out.append(sourcevfs[p])
         return out
+    '''
 
     def source_vfs_to_relative_path(self, path: str) -> str:
         assert is_normalized_path(path)
