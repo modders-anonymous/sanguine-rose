@@ -3,12 +3,12 @@ from sanguine.common import *
 from sanguine.gitdata.git_data_file import open_git_data_file_for_writing
 from sanguine.gitdata.project_json import GitProjectJson
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
-                                             GithubFileRetriever, ZeroFileRetriever)
+                                             GithubFileRetriever, ZeroFileRetriever, ToolFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins
 
 
-class _ToolsFinder:
+class _ToolFinder:
     tools_by_ext: dict[str, list[tuple[ToolPluginBase, any]]]
 
     def __init__(self, resolvedvfs: ResolvedVFS) -> None:
@@ -23,19 +23,19 @@ class _ToolsFinder:
                     self.tools_by_ext[ext] = []
                 self.tools_by_ext[ext].append(pluginex)
 
-    def find_tool_retriever(self, srcpath: str, targetpath: str) -> bool:
-        ext = os.path.splitext(srcpath)[1]
+    def find_tool_retriever(self, srcfile: FileOnDisk, targetpath: str) -> ToolFileRetriever | None:
+        ext = os.path.splitext(srcfile.file_path)[1]
         assert ext == os.path.splitext(targetpath)[1]
         if ext in self.tools_by_ext:
             plugins = self.tools_by_ext[ext]
             for plugin, ctx in plugins:
-                if plugin.could_be_produced(ctx, srcpath, targetpath):
-                    return True
-        return False
+                if plugin.could_be_produced(ctx, srcfile.file_path, targetpath):
+                    return ToolFileRetriever((srcfile.file_hash, srcfile.file_size), plugin.name())
+        return None
 
 
 def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
-    toolsfinder: _ToolsFinder = _ToolsFinder(wcache.resolved_vfs())
+    toolsfinder: _ToolFinder = _ToolFinder(wcache.resolved_vfs())
 
     info('Stage 0: collecting retrievers')
     possibleretrievers: dict[bytes, list[FileRetriever]] = {}
@@ -50,17 +50,21 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
             if len(retr) == 0:
                 targetpath = cfg.source_vfs_to_target_vfs(f.file_path)
-                if targetpath is not None and toolsfinder.find_tool_retriever(f.file_path, targetpath):
-                    ntools += 1
+                if targetpath is not None:
+                    r = toolsfinder.find_tool_retriever(f, targetpath)
+                    if r is not None:
+                        retr = [r]
+                        ntools += 1
+
+            if len(retr) == 0:
+                nzero += 1
+                ext = os.path.splitext(f.file_path)[1]
+                if len(ext) > 6:
+                    ext = '.longer.'
+                if ext not in nzerostats:
+                    nzerostats[ext] = 1
                 else:
-                    nzero += 1
-                    ext = os.path.splitext(f.file_path)[1]
-                    if len(ext) > 6:
-                        ext = '.longer.'
-                    if ext not in nzerostats:
-                        nzerostats[ext] = 1
-                    else:
-                        nzerostats[ext] += 1
+                    nzerostats[ext] += 1
             else:
                 possibleretrievers[f.file_hash] = retr
 
@@ -92,7 +96,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     for r in possibleretrievers.items():
         assert len(r[1]) > 0
         rr0 = r[1][0]
-        if isinstance(rr0, ZeroFileRetriever) or isinstance(rr0, GithubFileRetriever):
+        if isinstance(rr0, ZeroFileRetriever) or isinstance(rr0, GithubFileRetriever) or isinstance(rr0,
+                                                                                                    ToolFileRetriever):
             assert r[0] not in retrievers
             retrievers[r[0]] = rr0
             nzerogithub += 1
@@ -139,8 +144,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         assert len(possibleretrievers) == len(remainingretrievers2) + len(retrievers)
         for r in retrievers.items():
             retr: FileRetriever = r[1]
-            assert isinstance(retr, ArchiveFileRetriever) or isinstance(retr, GithubFileRetriever) or isinstance(retr,
-                                                                                                                 ZeroFileRetriever)
+            assert isinstance(retr, (ToolFileRetriever, ArchiveFileRetriever, GithubFileRetriever, ZeroFileRetriever))
             if isinstance(retr, ArchiveFileRetriever):
                 assert retr.archive_hash() in archives
 

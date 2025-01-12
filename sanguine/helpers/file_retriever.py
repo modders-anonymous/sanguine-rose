@@ -138,3 +138,17 @@ class ArchiveFileRetriever(FileRetriever):
         assert False  # should not be called directly, only via archive aggregation
         # noinspection PyUnreachableCode
         return ''
+
+
+class ToolFileRetriever(FileRetriever):
+    tool_name: str
+
+    def __init__(self, base_retriever_param: FileRetriever.BaseRetrieverParam, tool: str) -> None:
+        super().__init__(base_retriever_param)
+        self.tool_name = tool.lower()
+
+    def fetch(self, available: "AvailableFiles", targetfpath: str):
+        pass  # do nothing, will be generated when the tool is running
+
+    def fetch_for_reading(self, available: "AvailableFiles", tmpdirpath: str) -> str:
+        pass  # do nothing, will be generated when the tool is running

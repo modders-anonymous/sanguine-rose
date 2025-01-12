@@ -5,7 +5,7 @@ from sanguine.common import *
 from sanguine.gitdata.git_data_file import GitDataParam, GitDataType, GitDataWriteHandler, GitDataReadHandler
 from sanguine.helpers.archives import FileInArchive
 from sanguine.helpers.file_retriever import (FileRetriever, ZeroFileRetriever, GithubFileRetriever,
-                                             ArchiveFileRetriever, ArchiveFileRetrieverHelper)
+                                             ArchiveFileRetriever, ArchiveFileRetrieverHelper, ToolFileRetriever)
 
 ##### Handlers
 
@@ -205,12 +205,46 @@ class _GitRetrievedArchiveFileWriteHandler(_GitRetrievedFileWriteHandler):
                           (last.file_in_archive.intra_path, last.archive_hash, last.archive_size))
 
 
+### for GithubFileRetriever
+
+class _GitRetrievedToolFileReadHandler(_GitRetrievedFileReadHandler):
+    SPECIFIC_FIELDS: list[GitDataParam] = [
+        GitDataParam('t', GitDataType.Str, False),
+    ]
+
+    def __init__(self, files: list[tuple[str, FileRetriever]]) -> None:
+        super().__init__(_GitRetrievedToolFileReadHandler.SPECIFIC_FIELDS, files)
+
+    def decompress(self, common_param: tuple[str, int, bytes], specific_param: tuple[str]) -> None:
+        (t,) = specific_param
+        fr = ToolFileRetriever(_GitRetrievedFileReadHandler._common_param_to_base_retriever_param(common_param), t)
+        self.retrieved_files.append((_GitRetrievedFileReadHandler.rel_path(common_param), fr))
+
+
+class _GitRetrievedToolFileWriteHandler(_GitRetrievedFileWriteHandler):
+    def __init__(self) -> None:
+        super().__init__(_GitRetrievedToolFileReadHandler.SPECIFIC_FIELDS)
+
+    def legend(self) -> str:
+        return '[ t:tool name if Tool ]'
+
+    def is_my_retriever(self, fr: FileRetriever) -> bool:
+        return isinstance(fr, ToolFileRetriever)
+
+    def write_line(self, writer: gitdatafile.GitDataListWriter, rel_path: str, fr: FileRetriever) -> None:
+        assert isinstance(fr, ToolFileRetriever)
+        writer.write_line(self,
+                          _GitRetrievedFileWriteHandler.common_values(rel_path, fr),
+                          (fr.tool_name,))
+
+
 ### all write handlers
 
 _write_handlers: list[_GitRetrievedFileWriteHandler] = [
     _GitRetrievedZeroFileWriteHandler(),
     _GitRetrievedGithubFileWriteHandler(),
     _GitRetrievedArchiveFileWriteHandler(),
+    _GitRetrievedToolFileWriteHandler()
 ]
 
 
@@ -295,6 +329,7 @@ class GitProjectJson:
             _GitRetrievedZeroFileReadHandler(retrievers),
             _GitRetrievedGithubFileReadHandler(retrievers),
             _GitRetrievedArchiveFileReadHandler(intermediate_archives, retrievers),
+            _GitRetrievedToolFileReadHandler(retrievers)
         ]
         da = gitdatafile.GitDataReadList(_GitRetrievedFileReadHandler.COMMON_FIELDS, handlers)
         lineno = gitdatafile.read_git_file_list(da, rfile, lineno)
