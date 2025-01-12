@@ -26,20 +26,6 @@ class _FastSearchOverFolderListToCache:
         return found[1]
 
 
-class FileOnDisk:
-    file_hash: bytes
-    file_path: str
-    file_modified: float
-    file_size: int
-
-    def __init__(self, file_hash: bytes, file_modified: float, file_path: str, file_size: int):
-        assert file_path is not None
-        self.file_hash = file_hash
-        self.file_modified = file_modified
-        self.file_path = file_path
-        self.file_size = file_size
-
-
 ### helpers
 
 def _get_file_timestamp(fname: str) -> float:

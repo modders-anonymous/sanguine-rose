@@ -82,7 +82,15 @@ class ModManagerConfig:
         pass
 
     @abstractmethod
-    def source_vfs_root(self) -> str:
+    def source_vfs_to_target_vfs(self, path: str) -> str | None:  # returns path relative to target vfs root
+        pass
+
+    @abstractmethod
+    def target_vfs_to_source_vfs(self, sourcevfs: dict[str, FileOnDisk], relpath: str) -> list[FileOnDisk]:
+        pass
+
+    @abstractmethod
+    def source_vfs_to_relative_path(self, path: str) -> str:
         pass
 
 
@@ -302,7 +310,13 @@ class LocalProjectConfig:
     def this_modpack_folder(self) -> str:
         return GithubModpack(self.this_modpack).mpfolder(self.github_root_dir)
 
-    def source_vfs_root(self) -> str:
-        return self.mod_manager_config.source_vfs_root()
+    def source_vfs_to_target_vfs(self, path: str) -> str | None:  # returns path relative to target vfs root
+        return self.mod_manager_config.source_vfs_to_target_vfs(path)
+
+    def target_vfs_to_source_vfs(self, sourcevfs: dict[str, FileOnDisk], relpath: str) -> list[FileOnDisk]:
+        return self.mod_manager_config.target_vfs_to_source_vfs(sourcevfs, relpath)
+
+    def source_vfs_to_relative_path(self, path: str) -> str:
+        return self.mod_manager_config.source_vfs_to_relative_path(path)
 
     # private functions

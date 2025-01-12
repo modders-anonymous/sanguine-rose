@@ -18,6 +18,7 @@ class Mo2ProjectConfig(ModManagerConfig):
     master_profile: str | None
     generated_profiles: dict[str, str] | None
     master_modlist: ModList | None
+    _vfs_files: dict[str, list[str]] | None
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
@@ -25,6 +26,7 @@ class Mo2ProjectConfig(ModManagerConfig):
         self.master_profile = None
         self.generated_profiles = None
         self.master_modlist = None
+        self._vfs_files = None
 
     def parse_config_section(self, section: dict[str, any], configdir: str, fullconfig: dict[str, any],
                              download_dirs: list[str]) -> None:
@@ -92,5 +94,38 @@ class Mo2ProjectConfig(ModManagerConfig):
     def default_download_dirs(self) -> list[str]:
         return ['{mo2.mo2dir}downloads\\']
 
-    def source_vfs_root(self) -> str:
-        return self.mo2dir.folder
+    def source_vfs_to_target_vfs(self, path: str) -> str | None:  # returns path relative to target vfs root
+        assert is_normalized_path(path)
+        assert path.startswith(self.mo2dir.folder)
+        mo2mods = self.mo2dir.folder + 'mods\\'
+        if not path.startswith(mo2mods):
+            return None
+        relpath = path[len(mo2mods):]
+        # MO2 Root plugin
+        idx = relpath.find('\\root\\')
+        if idx >= 0:
+            idx2 = relpath.find('\\')
+            if idx == idx2:
+                return relpath[idx + len('\\root\\'):]
+
+        return 'data\\' + relpath
+
+    def target_vfs_to_source_vfs(self, sourcevfs: dict[str, FileOnDisk], relpath: str) -> list[FileOnDisk]:
+        assert relpath.islower()
+        out: list[FileOnDisk] = []
+
+        srcmods = self.mo2dir.folder + 'mods\\'
+        if relpath.startswith('data\\'):
+            slashrelpath = '\\' + relpath[len('data\\'):]
+        else:  # MO2 Root plugin
+            slashrelpath = '\\root\\' + relpath
+        for mod in self.master_modlist.all_enabled():
+            p = srcmods + mod.lower() + slashrelpath
+            if p in sourcevfs:
+                out.append(sourcevfs[p])
+        return out
+
+    def source_vfs_to_relative_path(self, path: str) -> str:
+        assert is_normalized_path(path)
+        assert path.startswith(self.mo2dir.folder)
+        return path[len(self.mo2dir.folder):]

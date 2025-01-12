@@ -83,6 +83,10 @@ def is_normalized_file_path(path: str) -> bool:
     return path == os.path.abspath(path).lower()
 
 
+def is_normalized_path(path: str) -> bool:
+    return path == os.path.abspath(path).lower()
+
+
 def to_short_path(base: str, path: str) -> str:
     assert path.startswith(base)
     return path[len(base):]
