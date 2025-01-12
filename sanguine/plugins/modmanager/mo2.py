@@ -123,7 +123,6 @@ class Mo2ProjectConfig(ModManagerConfig):
         target_files0: dict[str, list[tuple[int, FileOnDisk]]] = {}
         nfound = 0
         nnotfound = 0
-        info('MO2.resolve_vfs(): starting main loop...')
         for f in sourcevfs:
             relpath = self.source_vfs_to_target_vfs(f.file_path)
             if relpath is None:
@@ -135,6 +134,7 @@ class Mo2ProjectConfig(ModManagerConfig):
             assert res is not None
             _, modidx = res
             assert isinstance(modidx, int)
+            assert f.file_path.startswith(self.mo2dir.folder + 'mods\\' + allenabled[modidx].lower() + '\\')
 
             if relpath not in target_files0:
                 target_files0[relpath] = []
@@ -145,33 +145,16 @@ class Mo2ProjectConfig(ModManagerConfig):
 
         assert nfound == len(source_to_target)
 
-        info('MO2.resolve_vfs(): starting final loop...')
         target_files: dict[str, list[FileOnDisk]] = {}
         for key, val in target_files0.items():
             val = sorted(val, key=lambda x: x[0])
             assert key not in target_files
             target_files[key] = [f[1] for f in val]
+            assert (len(target_files[key]) == len(set(target_files[key])))
 
         info('MO2: ResolvedVFS: {} files omitted, {} resolved, with {} overrides'.format(nnotfound, nfound,
                                                                                          nfound - len(target_files)))
         return ResolvedVFS(source_to_target, target_files)
-
-    '''
-    def target_vfs_to_source_vfs(self, sourcevfs: dict[str, FileOnDisk], relpath: str) -> list[FileOnDisk]:
-        assert relpath.islower()
-        out: list[FileOnDisk] = []
-    
-        srcmods = self.mo2dir.folder + 'mods\\'
-        if relpath.startswith('data\\'):
-            slashrelpath = '\\' + relpath[len('data\\'):]
-        else:  # MO2 Root plugin
-            slashrelpath = '\\root\\' + relpath
-        for mod in self.master_modlist.all_enabled():
-            p = srcmods + mod.lower() + slashrelpath
-            if p in sourcevfs:
-                out.append(sourcevfs[p])
-        return out
-    '''
 
     def source_vfs_to_relative_path(self, path: str) -> str:
         assert is_normalized_path(path)
