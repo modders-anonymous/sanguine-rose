@@ -152,3 +152,14 @@ class ToolFileRetriever(FileRetriever):
 
     def fetch_for_reading(self, available: "AvailableFiles", tmpdirpath: str) -> str:
         pass  # do nothing, will be generated when the tool is running
+
+
+class UnknownFileRetriever(FileRetriever):
+    def __init__(self, base_retriever_param: FileRetriever.BaseRetrieverParam) -> None:
+        super().__init__(base_retriever_param)
+
+    def fetch(self, available: "AvailableFiles", targetfpath: str):
+        pass  # do nothing, will be generated when the tool is running
+
+    def fetch_for_reading(self, available: "AvailableFiles", tmpdirpath: str) -> str:
+        pass  # do nothing, will be generated when the tool is running

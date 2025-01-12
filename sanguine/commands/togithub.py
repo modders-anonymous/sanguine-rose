@@ -3,7 +3,8 @@ from sanguine.common import *
 from sanguine.gitdata.git_data_file import open_git_data_file_for_writing
 from sanguine.gitdata.project_json import GitProjectJson
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
-                                             GithubFileRetriever, ZeroFileRetriever, ToolFileRetriever)
+                                             GithubFileRetriever, ZeroFileRetriever, ToolFileRetriever,
+                                             UnknownFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins
 
@@ -74,6 +75,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             if len(retr) == 0:
                 nzero += 1
                 _add_ext_stats(nzerostats, f.file_path)
+                possibleretrievers[f.file_hash] = [UnknownFileRetriever((f.file_hash, f.file_size))]
             else:
                 possibleretrievers[f.file_hash] = retr
 
@@ -100,25 +102,25 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             stats[n] += 1
     srt = sorted(stats.keys())
     srtfirst = srt[:min(len(srt), 5)]
-    for x in srtfirst:
-        info('-> {} -> {}'.format(x, stats[x]))
+    for ss in srtfirst:
+        info('-> {} -> {}'.format(ss, stats[ss]))
     info('-> ...')
     srtlast = srt[-min(len(srt), 5):]
-    for x in srtlast:
-        info('{} -> {}'.format(x, stats[x]))
+    for ss in srtlast:
+        info('{} -> {}'.format(ss, stats[ss]))
 
     ### got all known retrievers, now processing
     retrievers: dict[bytes, FileRetriever] = {}
 
     ### processing unique retrievers
-    info('Stage 1: processing Zero, GitHub, Tools, and unique files in Archives')
+    info('Stage 1: processing Zero, GitHub, Tools, Unknown, and unique files in Archives')
     archives: dict[bytes, int] = {}  # for now, it is archives for unique files
     remainingretrievers: list[tuple[bytes, list[FileRetriever]]] = []
     nzerogithub = 0
     for r in possibleretrievers.items():
         assert len(r[1]) > 0
         rr0 = r[1][0]
-        if isinstance(rr0, (ZeroFileRetriever, GithubFileRetriever, ToolFileRetriever)):
+        if isinstance(rr0, (ZeroFileRetriever, GithubFileRetriever, ToolFileRetriever, UnknownFileRetriever)):
             assert r[0] not in retrievers
             retrievers[r[0]] = rr0
             nzerogithub += 1
@@ -165,7 +167,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         assert len(possibleretrievers) == len(remainingretrievers2) + len(retrievers)
         for r in retrievers.items():
             retr: FileRetriever = r[1]
-            assert isinstance(retr, (ToolFileRetriever, ArchiveFileRetriever, GithubFileRetriever, ZeroFileRetriever))
+            assert isinstance(retr, (UnknownFileRetriever, ToolFileRetriever, ArchiveFileRetriever, GithubFileRetriever, ZeroFileRetriever))
             if isinstance(retr, ArchiveFileRetriever):
                 assert retr.archive_hash() in archives
 
@@ -198,7 +200,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         else:
             fp = cfg.source_vfs_to_relative_path(f.file_path)
             retrievers_by_path.append((fp, retrievers[f.file_hash]))
-    assert nzero2 == nzero
+    assert nzero2 == 0
 
     info('Stage 2 done, writing...')
 

@@ -5,7 +5,8 @@ from sanguine.common import *
 from sanguine.gitdata.git_data_file import GitDataParam, GitDataType, GitDataWriteHandler, GitDataReadHandler
 from sanguine.helpers.archives import FileInArchive
 from sanguine.helpers.file_retriever import (FileRetriever, ZeroFileRetriever, GithubFileRetriever,
-                                             ArchiveFileRetriever, ArchiveFileRetrieverHelper, ToolFileRetriever)
+                                             ArchiveFileRetriever, ArchiveFileRetrieverHelper,
+                                             ToolFileRetriever, UnknownFileRetriever)
 
 ##### Handlers
 
@@ -205,7 +206,7 @@ class _GitRetrievedArchiveFileWriteHandler(_GitRetrievedFileWriteHandler):
                           (last.file_in_archive.intra_path, last.archive_hash, last.archive_size))
 
 
-### for GithubFileRetriever
+### for ToolFileRetriever
 
 class _GitRetrievedToolFileReadHandler(_GitRetrievedFileReadHandler):
     SPECIFIC_FIELDS: list[GitDataParam] = [
@@ -238,13 +239,48 @@ class _GitRetrievedToolFileWriteHandler(_GitRetrievedFileWriteHandler):
                           (fr.tool_name,))
 
 
+### for UnknownFileRetriever
+
+class _GitRetrievedUnknownFileReadHandler(_GitRetrievedFileReadHandler):
+    SPECIFIC_FIELDS: list[GitDataParam] = [
+        GitDataParam('u', GitDataType.Str, False),
+    ]
+
+    def __init__(self, files: list[tuple[str, FileRetriever]]) -> None:
+        super().__init__(_GitRetrievedToolFileReadHandler.SPECIFIC_FIELDS, files)
+
+    def decompress(self, common_param: tuple[str, int, bytes], specific_param: tuple[str]) -> None:
+        (u,) = specific_param
+        assert u == 'unknown'
+        fr = UnknownFileRetriever(_GitRetrievedFileReadHandler._common_param_to_base_retriever_param(common_param))
+        self.retrieved_files.append((_GitRetrievedFileReadHandler.rel_path(common_param), fr))
+
+
+class _GitRetrievedUnknownFileWriteHandler(_GitRetrievedFileWriteHandler):
+    def __init__(self) -> None:
+        super().__init__(_GitRetrievedUnknownFileReadHandler.SPECIFIC_FIELDS)
+
+    def legend(self) -> str:
+        return '[ u:"unknown" if Unknown ]'
+
+    def is_my_retriever(self, fr: FileRetriever) -> bool:
+        return isinstance(fr, UnknownFileRetriever)
+
+    def write_line(self, writer: gitdatafile.GitDataListWriter, rel_path: str, fr: FileRetriever) -> None:
+        assert isinstance(fr, UnknownFileRetriever)
+        writer.write_line(self,
+                          _GitRetrievedFileWriteHandler.common_values(rel_path, fr),
+                          ('unknown',))
+
+
 ### all write handlers
 
 _write_handlers: list[_GitRetrievedFileWriteHandler] = [
     _GitRetrievedZeroFileWriteHandler(),
     _GitRetrievedGithubFileWriteHandler(),
     _GitRetrievedArchiveFileWriteHandler(),
-    _GitRetrievedToolFileWriteHandler()
+    _GitRetrievedToolFileWriteHandler(),
+    _GitRetrievedUnknownFileWriteHandler()
 ]
 
 
@@ -329,7 +365,8 @@ class GitProjectJson:
             _GitRetrievedZeroFileReadHandler(retrievers),
             _GitRetrievedGithubFileReadHandler(retrievers),
             _GitRetrievedArchiveFileReadHandler(intermediate_archives, retrievers),
-            _GitRetrievedToolFileReadHandler(retrievers)
+            _GitRetrievedToolFileReadHandler(retrievers),
+            _GitRetrievedUnknownFileWriteHandler(retrievers)
         ]
         da = gitdatafile.GitDataReadList(_GitRetrievedFileReadHandler.COMMON_FIELDS, handlers)
         lineno = gitdatafile.read_git_file_list(da, rfile, lineno)
