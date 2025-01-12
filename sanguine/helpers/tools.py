@@ -8,6 +8,10 @@ class ToolPluginBase(ABC):
         pass
 
     @abstractmethod
+    def name(self) -> str:
+        pass
+
+    @abstractmethod
     def extensions(self) -> list[str]:
         pass
 
@@ -16,7 +20,7 @@ class ToolPluginBase(ABC):
         pass
 
     @abstractmethod
-    def could_be_produced(self, context: any, path: str) -> bool:
+    def could_be_produced(self, context: any, srcpath: str, targetpath: str) -> bool:
         pass
 
 

@@ -101,12 +101,14 @@ class Mo2ProjectConfig(ModManagerConfig):
         if not path.startswith(mo2mods):
             return None
         relpath = path[len(mo2mods):]
+        slash = relpath.find('\\')
+        if slash == -1:
+            return None
+        relpath = relpath[slash + 1:]
+
         # MO2 Root plugin
-        idx = relpath.find('\\root\\')
-        if idx >= 0:
-            idx2 = relpath.find('\\')
-            if idx == idx2:
-                return relpath[idx + len('\\root\\'):]
+        if relpath.startswith('root\\'):
+            return relpath[len('root\\'):]
 
         return 'data\\' + relpath
 

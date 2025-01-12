@@ -12,7 +12,7 @@ class _BodySlideToolPluginContext:
         self.rel_output_files = {}
 
 
-def _parse_osp(fname) -> list[str]:
+def _parse_osp(fname: str) -> list[str]:
     try:
         tree = ElementTree.parse(fname)
         root = tree.getroot()
@@ -20,12 +20,12 @@ def _parse_osp(fname) -> list[str]:
             warn('Unexpected root tag {} in {}'.format(root.tag, fname))
             return []
         out: list[str] = []
-        for ch in root.children:
+        for ch in root:
             if ch.tag.lower() == 'sliderset':
                 slidersetname = ch.attrib.get('name', '?')
                 outputfile = None
                 outputpath = None
-                for ch2 in ch.children:
+                for ch2 in ch:
                     if ch2.tag.lower() == 'outputfile':
                         if outputfile is not None:
                             warn('Duplicate <OutputFile> tag for {} in {}'.format(slidersetname, fname))
@@ -40,14 +40,18 @@ def _parse_osp(fname) -> list[str]:
                 if outputfile is None or outputpath is None:
                     warn('Missing <OutputFile> or <OutputPath> tag for {} in {}'.format(slidersetname, fname))
                 else:
-                    path = outputpath + '\\' + outputfile
+                    path = 'data\\' + outputpath + '\\' + outputfile
                     out.append(path.lower())
         return out
     except Exception as e:
         warn('Error parsing {}: {}={}'.format(fname, type(e), e))
+        return []
 
 
 class BodySlideToolPlugin(ToolPluginBase):
+    def name(self) -> str:
+        return 'BodySlide'
+
     def extensions(self) -> list[str]:
         return ['.tri', '.nif']
 
@@ -58,13 +62,13 @@ class BodySlideToolPlugin(ToolPluginBase):
             if osppattern.match(relpath):
                 srcfiles = resolvedvfs.target_files(relpath)
                 assert len(srcfiles) > 0
-                modified = _parse_osp(srcfiles[-1])
+                modified = _parse_osp(srcfiles[-1].file_path)
                 ctx.rel_output_files |= {m: 1 for m in modified}
         return ctx
 
-    def could_be_produced(self, ctx: any, path: str) -> bool:
+    def could_be_produced(self, ctx: any, srcpath: str, targetpath: str) -> bool:
         assert isinstance(ctx, _BodySlideToolPluginContext)
-        f, ext = os.path.splitext(path)
+        f, ext = os.path.splitext(targetpath)
         assert ext in self.extensions()
         if ext == '.tri':
             return f in ctx.rel_output_files

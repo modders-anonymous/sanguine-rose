@@ -14,6 +14,7 @@ class _ToolsFinder:
     def __init__(self, resolvedvfs: ResolvedVFS) -> None:
         self.tools_by_ext = {}
         for plugin in all_tool_plugins():
+            info('Preparing context for {} tool...'.format(plugin.name()))
             pluginex = (plugin, plugin.create_context(resolvedvfs))
             exts = plugin.extensions()
             assert len(exts) > 0
@@ -22,12 +23,13 @@ class _ToolsFinder:
                     self.tools_by_ext[ext] = []
                 self.tools_by_ext[ext].append(pluginex)
 
-    def find_tool_retriever(self, fpath: str) -> bool:
-        ext = os.path.splitext(fpath)[1]
+    def find_tool_retriever(self, srcpath: str, targetpath: str) -> bool:
+        ext = os.path.splitext(srcpath)[1]
+        assert ext == os.path.splitext(targetpath)[1]
         if ext in self.tools_by_ext:
             plugins = self.tools_by_ext[ext]
             for plugin, ctx in plugins:
-                if plugin.could_be_produced(ctx, fpath):
+                if plugin.could_be_produced(ctx, srcpath, targetpath):
                     return True
         return False
 
@@ -47,7 +49,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         else:
             retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
             if len(retr) == 0:
-                if toolsfinder.find_tool_retriever(f.file_path):
+                targetpath = cfg.source_vfs_to_target_vfs(f.file_path)
+                if targetpath is not None and toolsfinder.find_tool_retriever(f.file_path, targetpath):
                     ntools += 1
                 else:
                     nzero += 1
