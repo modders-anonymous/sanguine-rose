@@ -14,7 +14,7 @@ from types import TracebackType
 
 Type = typing.Type
 
-# noinspection PyUnresolvedReferences, PyProtectedMember
+# noinspection PyUnresolvedReferences
 from sanguine.install.install_logging import (debug, info, perf_warn, warn, alert, critical,
                                               info_or_perf_warn, log_with_level,
                                               enable_ex_logging, add_file_logging)
