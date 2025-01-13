@@ -28,7 +28,7 @@ class Mo2ProjectConfig(ModManagerConfig):
         self.master_modlist = None
         self._vfs_files = None
 
-    def parse_config_section(self, section: dict[str, any], configdir: str, fullconfig: dict[str, any],
+    def parse_config_section(self, section: ConfigData, configdir: str, fullconfig: ConfigData,
                              download_dirs: list[str]) -> None:
         unused_config_warning('mo2', section,
                               ['mo2dir', 'ignores', 'masterprofile', 'generatedprofiles'])

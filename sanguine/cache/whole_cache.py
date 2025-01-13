@@ -10,7 +10,7 @@ class WholeCache:
     # WholeCache, once ready_task_name() is reached, contains whole information about the folders, and available files
     #             all the information is in-memory, so it can work incredibly fast
     _project_config: LocalProjectConfig
-    _cache_data: dict[str, any]
+    _cache_data: ConfigData
     _source_vfs_cache: FolderCache
     _available: AvailableFiles
     _resolved_vfs: ResolvedVFS | None

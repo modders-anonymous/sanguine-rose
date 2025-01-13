@@ -10,7 +10,7 @@ from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins
 
 
 class _ToolFinder:
-    tools_by_ext: dict[str, list[tuple[ToolPluginBase, any]]]
+    tools_by_ext: dict[str, list[tuple[ToolPluginBase, Any]]]
 
     def __init__(self, gameuniverse: str, resolvedvfs: ResolvedVFS) -> None:
         self.tools_by_ext = {}
@@ -168,7 +168,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         for r in retrievers.items():
             retr: FileRetriever = r[1]
             assert isinstance(retr, (
-            UnknownFileRetriever, ToolFileRetriever, ArchiveFileRetriever, GithubFileRetriever, ZeroFileRetriever))
+                UnknownFileRetriever, ToolFileRetriever, ArchiveFileRetriever, GithubFileRetriever, ZeroFileRetriever))
             if isinstance(retr, ArchiveFileRetriever):
                 assert retr.archive_hash() in archives
 

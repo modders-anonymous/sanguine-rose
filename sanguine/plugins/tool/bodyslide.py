@@ -58,7 +58,7 @@ class BodySlideToolPlugin(ToolPluginBase):
     def extensions(self) -> list[str]:
         return ['.tri', '.nif']
 
-    def create_context(self, resolvedvfs: ResolvedVFS) -> any:
+    def create_context(self, resolvedvfs: ResolvedVFS) -> Any:
         ctx: _BodySlideToolPluginContext = _BodySlideToolPluginContext()
         osppattern = re.compile(r'data\\CalienteTools\\Bodyslide\\SliderSets\\.*\.osp$', re.IGNORECASE)
         for relpath in resolvedvfs.all_target_files():
@@ -69,7 +69,7 @@ class BodySlideToolPlugin(ToolPluginBase):
                 ctx.rel_output_files |= {m: 1 for m in modified}
         return ctx
 
-    def could_be_produced(self, ctx: any, srcpath: str, targetpath: str) -> bool:
+    def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> bool:
         assert isinstance(ctx, _BodySlideToolPluginContext)
         f, ext = os.path.splitext(targetpath)
         assert ext in self.extensions()

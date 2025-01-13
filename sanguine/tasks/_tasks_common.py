@@ -34,14 +34,14 @@ def is_lambda(func: Callable) -> bool:
 
 
 class LambdaReplacement:
-    f: Callable[[any, any], any]
-    capture: any
+    f: Callable[[Any, Any], Any]
+    capture: Any
 
-    def __init__(self, f: Callable[[any, any], any], capture: any) -> None:
+    def __init__(self, f: Callable[[Any, Any], Any], capture: Any) -> None:
         self.f = f
         self.capture = capture
 
-    def call(self, param: any) -> any:
+    def call(self, param: Any) -> Any:
         return self.f(self.capture, param)
 
 
@@ -75,13 +75,13 @@ class TaskDataDependencies:
 
 class Task:
     name: str
-    f: Callable[[any, ...], any] | None  # variable # of params depending on len(dependencies)
-    param: any
+    f: Callable[[Any, ...], Any] | None  # variable # of params depending on len(dependencies)
+    param: Any
     dependencies: list[str]
     w: float | None
     data_dependencies: TaskDataDependencies
 
-    def __init__(self, name: str, f: Callable, param: any, dependencies: list[str], w: float | None = None,
+    def __init__(self, name: str, f: Callable, param: Any, dependencies: list[str], w: float | None = None,
                  datadeps: TaskDataDependencies = None) -> None:
         self.name = name
         self.f = f

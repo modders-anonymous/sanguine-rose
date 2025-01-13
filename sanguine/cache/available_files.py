@@ -1,7 +1,7 @@
 import os.path
 
 import sanguine.tasks as tasks
-from sanguine.cache.folder_cache import FolderCache, FileOnDisk
+from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.root_git_data import RootGitData
 from sanguine.common import *
 from sanguine.gitdata.file_origin import file_origins_for_file, FileOrigin, file_origin_plugins, FileOriginPluginBase
@@ -41,7 +41,7 @@ class AvailableFiles:
     _hash_remapping_plugins: list[FileOriginPluginBase]
 
     def __init__(self, by: str, cachedir: str, tmpdir: str, rootgitdir: str, rootmodpackdir: str, downloads: list[str],
-                 github_folders: list[GithubFolder], cache_data: dict[str, any]) -> None:
+                 github_folders: list[GithubFolder], cache_data: ConfigData) -> None:
         self._root_git_dir = rootgitdir
         self._hash_remapping_plugins = []
         extrahashfactories = []

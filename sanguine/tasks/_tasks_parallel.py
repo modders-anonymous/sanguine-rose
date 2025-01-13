@@ -12,7 +12,7 @@ from sanguine.tasks._tasks_logging import (_ChildProcessLogHandler, create_loggi
 from sanguine.tasks._tasks_shared import _pool_of_shared_returns, SharedReturnParam
 
 
-def _run_task(task: Task, depparams: list[any]) -> (Exception | None, any):
+def _run_task(task: Task, depparams: list[Any]) -> (Exception | None, Any):
     ndep = len(depparams)
     assert ndep <= 3
     try:
@@ -34,9 +34,9 @@ def _run_task(task: Task, depparams: list[any]) -> (Exception | None, any):
         return e, None
 
 
-def _process_nonown_tasks(tasks: list[list], dwait: float | None) -> tuple[Exception | None, any]:
+def _process_nonown_tasks(tasks: list[list], dwait: float | None) -> tuple[Exception | None, Any]:
     assert isinstance(tasks, list)
-    outtasks: list[tuple[str, tuple[float, float], any]] = []
+    outtasks: list[tuple[str, tuple[float, float], Any]] = []
     for tplus in tasks:
         task = tplus[0]
         ndep = len(task.dependencies)
@@ -245,7 +245,7 @@ class Parallel:
     _ready_own_task_nodes: dict[str, _TaskGraphNode]  # name->node
     _ready_own_task_nodes_heap: list[_TaskGraphNode]
     _running_task_nodes: dict[str, tuple[int, float, _TaskGraphNode]]  # name->(procnum,started,node)
-    _done_task_nodes: dict[str, tuple[_TaskGraphNode, any]]  # name->(node,out)
+    _done_task_nodes: dict[str, tuple[_TaskGraphNode, Any]]  # name->(node,out)
     _pending_patterns: list[tuple[str, _TaskGraphNode]]  # pattern, node
     _dbg_serialize: bool
     _old_logging_hook: Callable[[logging.LogRecord], None] | None | bool
@@ -613,7 +613,7 @@ class Parallel:
             self._ready_task_nodes[ch.task.name] = ch
             heapq.heappush(self._ready_task_nodes_heap, ch)
 
-    def _process_out_tasks(self, procnum: int, tasks: list[tuple[str, tuple, any]]) -> float:
+    def _process_out_tasks(self, procnum: int, tasks: list[tuple[str, tuple, Any]]) -> float:
         outt = 0.
         for taskname, times, out in tasks:
             assert taskname in self._running_task_nodes
@@ -848,7 +848,7 @@ class Parallel:
 
         return best
 
-    def received_shared_return(self, sharedparam: SharedReturnParam) -> any:
+    def received_shared_return(self, sharedparam: SharedReturnParam) -> Any:
         (name, sender) = sharedparam
         shm = shared_memory.SharedMemory(name)
         out = pickle.loads(shm.buf)

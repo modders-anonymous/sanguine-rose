@@ -16,7 +16,7 @@ def _normalize_config_dir_path(path: str, configdir: str) -> str:  # relative to
         return normalize_dir_path(configdir + path)
 
 
-def config_dir_path(path: str, configdir: str, config: dict[str, any]):
+def config_dir_path(path: str, configdir: str, config: ConfigData):
     path = _normalize_config_dir_path(path, configdir)
     path = path.replace('{CONFIG-DIR}', configdir)
     replaced = False
@@ -69,7 +69,7 @@ class ModManagerConfig:
         self.mod_manager_name = modmanagername
 
     @abstractmethod
-    def parse_config_section(self, section: dict[str, any], configdir: str, fullconfig: dict[str, any],
+    def parse_config_section(self, section: ConfigData, configdir: str, fullconfig: ConfigData,
                              download_dirs: list[str]) -> None:
         pass
 
@@ -168,13 +168,13 @@ class GithubModpackConfig:
     is_root: bool
     # for root:
     game_universe: str | None
-    origin_configs: dict[str, any] | None
+    origin_configs: ConfigData | None
 
     # for non-root:
     dependencies: list[GithubModpack]
     own_mod_names: list[str]
 
-    def __init__(self, jsonconfigfname: str, jsonconfig: dict[str, any]) -> None:
+    def __init__(self, jsonconfigfname: str, jsonconfig: ConfigData) -> None:
         is_root = jsonconfig.get('isroot', 0)
         abort_if_not(is_root == 1 or is_root == 0)
         self.is_root = is_root != 0
@@ -194,7 +194,7 @@ class GithubModpackConfig:
 
 
 def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
-                                             allmodpackconfigs: dict[str, any]) -> str | None:
+                                             allmodpackconfigs: ConfigData) -> str | None:
     rootmodpack: str | None = None
     if ghproject in allmodpackconfigs:
         return

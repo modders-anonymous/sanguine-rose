@@ -182,16 +182,16 @@ def truncate_file_hash(h: bytes) -> bytes:
 ### generic helpers
 
 class Val:
-    val: any
+    val: Any
 
-    def __init__(self, initval: any) -> None:
+    def __init__(self, initval: Any) -> None:
         self.val = initval
 
     def __str__(self) -> str:
         return str(self.val)
 
 
-def add_to_dict_of_lists(dicttolook: dict[any, list[any]], key: any, val: any) -> None:
+def add_to_dict_of_lists(dicttolook: dict[Any, list[Any]], key: Any, val: Any) -> None:
     if key not in dicttolook:
         dicttolook[key] = [val]
     else:
@@ -199,9 +199,9 @@ def add_to_dict_of_lists(dicttolook: dict[any, list[any]], key: any, val: any) -
 
 
 class FastSearchOverPartialStrings:
-    _strings: list[tuple[str, int, any]]
+    _strings: list[tuple[str, int, Any]]
 
-    def __init__(self, src: list[tuple[str, any]]) -> None:
+    def __init__(self, src: list[tuple[str, Any]]) -> None:
         self._strings = []
         for s in src:
             self._strings.append((s[0], -1, s[1]))
@@ -228,7 +228,7 @@ class FastSearchOverPartialStrings:
                         self._strings[i] = (p, -1, val)
                         break
 
-    def find_val_for_str(self, s: str) -> tuple[str, any] | None:
+    def find_val_for_str(self, s: str) -> tuple[str, Any] | None:
         # k = (s, -1, None)
         idx = bisect_right(self._strings, s, key=lambda x2: x2[0])
         if idx == 0:
@@ -245,7 +245,7 @@ class FastSearchOverPartialStrings:
                 return prev[0], prev[2]
 
 
-def unused_config_warning(where: str, cfg: dict[str, any], known: list[str]) -> None:
+def unused_config_warning(where: str, cfg: ConfigData, known: list[str]) -> None:
     known2 = {key: 1 for key in known}
     errstr = ''
     for k in cfg.keys():
@@ -275,10 +275,10 @@ def from_json_hash(s: str) -> bytes:
 
 
 class SanguineJsonEncoder(json.JSONEncoder):
-    def encode(self, o: any) -> any:
+    def encode(self, o: Any) -> Any:
         return json.JSONEncoder.encode(self, self.default(o))
 
-    def default(self, o: any) -> any:
+    def default(self, o: Any) -> Any:
         if isinstance(o, bytes):
             return base64.b64encode(o).decode('ascii')
         elif isinstance(o, Callable):
@@ -292,7 +292,7 @@ class SanguineJsonEncoder(json.JSONEncoder):
         else:
             return o
 
-    def _adjust_dict(self, d: dict[str, any]) -> dict[str, any]:
+    def _adjust_dict(self, d: dict[Any, Any]) -> dict[Any, Any]:
         out = {}
         for k, v in d.items():
             if isinstance(k, bytes):
@@ -301,13 +301,13 @@ class SanguineJsonEncoder(json.JSONEncoder):
         return out
 
 
-def as_json(data: any) -> str:
+def as_json(data: Any) -> str:
     return SanguineJsonEncoder().encode(data)
 
 
 ### file-related helpers
 
-def read_dict_from_pickled_file(fpath: str) -> dict[str, any]:
+def read_dict_from_pickled_file(fpath: str) -> dict[Any, Any]:
     try:
         with open(fpath, 'rb') as rfile:
             return pickle.load(rfile)
@@ -331,7 +331,7 @@ def is_esx(path: str) -> bool:
 
 '''
 ### unused, candidates for removal
-def escape_json(s: any) -> str:
+def escape_json(s: Any) -> str:
     return json.dumps(s)
 
 def all_esxs(mod: str, mo2: str) -> list[str]:
@@ -340,7 +340,7 @@ def all_esxs(mod: str, mo2: str) -> list[str]:
     esxs = esxs + glob.glob(mo2 + 'mods/' + mod + '/*.esm')
     return esxs
 
-def read_dict_from_json_file(fpath: str) -> dict[str, any]:
+def read_dict_from_json_file(fpath: str) -> dict[Any, Any]:
     try:
         with open(fpath, 'rt', encoding='utf-8') as rfile:
             return json.load(rfile)

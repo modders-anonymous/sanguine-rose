@@ -13,6 +13,8 @@ from collections.abc import Callable, Generator, Iterable
 from types import TracebackType
 
 Type = typing.Type
+Any = typing.Any
+ConfigData = dict[str, Any]
 
 # noinspection PyUnresolvedReferences
 from sanguine.install.install_logging import (debug, info, perf_warn, warn, alert, critical,

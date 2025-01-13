@@ -32,7 +32,7 @@ def _read_git_archives(params: tuple[str]) -> list[Archive]:
 
 
 def _read_cached_git_archives(rootgitdir: str, cachedir: str,
-                              cachedata: dict[str, any]) -> tuple[list[Archive], dict[str, any]]:
+                              cachedata: ConfigData) -> tuple[list[Archive], ConfigData]:
     assert is_normalized_dir_path(rootgitdir)
     rootgitfile = rootgitdir + _KNOWN_ARCHIVES_FNAME
     return pickled_cache(cachedir, cachedata, 'known_archives', [rootgitfile],
@@ -86,7 +86,7 @@ def _read_git_tentative_names(params: tuple[str]) -> dict[bytes, list[str]]:
 
 
 def _read_cached_git_tentative_names(rootgitdir: str, cachedir: str,
-                                     cachedata: dict[str, any]) -> tuple[dict[bytes, list[str]], dict[str, any]]:
+                                     cachedata: ConfigData) -> tuple[dict[bytes, list[str]], ConfigData]:
     assert is_normalized_dir_path(rootgitdir)
     rootgitfile = rootgitdir + _KNOWN_TENTATIVE_ARCHIVE_NAMES_FNAME
     return pickled_cache(cachedir, cachedata, 'known_tentative_archive_names', [rootgitfile],
@@ -100,23 +100,23 @@ def _write_git_tentative_names(rootgitdir: str, tanames: dict[bytes, list[str]])
         GitTentativeArchiveNames().write(wf, tanames)
 
 
-def _read_fo_plugin_data(params: tuple[str, str, Callable[[typing.TextIO], any]]) -> any:
+def _read_fo_plugin_data(params: tuple[str, str, Callable[[typing.TextIO], Any]]) -> Any:
     (name, rootgitfile, rdfunc) = params
     assert is_normalized_file_path(rootgitfile)
     with gitdatafile.open_git_data_file_for_reading(rootgitfile) as rf:
         return name, rdfunc(rf)
 
 
-def _read_cached_fo_plugin_data(rootgitdir: str, name: str, rdfunc: Callable[[typing.TextIO], any],
-                                cachedir: str, cachedata: dict[str, any]) -> tuple[any, dict[str, any]]:
+def _read_cached_fo_plugin_data(rootgitdir: str, name: str, rdfunc: Callable[[typing.TextIO], Any],
+                                cachedir: str, cachedata: ConfigData) -> tuple[Any, ConfigData]:
     assert is_normalized_dir_path(rootgitdir)
     rootgitfile = rootgitdir + _known_plugin_fname(name)
     return pickled_cache(cachedir, cachedata, 'known_' + name + '_data', [rootgitfile],
                          _read_fo_plugin_data, (name, rootgitfile, rdfunc))
 
 
-def _write_fo_plugin_data(rootgitdir: str, name: str, wrfunc: Callable[[typing.TextIO, any], None],
-                          wrdata: any) -> None:
+def _write_fo_plugin_data(rootgitdir: str, name: str, wrfunc: Callable[[typing.TextIO, Any], None],
+                          wrdata: Any) -> None:
     assert is_normalized_dir_path(rootgitdir)
     fpath = rootgitdir + _known_plugin_fname(name)
     assert is_normalized_file_path(fpath)
@@ -141,7 +141,7 @@ def _append_archive(archives_by_hash, archived_files_by_hash, archived_files_by_
         archived_files_by_name[fname].append((ar, fi))
 
 
-def _load_archives_task_func(param: tuple[str, str, dict[str, any]]) -> tuple[dict, dict, dict, dict[str, any]]:
+def _load_archives_task_func(param: tuple[str, str, dict[str, Any]]) -> tuple[dict, dict, dict, dict[str, Any]]:
     (rootgitdir, cachedir, cachedata) = param
     (archives, cacheoverrides) = _read_cached_git_archives(rootgitdir, cachedir, cachedata)
     archives_by_hash = {}
@@ -190,8 +190,8 @@ def _save_archives_task_func(param: tuple[str, list[Archive]]) -> None:
         _debug_assert_eq_list(saved_loaded, sorted_archives)
 
 
-def _load_tentative_names_task_func(param: tuple[str, str, dict[str, any]]) -> tuple[
-    dict[bytes, list[str]], dict[str, any]]:
+def _load_tentative_names_task_func(param: tuple[str, str, ConfigData]) -> tuple[
+    dict[bytes, list[str]], ConfigData]:
     (rootgitdir, cachedir, cachedata) = param
     (tanames, cacheoverrides) = _read_cached_git_tentative_names(rootgitdir, cachedir, cachedata)
     return tanames, cacheoverrides
@@ -212,12 +212,12 @@ def _save_tentative_names_task_func(param: tuple[str, dict[bytes, list[str]]]) -
         _debug_assert_eq_list(saved_loaded, sorted_tanames)
 
 
-def _load_plugin_data_task_func(param: tuple[str, str, Callable, str, dict[str, any]]) -> any:
+def _load_plugin_data_task_func(param: tuple[str, str, Callable, str, ConfigData]) -> Any:
     (rootgitdir, name, rdfunc, cachedir, cachedata) = param
     return _read_cached_fo_plugin_data(rootgitdir, name, rdfunc, cachedir, cachedata)
 
 
-def _save_plugin_data_task_func(param: tuple[str, str, Callable, any]) -> None:
+def _save_plugin_data_task_func(param: tuple[str, str, Callable, Any]) -> None:
     (rootgitdir, name, wrfunc, wrdata) = param
     _write_fo_plugin_data(rootgitdir, name, wrfunc, wrdata)
 
@@ -228,7 +228,7 @@ class RootGitData:
     _root_git_dir: str
     _cache_dir: str
     _tmp_dir: str
-    _cache_data: dict[str, any]
+    _cache_data: ConfigData
     _archives_by_hash: dict[bytes, Archive] | None
     _archived_files_by_hash: dict[bytes, list[tuple[Archive, FileInArchive]]] | None  # all (ar,fi) pairs for given hash
     _archived_files_by_name: dict[str, list[tuple[Archive, FileInArchive]]] | None
@@ -244,7 +244,7 @@ class RootGitData:
     _LOADFOOWNTASKNAME = 'sanguine.rootgit.ownloadfo'
 
     def __init__(self, new_hashes_by: str, rootgitdir: str, cachedir: str, tmpdir: str,
-                 cache_data: dict[str, any]) -> None:
+                 cache_data: ConfigData) -> None:
         self._new_hashes_by = new_hashes_by
         self._root_git_dir = rootgitdir
         self._cache_dir = cachedir
@@ -428,7 +428,7 @@ class RootGitData:
              'sanguine.rootgit._archived_files_by_hash',
              'sanguine.rootgit._archived_files_by_name'])
 
-    def _load_archives_own_task_func(self, out: tuple[dict, dict, dict, dict[str, any]]) -> None:
+    def _load_archives_own_task_func(self, out: tuple[dict, dict, dict, dict[str, Any]]) -> None:
         (archives_by_hash, archived_files_by_hash, archived_files_by_name, cacheoverrides) = out
         assert self._archives_by_hash is None
         assert self._archived_files_by_hash is None
@@ -477,7 +477,7 @@ class RootGitData:
             [],
             ['sanguine.rootgit._tentative_archive_names'])
 
-    def _load_tentative_names_own_task_func(self, out: tuple[dict[bytes, list[str]], dict[str, any]]) -> None:
+    def _load_tentative_names_own_task_func(self, out: tuple[dict[bytes, list[str]], ConfigData]) -> None:
         assert self._fo_is_ready == 0
         self._fo_is_ready = 1
         (tanames, cacheoverrides) = out
@@ -485,7 +485,7 @@ class RootGitData:
         self._tentative_archive_names = tanames
         self._cache_data |= cacheoverrides
 
-    def _load_own_plugin_data_task_func(self, out: tuple[any, dict[str, any]]) -> None:
+    def _load_own_plugin_data_task_func(self, out: tuple[Any, ConfigData]) -> None:
         assert self._fo_is_ready == 0
         (loadret, cacheoverrides) = out
         (name, plugindata) = loadret

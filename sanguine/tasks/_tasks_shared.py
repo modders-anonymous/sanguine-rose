@@ -12,7 +12,7 @@ class SharedReturn:
     shm: shared_memory.SharedMemory
     closed: bool
 
-    def __init__(self, item: any):
+    def __init__(self, item: Any):
         data = pickle.dumps(item)
         self.shm = shared_memory.SharedMemory(create=True, size=len(data))
         shared = self.shm.buf
@@ -72,7 +72,7 @@ class SharedPublication:
     shm: shared_memory.SharedMemory
     closed: bool
 
-    def __init__(self, parallel: "Parallel", item: any):
+    def __init__(self, parallel: "Parallel", item: Any):
         data = pickle.dumps(item)
         self.shm = shared_memory.SharedMemory(create=True, size=len(data))
         shared = self.shm.buf
@@ -102,10 +102,10 @@ def make_shared_publication_param(shared: SharedPublication) -> str:
     return shared.name()
 
 
-_cache_of_published: dict[str, any] = {}  # per-process cache of published data
+_cache_of_published: dict[str, Any] = {}  # per-process cache of published data; not a ConfigData
 
 
-def from_publication(sharedparam: SharedPubParam, should_cache=True) -> any:
+def from_publication(sharedparam: SharedPubParam, should_cache=True) -> Any:
     found = _cache_of_published.get(sharedparam)
     if found is not None:
         return found

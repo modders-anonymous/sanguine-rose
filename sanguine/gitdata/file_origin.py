@@ -44,7 +44,7 @@ class FileOriginPluginBase(ABC):
         pass
 
     @abstractmethod
-    def config(self, cfg: dict[str, any]) -> None:
+    def config(self, cfg: ConfigData) -> None:
         pass
 
     @abstractmethod
@@ -55,22 +55,22 @@ class FileOriginPluginBase(ABC):
     # reading, part 1 (to be run in a separate process)
     @abstractmethod
     def load_json5_file_func(self) -> Callable[
-        [typing.TextIO], any]:  # function returning function; returned function cannot be a lambda
+        [typing.TextIO], Any]:  # function returning function; returned function cannot be a lambda
         pass
 
     # reading, part 2 (to be run locally)
     @abstractmethod
-    def got_loaded_data(self, data: any) -> None:
+    def got_loaded_data(self, data: Any) -> None:
         pass
 
     # writing, part 1 (to be run locally)
     @abstractmethod
-    def data_for_saving(self) -> any:
+    def data_for_saving(self) -> Any:
         pass
 
     # writing, part 2 (to be run in a separate process)
     @abstractmethod
-    def save_json5_file_func(self) -> Callable[[typing.TextIO, any], None]:
+    def save_json5_file_func(self) -> Callable[[typing.TextIO, Any], None]:
         pass
 
     @abstractmethod
@@ -125,15 +125,15 @@ def file_origin_plugin_by_name(name: str) -> FileOriginPluginBase:
     return _file_origin_plugins[name]
 
 
-def _config_file_origin_plugins(cfg: dict[str, any], _: None) -> None:
+def _config_file_origin_plugins(cfg: ConfigData, _: None) -> None:
     global _file_origin_plugins
-    unused_config_warning('file_origin_plugins',cfg,[p.name() for p in _file_origin_plugins.values()])
+    unused_config_warning('file_origin_plugins', cfg, [p.name() for p in _file_origin_plugins.values()])
     for p in _file_origin_plugins.values():
         if p.name() in cfg:
             p.config(cfg[p.name()])
 
 
-def config_file_origin_plugins(cfg: dict[str, any]) -> None:
+def config_file_origin_plugins(cfg: ConfigData) -> None:
     _config_file_origin_plugins(cfg, None)
     init = tasks.LambdaReplacement(_config_file_origin_plugins, cfg)
     tasks.add_global_process_initializer(init)

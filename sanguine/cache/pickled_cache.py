@@ -1,8 +1,8 @@
 from sanguine.common import *
 
 
-def pickled_cache(cachedir: str, cachedata: dict[str, any], prefix: str, origfiles: list[str],
-                  calc: Callable[[any], any], params: any = None) -> tuple[any, dict[str:str]]:
+def pickled_cache(cachedir: str, cachedata: ConfigData, prefix: str, origfiles: list[str],
+                  calc: Callable[[Any], Any], params: Any = None) -> tuple[Any, dict[str:str]]:
     assert isinstance(origfiles, list)
     readpaths = cachedata.get(prefix + '.files')
 

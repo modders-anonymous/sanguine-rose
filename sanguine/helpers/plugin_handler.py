@@ -5,7 +5,7 @@ import inspect
 from sanguine.common import *
 
 
-def load_plugins(plugindir: str, basecls: any, found: Callable[[any], None]) -> None:
+def load_plugins(plugindir: str, basecls: Any, found: Callable[[Any], None]) -> None:
     # plugindir is relative to the path of this very file
     thisdir = os.path.split(os.path.abspath(__file__))[0] + '\\..\\'
     # print(thisdir)

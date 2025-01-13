@@ -242,7 +242,7 @@ def _save_nexus_json5(wf: typing.TextIO, data: tuple[dict[bytes, bytes], dict[by
 ### Plugin
 
 class NexusMd5Hash(ExtraHash):
-    _md5: any
+    _md5: Any
 
     def __init__(self):
         super().__init__()
@@ -272,7 +272,7 @@ class NexusFileOriginPlugin(FileOriginPluginBase):
     def name(self) -> str:
         return 'nexus'
 
-    def config(self, cfg: dict[str, any]) -> None:
+    def config(self, cfg: ConfigData) -> None:
         unused_config_warning('origins.nexus', cfg, ['gameids'])
         if 'gameids' in cfg:
             gameids = cfg['gameids']
@@ -290,20 +290,20 @@ class NexusFileOriginPlugin(FileOriginPluginBase):
 
     ### reading and writing is split into two parts, to facilitate multiprocessing
     # reading, part 1 (to be run in a separate process)
-    def load_json5_file_func(self) -> Callable[[typing.TextIO], any]:  # function returning function
+    def load_json5_file_func(self) -> Callable[[typing.TextIO], Any]:  # function returning function
         return _load_nexus_json5
 
     # reading, part 2 (to be run locally)
-    def got_loaded_data(self, data: any) -> None:
+    def got_loaded_data(self, data: Any) -> None:
         self.nexus_hash_mapping = data[0]
         self.nexus_file_origins = data[1]
 
     # writing, part 1 (to be run locally)
-    def data_for_saving(self) -> any:
+    def data_for_saving(self) -> Any:
         return self.nexus_hash_mapping, self.nexus_file_origins
 
     # writing, part 2 (to be run in a separate process)
-    def save_json5_file_func(self) -> Callable[[typing.TextIO, any], None]:
+    def save_json5_file_func(self) -> Callable[[typing.TextIO, Any], None]:
         return _save_nexus_json5
 
     def add_file_origin(self, h: bytes, fo: FileOrigin) -> bool:

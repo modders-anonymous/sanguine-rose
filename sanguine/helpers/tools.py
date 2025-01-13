@@ -19,11 +19,11 @@ class ToolPluginBase(ABC):
         pass
 
     @abstractmethod
-    def create_context(self, resolvedvfs: ResolvedVFS) -> any:
+    def create_context(self, resolvedvfs: ResolvedVFS) -> Any:
         pass
 
     @abstractmethod
-    def could_be_produced(self, context: any, srcpath: str, targetpath: str) -> bool:
+    def could_be_produced(self, context: Any, srcpath: str, targetpath: str) -> bool:
         pass
 
 
