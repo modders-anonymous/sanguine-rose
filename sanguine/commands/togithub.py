@@ -12,9 +12,9 @@ from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins
 class _ToolFinder:
     tools_by_ext: dict[str, list[tuple[ToolPluginBase, any]]]
 
-    def __init__(self, resolvedvfs: ResolvedVFS) -> None:
+    def __init__(self, gameuniverse: str, resolvedvfs: ResolvedVFS) -> None:
         self.tools_by_ext = {}
-        for plugin in all_tool_plugins():
+        for plugin in all_tool_plugins(gameuniverse):
             info('Preparing context for {} tool...'.format(plugin.name()))
             pluginex = (plugin, plugin.create_context(resolvedvfs))
             exts = plugin.extensions()
@@ -46,7 +46,7 @@ def _add_ext_stats(stats: dict[str, int], fpath: str) -> None:
 
 
 def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
-    toolsfinder: _ToolFinder = _ToolFinder(wcache.resolved_vfs())
+    toolsfinder: _ToolFinder = _ToolFinder(cfg.root_modpack_config().game_universe, wcache.resolved_vfs())
 
     info('Stage 0: collecting retrievers')
     possibleretrievers: dict[bytes, list[FileRetriever]] = {}
@@ -167,7 +167,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         assert len(possibleretrievers) == len(remainingretrievers2) + len(retrievers)
         for r in retrievers.items():
             retr: FileRetriever = r[1]
-            assert isinstance(retr, (UnknownFileRetriever, ToolFileRetriever, ArchiveFileRetriever, GithubFileRetriever, ZeroFileRetriever))
+            assert isinstance(retr, (
+            UnknownFileRetriever, ToolFileRetriever, ArchiveFileRetriever, GithubFileRetriever, ZeroFileRetriever))
             if isinstance(retr, ArchiveFileRetriever):
                 assert retr.archive_hash() in archives
 

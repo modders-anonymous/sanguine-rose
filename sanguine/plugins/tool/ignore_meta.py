@@ -1,9 +1,12 @@
-from sanguine.common import *
 from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS
+
 
 class IgnoreMetaToolPlugin(ToolPluginBase):
     def name(self) -> str:
         return 'IgnoreMeta'
+
+    def supported_games(self) -> list[str]:
+        return ['SKYRIM']
 
     def extensions(self) -> list[str]:
         return ['.ini']

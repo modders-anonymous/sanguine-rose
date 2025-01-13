@@ -52,6 +52,9 @@ class BodySlideToolPlugin(ToolPluginBase):
     def name(self) -> str:
         return 'BodySlide'
 
+    def supported_games(self) -> list[str]:
+        return ['SKYRIM']
+
     def extensions(self) -> list[str]:
         return ['.tri', '.nif']
 

@@ -167,24 +167,28 @@ class GithubModpack(GithubFolder):
 class GithubModpackConfig:
     is_root: bool
     # for root:
+    game_universe: str | None
     origin_configs: dict[str, any] | None
 
     # for non-root:
     dependencies: list[GithubModpack]
     own_mod_names: list[str]
 
-    def __init__(self, jsonconfig: dict[str, any]) -> None:
-        is_root = jsonconfig.get('is_root', 0)
+    def __init__(self, jsonconfigfname: str, jsonconfig: dict[str, any]) -> None:
+        is_root = jsonconfig.get('isroot', 0)
         abort_if_not(is_root == 1 or is_root == 0)
         self.is_root = is_root != 0
         if self.is_root:
-            unused_config_warning('ModpackConfig', jsonconfig, ['is_root', 'origins'])
+            unused_config_warning(jsonconfigfname, jsonconfig, ['isroot', 'origins', 'gameuniverse'])
             self.origin_configs = jsonconfig.get('origins', {})
+            abort_if_not('gameuniverse' in jsonconfig)
+            self.game_universe = jsonconfig['gameuniverse']
             self.dependencies = []
             self.own_mod_names = []
         else:
-            unused_config_warning('ModpackConfig', jsonconfig, ['is_root', 'dependencies', 'ownmods'])
+            unused_config_warning('ModpackConfig', jsonconfig, ['isroot', 'dependencies', 'ownmods'])
             self.origin_configs = None
+            self.game_universe = None
             self.dependencies = [GithubModpack(d) for d in jsonconfig['dependencies']]
             self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
 
@@ -209,9 +213,10 @@ def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
         info('GitHub project {} cloned successfully'.format(ghproject))
 
     assert ok == 1
-    with open_3rdparty_txt_file(gh.mpfolder(githubrootdir) + 'sanguine.json5') as rf:
+    jsonconfigfname = gh.mpfolder(githubrootdir) + 'sanguine.json5'
+    with open_3rdparty_txt_file(jsonconfigfname) as rf:
         jsonconfig = json5.load(rf)
-        mpcfg = GithubModpackConfig(jsonconfig)
+        mpcfg = GithubModpackConfig(jsonconfigfname, jsonconfig)
         allmodpackconfigs[ghproject] = mpcfg
 
         if mpcfg.is_root:
@@ -300,6 +305,11 @@ class LocalProjectConfig:
             config_file_origin_plugins(self.all_modpack_configs[self.root_modpack].origin_configs)
 
             self.github_username = jsonconfig.get('github_username')
+
+    def root_modpack_config(self) -> GithubModpackConfig:
+        assert self.root_modpack is not None
+        assert self.root_modpack in self.all_modpack_configs
+        return self.all_modpack_configs[self.root_modpack]
 
     def active_source_vfs_folders(self) -> FolderListToCache:
         return self.mod_manager_config.active_source_vfs_folders()
