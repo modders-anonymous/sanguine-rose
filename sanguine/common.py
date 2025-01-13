@@ -106,10 +106,10 @@ class ResolvedVFS:
         self._source_to_target = sourcetotarget
         self._target_files = targetfiles
 
-    def all_source_files(self) -> any:  # effectively Iterable, but doesn't comply with it
+    def all_source_files(self) -> Iterable[str]:
         return self._source_to_target.keys()
 
-    def all_target_files(self) -> any:  # effectively Iterable, but doesn't comply with it
+    def all_target_files(self) -> Iterable[str]:
         return self._target_files.keys()
 
     def source_to_target(self, path: str) -> str:
