@@ -102,7 +102,7 @@ class GitParamPathCompressor(GitParamCompressor):
 
     @staticmethod
     def _to_json_fpath(fpath: str) -> str:
-        return urlparse.quote(fpath, safe=" /+()'&#$[];,!@")
+        return urlparse.quote(fpath, safe=" /+()'&#$[];,!@<>")
 
     def compress(self, path: str | None) -> str:
         if path is None:

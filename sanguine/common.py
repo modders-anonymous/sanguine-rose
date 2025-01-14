@@ -204,6 +204,7 @@ class FastSearchOverPartialStrings:
     def __init__(self, src: list[tuple[str, Any]]) -> None:
         self._strings = []
         for s in src:
+            assert isinstance(s, tuple)
             self._strings.append((s[0], -1, s[1]))
         self._strings.sort(key=lambda x2: x2[0])
 

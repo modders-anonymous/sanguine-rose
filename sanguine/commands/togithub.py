@@ -62,15 +62,15 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
             if len(retr) == 0:
                 targetpath = cfg.source_vfs_to_target_vfs(f.file_path)
-                if targetpath is not None:
-                    r = toolsfinder.find_tool_retriever(f, targetpath)
-                    if r is not None:
-                        retr = [r]
-                        ntools += 1
-                        tool = r.tool_name
-                        if tool not in toolstats:
-                            toolstats[tool] = {}
-                        _add_ext_stats(toolstats[tool], f.file_path)
+                assert targetpath is not None
+                r = toolsfinder.find_tool_retriever(f, targetpath)
+                if r is not None:
+                    retr = [r]
+                    ntools += 1
+                    tool = r.tool_name
+                    if tool not in toolstats:
+                        toolstats[tool] = {}
+                    _add_ext_stats(toolstats[tool], f.file_path)
 
             if len(retr) == 0:
                 nzero += 1
@@ -199,7 +199,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         if not f.file_hash in retrievers:
             nzero2 += 1
         else:
-            fp = cfg.source_vfs_to_relative_path(f.file_path)
+            fp = cfg.source_vfs_to_generic_save_path(f.file_path)
             retrievers_by_path.append((fp, retrievers[f.file_hash]))
     assert nzero2 == 0
 

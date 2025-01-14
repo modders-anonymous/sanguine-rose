@@ -13,7 +13,7 @@ class Mo2Plugin(ModManagerPluginBase):
 
 
 class Mo2ProjectConfig(ModManagerConfig):
-    mo2dir: FolderToCache | None
+    mo2dir: str | None
     ignore_dirs: list[str]
     master_profile: str | None
     generated_profiles: dict[str, str] | None
@@ -43,35 +43,32 @@ class Mo2ProjectConfig(ModManagerConfig):
         for ignore in ignores:
             if ignore == '{DEFAULT-MO2-IGNORES}':
                 self.ignore_dirs += [normalize_dir_path(mo2dir + defignore) for defignore in [
-                    'plugins\\data\\RootBuilder',
-                    'crashDumps',
-                    'logs',
-                    'webcache',
                     'overwrite\\Root\\Logs',
+                    'overwrite\\Root\\Backup',
                     'overwrite\\ShaderCache'
                 ]]
             else:
                 self.ignore_dirs.append(normalize_source_vfs_dir_path(ignore, mo2dir))
 
         assert self.mo2dir is None
-        self.mo2dir = FolderToCache(mo2dir, self.ignore_dirs + [mo2dir + 'mods\\'] + download_dirs)
+        self.mo2dir = mo2dir
 
         assert self.master_profile is None
         assert self.generated_profiles is None
         self.master_profile = section.get('masterprofile')
         abort_if_not(self.master_profile is not None and isinstance(self.master_profile, str),
                      lambda: "'masterprofile' in config must be a string, got " + repr(self.master_profile))
-        abort_if_not(os.path.isdir(self.mo2dir.folder + 'profiles\\' + self.master_profile))
+        abort_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + self.master_profile))
 
         self.generated_profiles = section.get('generatedprofiles')
         abort_if_not(self.generated_profiles is not None and isinstance(self.generated_profiles, dict),
                      lambda: "'generatedprofiles' in config must be a list, got " + repr(self.generated_profiles))
         for gp in self.generated_profiles.keys():
-            abort_if_not(os.path.isdir(self.mo2dir.folder + 'profiles\\' + gp))
+            abort_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + gp))
 
         assert self.master_modlist is None
         self.master_modlist = ModList(
-            normalize_dir_path(self.mo2dir.folder + 'profiles\\' + self.master_profile + '\\'))
+            normalize_dir_path(self.mo2dir + 'profiles\\' + self.master_profile + '\\'))
 
     def is_path_ignored(self, path: str) -> bool:
         for ig in self.ignore_dirs:
@@ -80,13 +77,16 @@ class Mo2ProjectConfig(ModManagerConfig):
         return False
 
     def active_source_vfs_folders(self) -> FolderListToCache:
-        out: FolderListToCache = FolderListToCache([self.mo2dir])
-        modsdir = self.mo2dir.folder + 'mods\\'
-        assert modsdir in self.mo2dir.exdirs
-        exdirs = [x for x in self.mo2dir.exdirs if x != modsdir]
+        overwritef = self.mo2dir + 'overwrite\\'
+        if FolderToCache.ok_to_construct(overwritef, self.ignore_dirs):
+            overwrite = [FolderToCache(overwritef, self.ignore_dirs)]
+        else:
+            overwrite = []
+        out: FolderListToCache = FolderListToCache(overwrite)
+        exdirs = self.ignore_dirs
 
         for mod in self.master_modlist.all_enabled():
-            folder = normalize_dir_path(self.mo2dir.folder + 'mods\\' + mod + '\\')
+            folder = normalize_dir_path(self.mo2dir + 'mods\\' + mod + '\\')
             if FolderToCache.ok_to_construct(folder, exdirs) and not self.is_path_ignored(folder):
                 out.append(FolderToCache(folder, exdirs))
         return out
@@ -94,19 +94,18 @@ class Mo2ProjectConfig(ModManagerConfig):
     def default_download_dirs(self) -> list[str]:
         return ['{mo2.mo2dir}downloads\\']
 
-    def source_vfs_to_target_vfs(self, path: str) -> str | None:  # returns path relative to target vfs root
+    def source_vfs_to_target_vfs(self, path: str) -> str:  # returns path relative to target vfs root
         assert is_normalized_path(path)
-        assert path.startswith(self.mo2dir.folder)
-        mo2mods = self.mo2dir.folder + 'mods\\'
-        if not path.startswith(mo2mods):
-            return None
+        if path.startswith(self.mo2dir + 'overwrite\\'):
+            return path[len('overwrite\\'):]
+        mo2mods = self.mo2dir + 'mods\\'
+        assert path.startswith(mo2mods)
         relpath = path[len(mo2mods):]
         slash = relpath.find('\\')
-        if slash == -1:
-            return None
+        assert slash != -1
         relpath = relpath[slash + 1:]
 
-        # MO2 Root plugin
+        # MO2 RootBuilder plugin
         if relpath.startswith('root\\'):
             return relpath[len('root\\'):]
 
@@ -117,24 +116,27 @@ class Mo2ProjectConfig(ModManagerConfig):
 
         allenabled = list(self.master_modlist.all_enabled())
         modsrch = FastSearchOverPartialStrings(
-            [(self.mo2dir.folder + 'mods\\' + allenabled[i].lower() + '\\', i) for i in range(len(allenabled))])
+            [(self.mo2dir + 'overwrite\\', -1)] + [(self.mo2dir + 'mods\\' + allenabled[i].lower() + '\\', i) for i in
+                                                   range(len(allenabled))])
 
         source_to_target: dict[str, str] = {}
         target_files0: dict[str, list[tuple[int, FileOnDisk]]] = {}
-        nfound = 0
-        nnotfound = 0
+        nsourcevfs = 0
         for f in sourcevfs:
             relpath = self.source_vfs_to_target_vfs(f.file_path)
-            if relpath is None:
-                nnotfound += 1
-                continue
-            nfound += 1
+            assert relpath is not None
+            nsourcevfs += 1
 
             res = modsrch.find_val_for_str(f.file_path)
             assert res is not None
             _, modidx = res
             assert isinstance(modidx, int)
-            assert f.file_path.startswith(self.mo2dir.folder + 'mods\\' + allenabled[modidx].lower() + '\\')
+            if __debug__:
+                if modidx < 0:
+                    assert modidx == -1
+                    assert f.file_path.startswith(self.mo2dir + 'overwrite\\')
+                else:
+                    assert f.file_path.startswith(self.mo2dir + 'mods\\' + allenabled[modidx].lower() + '\\')
 
             if relpath not in target_files0:
                 target_files0[relpath] = []
@@ -143,7 +145,7 @@ class Mo2ProjectConfig(ModManagerConfig):
             assert f.file_path not in source_to_target
             source_to_target[f.file_path] = relpath
 
-        assert nfound == len(source_to_target)
+        assert nsourcevfs == len(source_to_target)
 
         target_files: dict[str, list[FileOnDisk]] = {}
         for key, val in target_files0.items():
@@ -152,11 +154,14 @@ class Mo2ProjectConfig(ModManagerConfig):
             target_files[key] = [f[1] for f in val]
             assert (len(target_files[key]) == len(set(target_files[key])))
 
-        info('MO2: ResolvedVFS: {} files omitted, {} resolved, with {} overrides'.format(nnotfound, nfound,
-                                                                                         nfound - len(target_files)))
+        info('MO2: ResolvedVFS: {} files resolved, with {} overrides'.format(nsourcevfs,
+                                                                             nsourcevfs - len(target_files)))
         return ResolvedVFS(source_to_target, target_files)
 
-    def source_vfs_to_relative_path(self, path: str) -> str:
-        assert is_normalized_path(path)
-        assert path.startswith(self.mo2dir.folder)
-        return path[len(self.mo2dir.folder):]
+    def source_vfs_to_generic_save_path(self, path: str) -> str:
+        assert is_normalized_file_path(path)
+        overwrite = self.mo2dir + 'overwrite\\'
+        if path.startswith(overwrite):
+            return '<overwrite>\\' + path[len(overwrite):]
+        assert path.startswith(self.mo2dir + 'mods\\')
+        return path[len(self.mo2dir + 'mods\\'):]
