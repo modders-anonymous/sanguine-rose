@@ -1,7 +1,6 @@
 # part of common.py which can be used in install scripts too
 
 # noinspection PyUnresolvedReferences
-import enum
 import os
 import traceback
 import typing
@@ -9,6 +8,8 @@ import typing
 from abc import ABC, abstractmethod
 # noinspection PyUnresolvedReferences
 from collections.abc import Callable, Generator, Iterable
+# noinspection PyUnresolvedReferences
+from enum import Enum, IntEnum
 # noinspection PyUnresolvedReferences
 from types import TracebackType
 

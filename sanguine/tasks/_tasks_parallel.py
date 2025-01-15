@@ -1,7 +1,6 @@
 import heapq
 import logging
 import time
-from enum import IntEnum
 from multiprocessing import Queue as PQueue, SimpleQueue, Process, shared_memory
 from threading import Thread  # only for logging!
 

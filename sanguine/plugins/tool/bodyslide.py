@@ -2,7 +2,7 @@ import re
 import xml.etree.ElementTree as ElementTree
 
 from sanguine.common import *
-from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS
+from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS, CouldBeProducedByTool
 
 
 class _BodySlideToolPluginContext:
@@ -69,14 +69,15 @@ class BodySlideToolPlugin(ToolPluginBase):
                 ctx.rel_output_files |= {m: 1 for m in modified}
         return ctx
 
-    def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> bool:
+    def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> CouldBeProducedByTool:
         assert isinstance(ctx, _BodySlideToolPluginContext)
         f, ext = os.path.splitext(targetpath)
         assert ext in self.extensions()
         if ext == '.tri':
-            return f in ctx.rel_output_files
+            return CouldBeProducedByTool.WithKnownConfig if f in ctx.rel_output_files else CouldBeProducedByTool.NotFound
         assert ext == '.nif'
         if f.endswith('_0') or f.endswith('_1'):
-            return f[:-2] in ctx.rel_output_files
+            return CouldBeProducedByTool.WithKnownConfig if f[
+                                                            :-2] in ctx.rel_output_files else CouldBeProducedByTool.NotFound
         else:
-            return False
+            return CouldBeProducedByTool.NotFound

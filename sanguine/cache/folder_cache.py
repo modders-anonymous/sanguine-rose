@@ -172,7 +172,7 @@ def _scan_folder_task_func(
     sdout = _FolderScanDirOut(tocache.folder)
     stats = _FolderScanStats()
     filesbypath = tasks.from_publication(pubfilesbypath)
-    debug('FolderCache._scan_folder_task_func({}): {} pubfilesbypath'.format(name,len(filesbypath)))
+    debug('FolderCache._scan_folder_task_func({}): {} pubfilesbypath'.format(name, len(filesbypath)))
     started = time.perf_counter()
     lfilesbypath = len(filesbypath)
     FolderCache.scan_dir(started, sdout, stats, tocache, tocache.folder, filesbypath, pubfilesbypath, name)
@@ -196,6 +196,7 @@ def _save_files_task_func(
     _write_dict_of_files(cachedir, name, filesbypath, filteredfiles)
     _write_all_scan_stats(cachedir, name, scan_stats)
     assert len(filesbypath) == lfilesbypath
+
 
 class _ScanStatsNode:
     parent: "_ScanStatsNode|None"
@@ -600,7 +601,8 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         self._files_by_path = filesbypath
         self._filtered_files = filteredfiles
 
-        debug('FolderCache.{}: _load_files_own_task_func(): {} _files_by_path'.format(self.name,len(self._files_by_path)))
+        debug('FolderCache.{}: _load_files_own_task_func(): {} _files_by_path'.format(self.name,
+                                                                                      len(self._files_by_path)))
 
         debug('FolderCache.{}: almost processed loading files, preparing SharedPublication'.format(self.name))
         self.pub_files_by_path = tasks.SharedPublication(parallel, self._files_by_path)
@@ -620,7 +622,8 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         (f, xtra) = out
         scannedfiles[f.file_path] = f
         self._files_by_path[f.file_path] = f
-        debug('FolderCache.{}: _own_calc_hash_task_func(): {} _files_by_path'.format(self.name,len(self._files_by_path)))
+        debug(
+            'FolderCache.{}: _own_calc_hash_task_func(): {} _files_by_path'.format(self.name, len(self._files_by_path)))
         assert len(xtra) == len(self._extra_hash_factories)
         if __debug__:
             if f.file_hash in self.extra_hashes:
@@ -665,7 +668,8 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         self._all_scan_stats = self._new_all_scan_stats
         self._new_all_scan_stats = None
 
-        debug('FolderCache.{}: _own_reconcile_task_func(): {} _files_by_path'.format(self.name,len(self._files_by_path)))
+        debug(
+            'FolderCache.{}: _own_reconcile_task_func(): {} _files_by_path'.format(self.name, len(self._files_by_path)))
 
         savetaskname = 'sanguine.foldercache.' + self.name + '.save'
         savetask = tasks.Task(savetaskname, _save_files_task_func,
@@ -695,7 +699,8 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         else:
             self._new_all_scan_stats[sdout.root] = sdout.scan_stats
 
-        debug('FolderCache.{}: _scan_folder_own_task_func(): {} _files_by_path'.format(self.name,len(self._files_by_path)))
+        debug('FolderCache.{}: _scan_folder_own_task_func(): {} _files_by_path'.format(self.name,
+                                                                                       len(self._files_by_path)))
 
         # new hashing tasks
         for f in sdout.requested_files:

@@ -6,7 +6,7 @@ from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever
                                              GithubFileRetriever, ZeroFileRetriever, ToolFileRetriever,
                                              UnknownFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
-from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins
+from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 
 
 class _ToolFinder:
@@ -30,7 +30,8 @@ class _ToolFinder:
         if ext in self.tools_by_ext:
             plugins = self.tools_by_ext[ext]
             for plugin, ctx in plugins:
-                if plugin.could_be_produced(ctx, srcfile.file_path, targetpath):
+                cbp = plugin.could_be_produced(ctx, srcfile.file_path, targetpath)
+                if cbp.should_ignore() or cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
                     return ToolFileRetriever((srcfile.file_hash, srcfile.file_size), plugin.name())
         return None
 

@@ -2,6 +2,22 @@ from sanguine.common import *
 from sanguine.helpers.plugin_handler import load_plugins
 
 
+class CouldBeProducedByTool(IntEnum):
+    NotFound = 0,
+    JustIgnore = 1,  # special value, excluded from otherwise ordered values
+    Maybe = 2,
+    WithKnownConfig = 3,
+    WithOldConfig = 4,
+    WithCurrentConfig = 5
+
+    def should_ignore(self) -> bool:
+        return self == CouldBeProducedByTool.JustIgnore
+
+    def is_greater_or_eq(self, cbp: "CouldBeProducedByTool") -> bool:
+        assert cbp != CouldBeProducedByTool.JustIgnore
+        return int(self) >= int(cbp)
+
+
 class ToolPluginBase(ABC):
     def __init__(self) -> None:
         pass
@@ -23,7 +39,7 @@ class ToolPluginBase(ABC):
         pass
 
     @abstractmethod
-    def could_be_produced(self, context: Any, srcpath: str, targetpath: str) -> bool:
+    def could_be_produced(self, context: Any, srcpath: str, targetpath: str) -> CouldBeProducedByTool:
         pass
 
 

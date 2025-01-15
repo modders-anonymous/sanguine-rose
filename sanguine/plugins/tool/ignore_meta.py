@@ -1,5 +1,5 @@
 from sanguine.common import *
-from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS
+from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS, CouldBeProducedByTool
 
 
 class IgnoreMetaToolPlugin(ToolPluginBase):
@@ -15,7 +15,9 @@ class IgnoreMetaToolPlugin(ToolPluginBase):
     def create_context(self, resolvedvfs: ResolvedVFS) -> Any:
         return None
 
-    def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> bool:
+    def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> CouldBeProducedByTool:
         assert ctx is None
         if targetpath == 'data\\meta.ini':
-            return True
+            return CouldBeProducedByTool.JustIgnore
+        else:
+            return CouldBeProducedByTool.NotFound

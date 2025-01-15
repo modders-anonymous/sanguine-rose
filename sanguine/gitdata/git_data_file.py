@@ -6,7 +6,6 @@
 
 import re
 import urllib.parse as urlparse
-from enum import Enum
 
 from sanguine.common import *
 
