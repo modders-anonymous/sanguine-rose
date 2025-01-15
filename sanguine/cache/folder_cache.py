@@ -9,6 +9,8 @@ from sanguine.common import *
 class _FastSearchOverFolderListToCache:
     _srch: FastSearchOverPartialStrings
 
+    # _dbg_orig: FolderListToCache
+
     def __init__(self, src: FolderListToCache) -> None:
         initlst = []
         for f in src.folders:
@@ -17,12 +19,17 @@ class _FastSearchOverFolderListToCache:
                 assert x.startswith(f.folder)
                 initlst.append((x, False))
         self.srch = FastSearchOverPartialStrings(initlst)
+        # self._dbg_orig = src
 
     def is_file_path_included(self, fpath: str) -> bool:
         assert is_normalized_file_path(fpath)
         found = self.srch.find_val_for_str(fpath)
         if found is None:
+            # if self._dbg_orig.is_file_path_included(fpath) is not False:
+            #    assert False
             return False
+        # if self._dbg_orig.is_file_path_included(fpath) != found[1]:
+        #    assert False
         return found[1]
 
 

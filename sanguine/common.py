@@ -227,6 +227,7 @@ class FastSearchOverPartialStrings:
                     prevrefs = prevrefs[:-1]
                     if len(prevrefs) == 0:
                         self._strings[i] = (p, -1, val)
+                        prevrefs.append(i)
                         break
 
     def find_val_for_str(self, s: str) -> tuple[str, Any] | None:
