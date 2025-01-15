@@ -5,7 +5,7 @@ from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.root_git_data import RootGitData
 from sanguine.common import *
 from sanguine.gitdata.file_origin import file_origins_for_file, FileOrigin, file_origin_plugins, FileOriginPluginBase
-from sanguine.helpers.archives import all_archive_plugins_extensions
+from sanguine.helpers.archives import all_archive_plugins_extensions, Archive
 from sanguine.helpers.file_retriever import (FileRetriever, ZeroFileRetriever, GithubFileRetriever,
                                              ArchiveFileRetriever, ArchiveFileRetrieverHelper)
 from sanguine.helpers.tmp_path import TmpPath
@@ -112,6 +112,9 @@ class AvailableFiles:
 
     def archive_stats(self) -> dict[bytes, tuple[int, int]]:  # hash -> (n,total_size)
         return self._root_data.archive_stats()
+
+    def archive_by_hash(self, h: bytes) -> Archive | None:
+        return self._root_data.archive_by_hash(h)
 
     def stats_of_interest(self) -> list[str]:
         return (self._downloads_cache.stats_of_interest() + self._github_cache.stats_of_interest()

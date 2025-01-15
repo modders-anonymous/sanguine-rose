@@ -1,12 +1,51 @@
+from sanguine.cache.available_files import AvailableFiles
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.gitdata.git_data_file import open_git_data_file_for_writing
 from sanguine.gitdata.project_json import GitProjectJson
+from sanguine.helpers.archives import Archive
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever, ToolFileRetriever,
                                              UnknownFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
+
+
+class _ModInProgress:
+    cfg: LocalProjectConfig
+    available: AvailableFiles
+    name: str
+    source_files: dict[str, FileOnDisk]
+    retrievers: list[FileRetriever]
+    known_archives: dict[bytes, tuple[Archive, int]]
+    _state: int
+
+    def __init__(self, cfg: LocalProjectConfig, available: AvailableFiles, name: str) -> None:
+        self.cfg = cfg
+        self.available = available
+        self.name = name
+        self.source_files = {}
+        self.retrievers = []
+        self.known_archives = {}
+        self._state = 0
+
+    def add_file(self, f: FileOnDisk):
+        assert self._state == 0
+        mod, intramod = self.cfg.parse_source_vfs(f.file_path)
+        assert mod == self.name
+        self.source_files[f.file_path] = f
+
+    def add_retriever(self, r: FileRetriever) -> None:
+        assert self._state in [0, 1]
+        if self._state == 0:
+            self._state = 1
+        self.retrievers.append(r)
+        if isinstance(r, ArchiveFileRetriever):
+            arh = r.archive_hash()
+            if arh not in self.known_archives:
+                ar = self.available.archive_by_hash(arh)
+                self.known_archives[arh] = (ar, 1)
+            self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
 
 
 class _ToolFinder:
@@ -200,7 +239,10 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         if not f.file_hash in retrievers:
             nzero2 += 1
         else:
-            fp = cfg.source_vfs_to_generic_save_path(f.file_path)
+            mod, intramod = cfg.parse_source_vfs(f.file_path)
+            assert mod is None or '\\' not in mod
+            assert intramod[0] != '\\'
+            fp = (mod if mod is not None else '<overwrite>') + '\\' + intramod
             retrievers_by_path.append((fp, retrievers[f.file_hash]))
     assert nzero2 == 0
 

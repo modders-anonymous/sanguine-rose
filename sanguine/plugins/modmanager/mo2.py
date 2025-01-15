@@ -158,10 +158,14 @@ class Mo2ProjectConfig(ModManagerConfig):
                                                                              nsourcevfs - len(target_files)))
         return ResolvedVFS(source_to_target, target_files)
 
-    def source_vfs_to_generic_save_path(self, path: str) -> str:
+    def parse_source_vfs(self, path: str) -> tuple[str | None, str]:
         assert is_normalized_file_path(path)
         overwrite = self.mo2dir + 'overwrite\\'
         if path.startswith(overwrite):
-            return '<overwrite>\\' + path[len(overwrite):]
-        assert path.startswith(self.mo2dir + 'mods\\')
-        return path[len(self.mo2dir + 'mods\\'):]
+            return None, path[len(overwrite):]
+        modsdir = self.mo2dir + 'mods\\'
+        assert path.startswith(modsdir)
+        lmodsdir = len(modsdir)
+        idx = path.find('\\', lmodsdir)
+        assert idx >= 0
+        return path[lmodsdir:idx], path[idx + 1:]

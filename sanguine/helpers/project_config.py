@@ -90,7 +90,7 @@ class ModManagerConfig:
         pass
 
     @abstractmethod
-    def source_vfs_to_generic_save_path(self, path: str) -> str:
+    def parse_source_vfs(self, path: str) -> tuple[str | None, str]:
         pass
 
 
@@ -326,7 +326,7 @@ class LocalProjectConfig:
     def resolve_vfs(self, srcfiles: Iterable[FileOnDisk]) -> ResolvedVFS:
         return self.mod_manager_config.resolve_vfs(srcfiles)
 
-    def source_vfs_to_generic_save_path(self, path: str) -> str:
-        return self.mod_manager_config.source_vfs_to_generic_save_path(path)
+    def parse_source_vfs(self, path: str) -> tuple[str | None, str]:
+        return self.mod_manager_config.parse_source_vfs(path)
 
     # private functions
