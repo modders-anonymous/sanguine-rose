@@ -98,25 +98,41 @@ class FolderListToCache:
         return len(self.folders)
 
 
-class ResolvedVFS:
-    _source_to_target: dict[str, str]  # full path to relpath
-    _target_files: dict[str, list[FileOnDisk]]  # relpath to list of files
+class ModFile:
+    mod: str | None
+    intramod: str
 
-    def __init__(self, sourcetotarget: dict[str, str], targetfiles: dict[str, list[FileOnDisk]]) -> None:
+    def __init__(self, mod: str | None, intramod: str) -> None:
+        self.mod = mod
+        self.intramod = intramod
+
+    def __hash__(self) -> int:
+        return hash((hash(self.mod), self.intramod))
+
+    def __eq__(self, other) -> bool:
+        return self.mod == other.mod and self.intramod == other.intramod
+
+
+
+class ResolvedVFS:
+    _source_to_target: dict[str, ModFile]  # full path to TargetFile
+    _target_files: dict[ModFile, list[FileOnDisk]]
+
+    def __init__(self, sourcetotarget: dict[str, ModFile], targetfiles: dict[ModFile, list[FileOnDisk]]) -> None:
         self._source_to_target = sourcetotarget
         self._target_files = targetfiles
 
     def all_source_files(self) -> Iterable[str]:
         return self._source_to_target.keys()
 
-    def all_target_files(self) -> Iterable[str]:
+    def all_target_files(self) -> Iterable[ModFile]:
         return self._target_files.keys()
 
-    def source_to_target(self, path: str) -> str:
+    def source_to_target(self, path: str) -> ModFile:
         return self._source_to_target[path]
 
-    def target_files(self, relpath: str) -> list[FileOnDisk]:
-        return self._target_files[relpath]
+    def modfile_to_target_files(self, mf: ModFile) -> list[FileOnDisk]:
+        return self._target_files[mf]
 
 
 ### Hashing

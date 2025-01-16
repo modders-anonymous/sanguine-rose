@@ -94,22 +94,15 @@ class Mo2ProjectConfig(ModManagerConfig):
     def default_download_dirs(self) -> list[str]:
         return ['{mo2.mo2dir}downloads\\']
 
-    def source_vfs_to_target_vfs(self, path: str) -> str:  # returns path relative to target vfs root
-        assert is_normalized_path(path)
-        if path.startswith(self.mo2dir + 'overwrite\\'):
-            return path[len('overwrite\\'):]
-        mo2mods = self.mo2dir + 'mods\\'
-        assert path.startswith(mo2mods)
-        relpath = path[len(mo2mods):]
-        slash = relpath.find('\\')
-        assert slash != -1
-        relpath = relpath[slash + 1:]
+    def modfile_to_target_vfs(self, mf: ModFile) -> str:  # returns path relative to target vfs root
+        if mf.mod is None:
+            return mf.intramod
 
         # MO2 RootBuilder plugin
-        if relpath.startswith('root\\'):
-            return relpath[len('root\\'):]
+        if mf.intramod.startswith('root\\'):
+            return mf.intramod[len('root\\'):]
 
-        return 'data\\' + relpath
+        return 'data\\' + mf.intramod
 
     def resolve_vfs(self, sourcevfs: Iterable[FileOnDisk]) -> ResolvedVFS:
         info('MO2: Starting resolving VFS...')
@@ -119,11 +112,12 @@ class Mo2ProjectConfig(ModManagerConfig):
             [(self.mo2dir + 'overwrite\\', -1)] + [(self.mo2dir + 'mods\\' + allenabled[i].lower() + '\\', i) for i in
                                                    range(len(allenabled))])
 
-        source_to_target: dict[str, str] = {}
-        target_files0: dict[str, list[tuple[int, FileOnDisk]]] = {}
+        source_to_target: dict[str, ModFile] = {}
+        target_files0: dict[ModFile, list[tuple[int, FileOnDisk]]] = {}
         nsourcevfs = 0
         for f in sourcevfs:
-            relpath = self.source_vfs_to_target_vfs(f.file_path)
+            mf: ModFile = self.parse_source_vfs(f.file_path)
+            relpath = self.modfile_to_target_vfs(mf)
             assert relpath is not None
             nsourcevfs += 1
 
@@ -139,15 +133,15 @@ class Mo2ProjectConfig(ModManagerConfig):
                     assert f.file_path.startswith(self.mo2dir + 'mods\\' + allenabled[modidx].lower() + '\\')
 
             if relpath not in target_files0:
-                target_files0[relpath] = []
-            target_files0[relpath].append((modidx, f))
+                target_files0[mf] = []
+            target_files0[mf].append((modidx, f))
 
             assert f.file_path not in source_to_target
-            source_to_target[f.file_path] = relpath
+            source_to_target[f.file_path] = mf
 
         assert nsourcevfs == len(source_to_target)
 
-        target_files: dict[str, list[FileOnDisk]] = {}
+        target_files: dict[ModFile, list[FileOnDisk]] = {}
         for key, val in target_files0.items():
             val = sorted(val, key=lambda x: x[0])
             assert key not in target_files
@@ -158,14 +152,14 @@ class Mo2ProjectConfig(ModManagerConfig):
                                                                              nsourcevfs - len(target_files)))
         return ResolvedVFS(source_to_target, target_files)
 
-    def parse_source_vfs(self, path: str) -> tuple[str | None, str]:
+    def parse_source_vfs(self, path: str) -> ModFile:
         assert is_normalized_file_path(path)
         overwrite = self.mo2dir + 'overwrite\\'
         if path.startswith(overwrite):
-            return None, path[len(overwrite):]
+            return ModFile(None, path[len(overwrite):])
         modsdir = self.mo2dir + 'mods\\'
         assert path.startswith(modsdir)
         lmodsdir = len(modsdir)
-        idx = path.find('\\', lmodsdir)
-        assert idx >= 0
-        return path[lmodsdir:idx], path[idx + 1:]
+        slash = path.find('\\', lmodsdir)
+        assert slash >= 0
+        return ModFile(path[lmodsdir:slash], path[slash + 1:])

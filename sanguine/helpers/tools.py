@@ -1,5 +1,6 @@
 from sanguine.common import *
 from sanguine.helpers.plugin_handler import load_plugins
+from sanguine.helpers.project_config import LocalProjectConfig
 
 
 class CouldBeProducedByTool(IntEnum):
@@ -35,7 +36,7 @@ class ToolPluginBase(ABC):
         pass
 
     @abstractmethod
-    def create_context(self, resolvedvfs: ResolvedVFS) -> Any:
+    def create_context(self, cfg: LocalProjectConfig, resolvedvfs: ResolvedVFS) -> Any:
         pass
 
     @abstractmethod

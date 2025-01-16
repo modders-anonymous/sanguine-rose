@@ -2,6 +2,7 @@ import re
 import xml.etree.ElementTree as ElementTree
 
 from sanguine.common import *
+from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS, CouldBeProducedByTool
 
 
@@ -58,12 +59,13 @@ class BodySlideToolPlugin(ToolPluginBase):
     def extensions(self) -> list[str]:
         return ['.tri', '.nif']
 
-    def create_context(self, resolvedvfs: ResolvedVFS) -> Any:
+    def create_context(self, cfg: LocalProjectConfig, resolvedvfs: ResolvedVFS) -> Any:
         ctx: _BodySlideToolPluginContext = _BodySlideToolPluginContext()
         osppattern = re.compile(r'data\\CalienteTools\\Bodyslide\\SliderSets\\.*\.osp$', re.IGNORECASE)
-        for relpath in resolvedvfs.all_target_files():
+        for mf in resolvedvfs.all_target_files():
+            relpath = cfg.modfile_to_target_vfs(mf)
             if osppattern.match(relpath):
-                srcfiles = resolvedvfs.target_files(relpath)
+                srcfiles = resolvedvfs.modfile_to_target_files(mf)
                 assert len(srcfiles) > 0
                 modified = _parse_osp(srcfiles[-1].file_path)
                 ctx.rel_output_files |= {m: 1 for m in modified}

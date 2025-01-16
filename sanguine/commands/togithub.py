@@ -1,12 +1,9 @@
 from sanguine.cache.available_files import AvailableFiles
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
-from sanguine.gitdata.git_data_file import open_git_data_file_for_writing
-from sanguine.gitdata.project_json import GitProjectJson
-from sanguine.helpers.archives import Archive
+from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
-                                             GithubFileRetriever, ZeroFileRetriever, ToolFileRetriever,
-                                             UnknownFileRetriever)
+                                             ToolFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 
@@ -15,47 +12,207 @@ class _ModInProgress:
     cfg: LocalProjectConfig
     available: AvailableFiles
     name: str
-    source_files: dict[str, FileOnDisk]
-    retrievers: list[FileRetriever]
+    files: dict[str, list[FileRetriever]]  # intramod -> list of retrievers
     known_archives: dict[bytes, tuple[Archive, int]]
-    _state: int
+    required_archives: dict[bytes, tuple[Archive, int]] | None
+    unresolved_retrievers: dict[str, list[FileRetriever]] | None
+    install_from: Archive | None
+    install_from_root: str | None
+    remaining_after_install_from: dict[str, list[FileRetriever]] | None
+    may_be_modified_by_tools: dict[str, bool] | None
+    skip_from_install: dict[str, bool] | None
 
     def __init__(self, cfg: LocalProjectConfig, available: AvailableFiles, name: str) -> None:
         self.cfg = cfg
         self.available = available
         self.name = name
-        self.source_files = {}
-        self.retrievers = []
+        self.files = {}
         self.known_archives = {}
-        self._state = 0
+        self.required_archives = None
 
-    def add_file(self, f: FileOnDisk):
-        assert self._state == 0
-        mod, intramod = self.cfg.parse_source_vfs(f.file_path)
-        assert mod == self.name
-        self.source_files[f.file_path] = f
+        self.install_from = None
+        self.install_from_root = None
+        self.remaining_after_install_from = None
+        self.may_be_modified_by_tools = None
+        self.skip_from_install = None
 
-    def add_retriever(self, r: FileRetriever) -> None:
-        assert self._state in [0, 1]
-        if self._state == 0:
-            self._state = 1
-        self.retrievers.append(r)
-        if isinstance(r, ArchiveFileRetriever):
-            arh = r.archive_hash()
-            if arh not in self.known_archives:
-                ar = self.available.archive_by_hash(arh)
-                self.known_archives[arh] = (ar, 1)
-            self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
+    def add_file(self, intramod: str, retrievers: list[FileRetriever]) -> None:
+        assert intramod not in self.files
+        self.files[intramod] = retrievers
+        for r in retrievers:
+            if isinstance(r, ArchiveFileRetriever):
+                arh = r.archive_hash()
+                if arh not in self.known_archives:
+                    ar = self.available.archive_by_hash(arh)
+                    self.known_archives[arh] = (ar, 1)
+                self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
+
+    def resolve_unique(self) -> None:
+        assert self.required_archives is None
+        assert self.unresolved_retrievers is None
+        assert self.install_from is None
+        assert self.install_from_root is None
+        assert self.remaining_after_install_from is None
+        assert self.skip_from_install is None
+        assert self.may_be_modified_by_tools is None
+        self.required_archives = {}
+        self.unresolved_retrievers = {}
+        for intra, rlist in self.files:
+            assert len(rlist) > 0
+            if len(rlist) == 1:
+                r0 = rlist[0]
+                if isinstance(r0, ArchiveFileRetriever):
+                    arh = r0.archive_hash()
+                    assert arh in self.known_archives
+                    assert arh not in self.required_archives
+                    self.required_archives[arh] = self.known_archives[arh]
+            else:
+                if __debug__:
+                    for r in rlist:
+                        assert isinstance(r, ArchiveFileRetriever)
+
+                assert intra not in self.unresolved_retrievers
+                self.unresolved_retrievers[intra] = rlist
+
+        if len(self.required_archives) == 1:
+            install_from_candidate: Archive = next(iter(self.required_archives.values()))[0]
+            candidate_roots: dict[str, int] = {}
+            for modpath, rlist in self.files:
+                assert len(rlist) > 0
+                r0 = rlist[0]
+                if __debug__:
+                    for r in rlist:
+                        assert r.file_hash == r0.file_hash
+                assert len(rlist) == 1 or isinstance(r0, ArchiveFileRetriever)
+                if isinstance(r0, ArchiveFileRetriever):
+                    for r in rlist:
+                        assert isinstance(r, ArchiveFileRetriever)
+                        if r.archive_hash() == install_from_candidate.archive_hash:
+                            inarrpath = r.single_archive_retrievers[0].file_in_archive.intra_path
+                            if inarrpath.endswith(modpath):
+                                candidate_root = inarrpath[:-len(modpath)]
+                                if candidate_root.endswith('\\'):
+                                    if candidate_root not in candidate_roots:
+                                        candidate_roots[candidate_root] = 1
+                                    else:
+                                        candidate_roots[candidate_root] += 1
+
+            assert len(candidate_roots) > 0
+            best_candidate_root = sorted(candidate_roots.items(), key=lambda x: x[1])[-1]
+            ratio = float(best_candidate_root[1]) / float(len(self.files))
+            assert ratio <= 1.
+            if ratio > 0.7:  # quite arbitrary, though should be bigger than 0.5 to ensure that it is the best anyway
+                self.install_from = install_from_candidate
+                self.install_from_root = best_candidate_root[0]
+                self.remaining_after_install_from = {}
+                self.may_be_modified_by_tools = {}
+
+                arfiles_by_name: dict[str, tuple[FileInArchive, bool]] = {arf.intra_path: (arf, False) for arf in
+                                                                          install_from_candidate.files}
+                arfiles_by_hash: dict[bytes, FileInArchive] = {arf.file_hash: arf for arf in
+                                                               install_from_candidate.files}
+                file_overrides: dict[str, list[FileRetriever]] = {}
+                for intra, rlist in self.files:
+                    if len(rlist) == 1:
+                        r0 = rlist[0]
+                        if isinstance(r0, ArchiveFileRetriever):
+                            if r0.archive_hash() == install_from_candidate.archive_hash:
+                                arintra = r0.single_archive_retrievers[0].file_in_archive.intra_path
+                                if arintra == self.install_from_root + intra:
+                                    if __debug__:
+                                        arf = arfiles_by_hash[r0.single_archive_retrievers[0].file_hash]
+                                        assert arf.intra_path == arintra
+                                    arfiles_by_name[arintra] = (arfiles_by_name[arintra][0], True)
+                                else:
+                                    arf = arfiles_by_hash[r0.single_archive_retrievers[0].file_hash]
+                                    arfiles_by_name[arf.intra_path] = (arfiles_by_name[arf.intra_path][0], True)
+                                    self.remaining_after_install_from[intra] = [r0]
+                    elif len(rlist) > 1:
+                        processed = False
+                        for r in rlist:
+                            assert isinstance(r, ArchiveFileRetriever)
+                            if r.archive_hash() == install_from_candidate.archive_hash:
+                                arintra = r.single_archive_retrievers[0].file_in_archive.intra_path
+                                if arintra == self.install_from_root + intra:
+                                    if __debug__:
+                                        arf = arfiles_by_hash[r.single_archive_retrievers[0].file_hash]
+                                        assert arf.intra_path == arintra
+                                    file_overrides[intra] = [r]
+                                    arfiles_by_name[arintra] = (arfiles_by_name[arintra][0], True)
+                                else:
+                                    arf = arfiles_by_hash[r.single_archive_retrievers[0].file_hash]
+                                    arfiles_by_name[arf.intra_path] = (arfiles_by_name[arf.intra_path][0], True)
+                                    self.remaining_after_install_from[intra] = [r]
+                                processed = True
+                                break  # for r in rlist
+                        if not processed:
+                            self.remaining_after_install_from[intra] = rlist
+                    else:
+                        assert len(rlist) == 0
+                        if self.install_from_root + intra in arfiles_by_name:  # file with such a path exists in archive, but is modified
+                            self.may_be_modified_by_tools[intra] = True
+                        self.remaining_after_install_from[intra] = rlist
+                self.files |= file_overrides
+
+                self.skip_from_install = {}
+                for arfile in arfiles_by_name.values():
+                    if not arfile[1]:
+                        self.skip_from_install[arfile[0].intra_path] = True
+
+                assert len(self.files) == len(self.install_from.files) - len(self.skip_from_install) + len(
+                    self.remaining_after_install_from)
+
+
+class _ModsInProgress:
+    _cfg: LocalProjectConfig
+    _available: AvailableFiles
+    mods: dict[str, _ModInProgress]
+    _all_retrievers: dict[bytes, list[FileRetriever]]
+
+    def __init__(self, cfg: LocalProjectConfig, available: AvailableFiles) -> None:
+        self.mods = {}
+        self._cfg = cfg
+        self._available = available
+
+    def has_retrievers_for(self, h: bytes) -> bool:
+        return h in self._all_retrievers
+
+    def add_new_file(self, mf: ModFile, retrievers: list[FileRetriever]) -> None:
+        h0 = retrievers[0].file_hash
+        assert not self.has_retrievers_for(h0)
+        if __debug__:
+            for r in retrievers:
+                assert r.file_hash == h0
+
+        if h0 not in self._all_retrievers:
+            self._all_retrievers[h0] = retrievers
+
+        if mf.mod not in self.mods:
+            self.mods[mf.mod] = _ModInProgress(self._cfg, self._available, mf.mod)
+        self.mods[mf.mod].add_file(mf.intramod, retrievers)
+
+    def add_dup_file(self, mf: ModFile, h: bytes) -> None:
+        assert self.has_retrievers_for(h)
+        if mf.mod not in self.mods:
+            self.mods[mf.mod] = _ModInProgress(self._cfg, self._available, mf.mod)
+        self.mods[mf.mod].add_file(mf.intramod, self._all_retrievers[h])
+
+    def all_retrievers(self) -> Iterable[tuple[bytes, list[FileRetriever]]]:
+        return self._all_retrievers.items()
+
+    def resolve_unique(self) -> None:
+        for mod in self.mods:
+            self.mods[mod].resolve_unique()
 
 
 class _ToolFinder:
     tools_by_ext: dict[str, list[tuple[ToolPluginBase, Any]]]
 
-    def __init__(self, gameuniverse: str, resolvedvfs: ResolvedVFS) -> None:
+    def __init__(self, cfg: LocalProjectConfig, resolvedvfs: ResolvedVFS) -> None:
         self.tools_by_ext = {}
-        for plugin in all_tool_plugins(gameuniverse):
+        for plugin in all_tool_plugins(cfg.root_modpack_config().game_universe):
             info('Preparing context for {} tool...'.format(plugin.name()))
-            pluginex = (plugin, plugin.create_context(resolvedvfs))
+            pluginex = (plugin, plugin.create_context(cfg, resolvedvfs))
             exts = plugin.extensions()
             assert len(exts) > 0
             for ext in exts:
@@ -86,22 +243,27 @@ def _add_ext_stats(stats: dict[str, int], fpath: str) -> None:
 
 
 def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
-    toolsfinder: _ToolFinder = _ToolFinder(cfg.root_modpack_config().game_universe, wcache.resolved_vfs())
+    toolsfinder: _ToolFinder = _ToolFinder(cfg, wcache.resolved_vfs())
 
     info('Stage 0: collecting retrievers')
-    possibleretrievers: dict[bytes, list[FileRetriever]] = {}
+    mip = _ModsInProgress(cfg, wcache._available)
+    # possibleretrievers: dict[bytes, list[FileRetriever]] = {}
     ntools = 0
     nzero = 0
     nzerostats = {}
     ndup = 0
     toolstats = {}
     for f in wcache.all_source_vfs_files():
-        if f.file_hash in possibleretrievers:
+        mf = cfg.parse_source_vfs(f.file_path)
+        if mip.has_retrievers_for(f.file_hash):
             ndup += 1
+            mip.add_dup_file(mf, f.file_hash)
         else:
             retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
+            '''
             if len(retr) == 0:
-                targetpath = cfg.source_vfs_to_target_vfs(f.file_path)
+                mf: ModFile = cfg.parse_source_vfs(f.file_path)
+                targetpath = cfg.modfile_to_target_vfs(mf)
                 assert targetpath is not None
                 r = toolsfinder.find_tool_retriever(f, targetpath)
                 if r is not None:
@@ -111,13 +273,13 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                     if tool not in toolstats:
                         toolstats[tool] = {}
                     _add_ext_stats(toolstats[tool], f.file_path)
-
+            '''
             if len(retr) == 0:
                 nzero += 1
                 _add_ext_stats(nzerostats, f.file_path)
-                possibleretrievers[f.file_hash] = [UnknownFileRetriever((f.file_hash, f.file_size))]
+                mip.add_new_file(mf, [])
             else:
-                possibleretrievers[f.file_hash] = retr
+                mip.add_new_file(mf, retr)
 
     info('found {} duplicate files, {} files likely generated by tools'.format(ndup, ntools))
     for tool in toolstats:
@@ -134,8 +296,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     info('stats (nretrievers->ntimes):')
     stats = {}
-    for r in possibleretrievers.items():
-        n = len(r[1])
+    for _, rlist in mip.all_retrievers():
+        n = len(rlist)
         if n not in stats:
             stats[n] = 1
         else:
@@ -149,32 +311,37 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     for ss in srtlast:
         info('{} -> {}'.format(ss, stats[ss]))
 
-    ### got all known retrievers, now processing
-    retrievers: dict[bytes, FileRetriever] = {}
+    ### processing unique retrievers, resolving per-mod install files, etc.
+    info('Stage 1: resolve_unique()...')
+    mip.resolve_unique()
 
-    ### processing unique retrievers
-    info('Stage 1: processing Zero, GitHub, Tools, Unknown, and unique files in Archives')
+    for modname, mod in mip.mods.values():
+        if mod.install_from is not None:
+            info('mod {}: install_from {}, root={}'.format(modname, mod.install_from.tentative_name,
+                                                           mod.install_from_root))
+
+    '''
     archives: dict[bytes, int] = {}  # for now, it is archives for unique files
     remainingretrievers: list[tuple[bytes, list[FileRetriever]]] = []
     nzerogithub = 0
-    for r in possibleretrievers.items():
-        assert len(r[1]) > 0
-        rr0 = r[1][0]
+    for h,rlist in mip.all_retrievers():
+        assert len(rlist) > 0
+        rr0 = rlist[0]
         if isinstance(rr0, (ZeroFileRetriever, GithubFileRetriever, ToolFileRetriever, UnknownFileRetriever)):
-            assert r[0] not in retrievers
-            retrievers[r[0]] = rr0
+            assert h not in retrievers
+            retrievers[h] = rr0
             nzerogithub += 1
-        elif len(r[1]) == 1:
+        elif len(rlist) == 1:
             assert isinstance(rr0, ArchiveFileRetriever)
-            assert r[0] not in retrievers
-            retrievers[r[0]] = rr0
+            assert h not in retrievers
+            retrievers[h] = rr0
             if rr0.archive_hash() not in archives:
                 archives[rr0.archive_hash()] = 1
             else:
                 archives[rr0.archive_hash()] += 1
         else:
             assert isinstance(rr0, ArchiveFileRetriever)
-            remainingretrievers.append(r)
+            remainingretrievers.append((h,rlist))
     assert len(possibleretrievers) == len(remainingretrievers) + len(retrievers)
 
     info('Stage 1: {} files from Zero, Github, and Tools; {} unique files in Archives'.format(nzerogithub,
@@ -254,6 +421,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         jsonwriter.write(f, retrievers_by_path)
 
     info('togithub processed successfully.')
+    '''
 
 
 '''
