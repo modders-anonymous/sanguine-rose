@@ -1,4 +1,5 @@
 from sanguine.common import *
+from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS, CouldBeProducedByTool
 
 
@@ -12,7 +13,7 @@ class IgnoreMetaToolPlugin(ToolPluginBase):
     def extensions(self) -> list[str]:
         return ['.ini']
 
-    def create_context(self, resolvedvfs: ResolvedVFS) -> Any:
+    def create_context(self, cfg: LocalProjectConfig, resolvedvfs: ResolvedVFS) -> Any:
         return None
 
     def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> CouldBeProducedByTool:

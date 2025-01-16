@@ -3,7 +3,7 @@ from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
-                                             ToolFileRetriever)
+                                             ToolFileRetriever, GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 
@@ -28,6 +28,7 @@ class _ModInProgress:
         self.name = name
         self.files = {}
         self.known_archives = {}
+        self.unresolved_retrievers = None
         self.required_archives = None
 
         self.install_from = None
@@ -57,14 +58,14 @@ class _ModInProgress:
         assert self.may_be_modified_by_tools is None
         self.required_archives = {}
         self.unresolved_retrievers = {}
-        for intra, rlist in self.files:
-            assert len(rlist) > 0
-            if len(rlist) == 1:
+        for intra, rlist in self.files.items():
+            if len(rlist) == 0:
+                pass
+            elif len(rlist) == 1:
                 r0 = rlist[0]
                 if isinstance(r0, ArchiveFileRetriever):
                     arh = r0.archive_hash()
                     assert arh in self.known_archives
-                    assert arh not in self.required_archives
                     self.required_archives[arh] = self.known_archives[arh]
             else:
                 if __debug__:
@@ -77,8 +78,9 @@ class _ModInProgress:
         if len(self.required_archives) == 1:
             install_from_candidate: Archive = next(iter(self.required_archives.values()))[0]
             candidate_roots: dict[str, int] = {}
-            for modpath, rlist in self.files:
-                assert len(rlist) > 0
+            for modpath, rlist in self.files.items():
+                if len(rlist) == 0:
+                    continue
                 r0 = rlist[0]
                 if __debug__:
                     for r in rlist:
@@ -91,7 +93,7 @@ class _ModInProgress:
                             inarrpath = r.single_archive_retrievers[0].file_in_archive.intra_path
                             if inarrpath.endswith(modpath):
                                 candidate_root = inarrpath[:-len(modpath)]
-                                if candidate_root.endswith('\\'):
+                                if candidate_root == '' or candidate_root.endswith('\\'):
                                     if candidate_root not in candidate_roots:
                                         candidate_roots[candidate_root] = 1
                                     else:
@@ -112,7 +114,7 @@ class _ModInProgress:
                 arfiles_by_hash: dict[bytes, FileInArchive] = {arf.file_hash: arf for arf in
                                                                install_from_candidate.files}
                 file_overrides: dict[str, list[FileRetriever]] = {}
-                for intra, rlist in self.files:
+                for intra, rlist in self.files.items():
                     if len(rlist) == 1:
                         r0 = rlist[0]
                         if isinstance(r0, ArchiveFileRetriever):
@@ -173,19 +175,21 @@ class _ModsInProgress:
         self.mods = {}
         self._cfg = cfg
         self._available = available
+        self._all_retrievers = {}
 
     def has_retrievers_for(self, h: bytes) -> bool:
         return h in self._all_retrievers
 
     def add_new_file(self, mf: ModFile, retrievers: list[FileRetriever]) -> None:
-        h0 = retrievers[0].file_hash
-        assert not self.has_retrievers_for(h0)
-        if __debug__:
-            for r in retrievers:
-                assert r.file_hash == h0
+        if len(retrievers) > 0:
+            h0 = retrievers[0].file_hash
+            assert not self.has_retrievers_for(h0)
+            if __debug__:
+                for r in retrievers:
+                    assert r.file_hash == h0
 
-        if h0 not in self._all_retrievers:
-            self._all_retrievers[h0] = retrievers
+            if h0 not in self._all_retrievers:
+                self._all_retrievers[h0] = retrievers
 
         if mf.mod not in self.mods:
             self.mods[mf.mod] = _ModInProgress(self._cfg, self._available, mf.mod)
@@ -260,6 +264,11 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             mip.add_dup_file(mf, f.file_hash)
         else:
             retr: list[FileRetriever] = wcache.file_retrievers_by_hash(f.file_hash)
+            if len(retr) > 0:
+                for r in retr:
+                    if isinstance(r, (ZeroFileRetriever, GithubFileRetriever)):
+                        retr = [r]
+                        break
             '''
             if len(retr) == 0:
                 mf: ModFile = cfg.parse_source_vfs(f.file_path)
