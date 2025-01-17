@@ -122,7 +122,7 @@ class _ModInProgress:
                                 arintra = r0.single_archive_retrievers[0].file_in_archive.intra_path
                                 if arintra == self.install_from_root + intra:
                                     if __debug__:
-                                        arf = arfiles_by_hash[r0.single_archive_retrievers[0].file_hash]
+                                        arf = arfiles_by_hash[truncate_file_hash(r0.single_archive_retrievers[0].file_hash)]
                                         assert arf.intra_path == arintra
                                     arfiles_by_name[arintra] = (arfiles_by_name[arintra][0], True)
                                 else:

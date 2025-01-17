@@ -113,7 +113,8 @@ class Mo2ProjectConfig(ModManagerConfig):
                                                    range(len(allenabled))])
 
         source_to_target: dict[str, ModFile] = {}
-        target_files0: dict[ModFile, list[tuple[int, FileOnDisk]]] = {}
+        target_files0: dict[str, list[tuple[ModFile, int, FileOnDisk]]] = {}
+        noverrides = 0
         nsourcevfs = 0
         for f in sourcevfs:
             mf: ModFile = self.parse_source_vfs(f.file_path)
@@ -133,8 +134,10 @@ class Mo2ProjectConfig(ModManagerConfig):
                     assert f.file_path.startswith(self.mo2dir + 'mods\\' + allenabled[modidx].lower() + '\\')
 
             if relpath not in target_files0:
-                target_files0[mf] = []
-            target_files0[mf].append((modidx, f))
+                target_files0[relpath] = []
+            else:
+                noverrides += 1
+            target_files0[relpath].append((mf, modidx, f))
 
             assert f.file_path not in source_to_target
             source_to_target[f.file_path] = mf
@@ -148,8 +151,8 @@ class Mo2ProjectConfig(ModManagerConfig):
             target_files[key] = [f[1] for f in val]
             assert (len(target_files[key]) == len(set(target_files[key])))
 
-        info('MO2: ResolvedVFS: {} files resolved, with {} overrides'.format(nsourcevfs,
-                                                                             nsourcevfs - len(target_files)))
+        assert nsourcevfs == len(target_files)
+        info('MO2: ResolvedVFS: {} files resolved, with {} overrides'.format(nsourcevfs, noverrides))
         return ResolvedVFS(source_to_target, target_files)
 
     def parse_source_vfs(self, path: str) -> ModFile:
