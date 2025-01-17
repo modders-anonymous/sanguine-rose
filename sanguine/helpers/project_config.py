@@ -169,6 +169,7 @@ class GithubModpackConfig:
     # for root:
     game_universe: str | None
     origin_configs: ConfigData | None
+    ignored_file_patterns: list[str]
 
     # for non-root:
     dependencies: list[GithubModpack]
@@ -179,12 +180,17 @@ class GithubModpackConfig:
         abort_if_not(is_root == 1 or is_root == 0)
         self.is_root = is_root != 0
         if self.is_root:
-            unused_config_warning(jsonconfigfname, jsonconfig, ['isroot', 'origins', 'gameuniverse'])
+            unused_config_warning(jsonconfigfname, jsonconfig, ['isroot', 'origins', 'gameuniverse', 'ignore'])
             self.origin_configs = jsonconfig.get('origins', {})
             abort_if_not('gameuniverse' in jsonconfig)
             self.game_universe = jsonconfig['gameuniverse']
             self.dependencies = []
             self.own_mod_names = []
+            self.ignored_file_patterns = jsonconfig.get('ignore', [])
+            if isinstance(self.ignored_file_patterns, str):
+                self.ignored_file_patterns = [self.ignored_file_patterns]
+            abort_if_not(isinstance(self.ignored_file_patterns, list))
+            self.ignored_file_patterns = [p.replace('/', '\\\\') for p in self.ignored_file_patterns]
         else:
             unused_config_warning('ModpackConfig', jsonconfig, ['isroot', 'dependencies', 'ownmods'])
             self.origin_configs = None

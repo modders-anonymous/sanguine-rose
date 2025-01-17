@@ -5,17 +5,12 @@ from sanguine.helpers.project_config import LocalProjectConfig
 
 class CouldBeProducedByTool(IntEnum):
     NotFound = 0,
-    JustIgnore = 1,  # special value, excluded from otherwise ordered values
-    Maybe = 2,
-    WithKnownConfig = 3,
-    WithOldConfig = 4,
-    WithCurrentConfig = 5
-
-    def should_ignore(self) -> bool:
-        return self == CouldBeProducedByTool.JustIgnore
+    Maybe = 1,
+    WithKnownConfig = 2,
+    WithOldConfig = 3,
+    WithCurrentConfig = 4
 
     def is_greater_or_eq(self, cbp: "CouldBeProducedByTool") -> bool:
-        assert cbp != CouldBeProducedByTool.JustIgnore
         return int(self) >= int(cbp)
 
 

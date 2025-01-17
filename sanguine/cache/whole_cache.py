@@ -12,7 +12,7 @@ class WholeCache:
     _project_config: LocalProjectConfig
     _cache_data: ConfigData
     _source_vfs_cache: FolderCache
-    _available: AvailableFiles
+    available: AvailableFiles
     _resolved_vfs: ResolvedVFS | None
     _SYNCOWNTASKNAME: str = 'sanguine.wholecache.sync'
 
@@ -26,9 +26,9 @@ class WholeCache:
             self._cache_data = {}
 
         rootmodpackdir = GithubModpack(projectcfg.root_modpack).folder(projectcfg.github_root_dir)
-        self._available = AvailableFiles(projectcfg.github_username, projectcfg.cache_dir, projectcfg.tmp_dir,
-                                         projectcfg.github_root_dir, rootmodpackdir,
-                                         projectcfg.download_dirs, projectcfg.github_folders(), self._cache_data)
+        self.available = AvailableFiles(projectcfg.github_username, projectcfg.cache_dir, projectcfg.tmp_dir,
+                                        projectcfg.github_root_dir, rootmodpackdir,
+                                        projectcfg.download_dirs, projectcfg.github_folders(), self._cache_data)
 
         folderstocache: FolderListToCache = projectcfg.active_source_vfs_folders()
         self._source_vfs_cache = FolderCache(projectcfg.cache_dir, 'vfs', folderstocache)
@@ -37,12 +37,12 @@ class WholeCache:
 
     def start_tasks(self, parallel: tasks.Parallel) -> None:
         self._source_vfs_cache.start_tasks(parallel)
-        self._available.start_tasks(parallel)
+        self.available.start_tasks(parallel)
 
         syncowntask = tasks.OwnTask(WholeCache._SYNCOWNTASKNAME,
                                     lambda _, _1, _2: self._start_sync_own_task_func(), None,
                                     [self._source_vfs_cache.ready_task_name(),
-                                     self._available.ready_task_name()])
+                                     self.available.ready_task_name()])
         parallel.add_task(syncowntask)
 
     @staticmethod
@@ -53,10 +53,10 @@ class WholeCache:
         return self._source_vfs_cache.all_files()
 
     def file_retrievers_by_hash(self, h: bytes) -> list[FileRetriever]:  # resolved as fully as feasible
-        return self._available.file_retrievers_by_hash(h)
+        return self.available.file_retrievers_by_hash(h)
 
     def archive_stats(self) -> dict[bytes, tuple[int, int]]:  # hash -> (n,total_size)
-        return self._available.archive_stats()
+        return self.available.archive_stats()
 
     def resolved_vfs(self) -> ResolvedVFS:
         if self._resolved_vfs is None:
@@ -64,7 +64,7 @@ class WholeCache:
         return self._resolved_vfs
 
     def stats_of_interest(self) -> list[str]:
-        return (self._available.stats_of_interest() + self._source_vfs_cache.stats_of_interest()
+        return (self.available.stats_of_interest() + self._source_vfs_cache.stats_of_interest()
                 + ['sanguine.wholecache.'])
 
     def done(self) -> None:
