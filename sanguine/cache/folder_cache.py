@@ -172,7 +172,7 @@ def _scan_folder_task_func(
     sdout = _FolderScanDirOut(tocache.folder)
     stats = _FolderScanStats()
     filesbypath = tasks.from_publication(pubfilesbypath)
-    debug('FolderCache._scan_folder_task_func({}): {} pubfilesbypath'.format(name, len(filesbypath)))
+    # debug('FolderCache._scan_folder_task_func({}): {} pubfilesbypath'.format(name, len(filesbypath)))
     started = time.perf_counter()
     lfilesbypath = len(filesbypath)
     FolderCache.scan_dir(started, sdout, stats, tocache, tocache.folder, filesbypath, pubfilesbypath, name)
@@ -705,7 +705,7 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         # new hashing tasks
         for f in sdout.requested_files:
             (fpath, tstamp, fsize) = f
-            debug(fpath)  # RM
+            # debug(fpath)  # RM
             htaskname = self._hashing_task_name(fpath)
             htask = tasks.Task(htaskname, _calc_hash_task_func,
                                (fpath, tstamp, fsize, self._extra_hash_factories),

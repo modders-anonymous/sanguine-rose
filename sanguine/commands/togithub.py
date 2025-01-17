@@ -65,7 +65,7 @@ class _ModInProgress:
         arfs = arfiles_by_hash[arfh]
         return arfs[0].intra_path  # TODO! - best matching name?
 
-    def resolve_unique(self) -> None:
+    def resolve_unique(self, cfg: LocalProjectConfig, itf: "_IgnoredTargetFiles") -> None:
         assert self.required_archives is None
         assert self.unresolved_retrievers is None
         assert self.install_from is None
@@ -196,7 +196,15 @@ class _ModInProgress:
                     self.skip_from_install = {}
                     for arfile in arfiles_by_name.values():
                         if not arfile[1]:
-                            self.skip_from_install[arfile[0].intra_path] = True
+                            fia: FileInArchive = arfile[0]
+                            if not fia.intra_path.startswith(self.install_from_root):
+                                self.skip_from_install[arfile[0].intra_path] = True
+                                continue
+                            intramod = fia.intra_path[len(self.install_from_root):]
+                            mf = ModFile(self.name, intramod)
+                            target = cfg.mod_manager_config.modfile_to_target_vfs(mf)
+                            if not itf.ignored(target):
+                                self.skip_from_install[arfile[0].intra_path] = True
 
                     if __debug__:
                         fromarch: list[str] = []
@@ -211,7 +219,16 @@ class _ModInProgress:
                         assert len(fromarch) == len(self.install_from.files) - len(self.skip_from_install) + len(
                             self.remaining_after_install_from)
 
-                        fromarch = sorted(fromarch)
+                        fromarch0 = sorted(fromarch)
+                        fromarch = []
+                        nignored = 0
+                        for f in fromarch0:
+                            mf = ModFile(self.name, f)
+                            if itf.ignored(cfg.mod_manager_config.modfile_to_target_vfs(mf)):
+                                nignored += 1
+                            else:
+                                fromarch.append(f)
+
                         origf = sorted(self.files.keys())
                         assert len(origf) == len(self.files)
                         if len(fromarch) != len(origf):
@@ -220,7 +237,8 @@ class _ModInProgress:
                             if fromarch[i] != origf[i]:
                                 assert False
 
-                        assert len(self.files) == len(self.install_from.files) - len(self.skip_from_install) + len(
+                        assert len(self.files) == len(self.install_from.files) - nignored - len(
+                            self.skip_from_install) + len(
                             self.remaining_after_install_from)
 
 
@@ -264,8 +282,9 @@ class _ModsInProgress:
         return self._all_retrievers.items()
 
     def resolve_unique(self) -> None:
+        itf = _IgnoredTargetFiles(self._cfg)
         for mod in self.mods:
-            self.mods[mod].resolve_unique()
+            self.mods[mod].resolve_unique(self._cfg, itf)
 
 
 class _ToolFinder:
@@ -309,27 +328,35 @@ def _add_ext_stats(stats: dict[str, int], fpath: str) -> None:
         stats[ext] += 1
 
 
+class _IgnoredTargetFiles:
+    ignored_file_patterns: list
+
+    def __init__(self, cfg: LocalProjectConfig) -> None:
+        self.ignored_file_patterns = [re.compile(p) for p in cfg.root_modpack_config().ignored_file_patterns]
+
+    def ignored(self, fpath: str) -> bool:
+        for p in self.ignored_file_patterns:
+            if p.match(fpath):
+                return True
+        return False
+
+
 def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     toolsfinder: _ToolFinder = _ToolFinder(cfg, wcache.resolved_vfs())
 
     info('Stage 0: collecting retrievers')
     mip = _ModsInProgress(cfg, wcache.available)
-    # possibleretrievers: dict[bytes, list[FileRetriever]] = {}
     nzero = 0
     nzerostats = {}
     ndup = 0
     toolstats = {}
     nignored = 0
-    ignored_file_patterns = [re.compile(p) for p in cfg.root_modpack_config().ignored_file_patterns]
+    itf = _IgnoredTargetFiles(cfg)
     for f in wcache.all_source_vfs_files():
         mf = cfg.parse_source_vfs(f.file_path)
 
         target = cfg.mod_manager_config.modfile_to_target_vfs(mf)
-        ignored = False
-        for p in ignored_file_patterns:
-            if p.match(target):
-                ignored = True
-                break
+        ignored = itf.ignored(target)
 
         if ignored:
             nignored += 1
@@ -400,7 +427,6 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             cbp, tool = toolsfinder.could_be_produced(srcf, targetpath)
             if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
                 ntools += 1
-                ext = os.path.splitext(key)[1]
                 may_overrides[ff] = (tool, cbp)
 
                 if tool not in toolstats:
