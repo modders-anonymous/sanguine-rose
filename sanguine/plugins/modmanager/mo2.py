@@ -112,12 +112,11 @@ class Mo2ProjectConfig(ModManagerConfig):
             [(self.mo2dir + 'overwrite\\', -1)] + [(self.mo2dir + 'mods\\' + allenabled[i].lower() + '\\', i) for i in
                                                    range(len(allenabled))])
 
-        source_to_target: dict[str, ModFile] = {}
-        target_files0: dict[str, list[tuple[ModFile, int, FileOnDisk]]] = {}
-        noverrides = 0
+        source_to_target: dict[str, str] = {}
+        target_files0: dict[str, list[tuple[int, FileOnDisk]]] = {}
         nsourcevfs = 0
         for f in sourcevfs:
-            mf: ModFile = self.parse_source_vfs(f.file_path)
+            mf = self.parse_source_vfs(f.file_path)
             relpath = self.modfile_to_target_vfs(mf)
             assert relpath is not None
             nsourcevfs += 1
@@ -135,24 +134,22 @@ class Mo2ProjectConfig(ModManagerConfig):
 
             if relpath not in target_files0:
                 target_files0[relpath] = []
-            else:
-                noverrides += 1
-            target_files0[relpath].append((mf, modidx, f))
+            target_files0[relpath].append((modidx, f))
 
             assert f.file_path not in source_to_target
-            source_to_target[f.file_path] = mf
+            source_to_target[f.file_path] = relpath
 
         assert nsourcevfs == len(source_to_target)
 
-        target_files: dict[ModFile, list[FileOnDisk]] = {}
+        target_files: dict[str, list[FileOnDisk]] = {}
         for key, val in target_files0.items():
             val = sorted(val, key=lambda x: x[0])
             assert key not in target_files
             target_files[key] = [f[1] for f in val]
             assert (len(target_files[key]) == len(set(target_files[key])))
 
-        assert nsourcevfs == len(target_files)
-        info('MO2: ResolvedVFS: {} files resolved, with {} overrides'.format(nsourcevfs, noverrides))
+        info('MO2: ResolvedVFS: {} files resolved, with {} overrides'.format(nsourcevfs,
+                                                                             nsourcevfs - len(target_files)))
         return ResolvedVFS(source_to_target, target_files)
 
     def parse_source_vfs(self, path: str) -> ModFile:

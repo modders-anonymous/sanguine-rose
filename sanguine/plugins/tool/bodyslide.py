@@ -62,10 +62,9 @@ class BodySlideToolPlugin(ToolPluginBase):
     def create_context(self, cfg: LocalProjectConfig, resolvedvfs: ResolvedVFS) -> Any:
         ctx: _BodySlideToolPluginContext = _BodySlideToolPluginContext()
         osppattern = re.compile(r'data\\CalienteTools\\Bodyslide\\SliderSets\\.*\.osp$', re.IGNORECASE)
-        for mf in resolvedvfs.all_target_files():
-            relpath = cfg.modfile_to_target_vfs(mf)
+        for relpath in resolvedvfs.all_target_files():
             if osppattern.match(relpath):
-                srcfiles = resolvedvfs.modfile_to_target_files(mf)
+                srcfiles = resolvedvfs.target_files(relpath)
                 assert len(srcfiles) > 0
                 modified = _parse_osp(srcfiles[-1].file_path)
                 ctx.rel_output_files |= {m: 1 for m in modified}
