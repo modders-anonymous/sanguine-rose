@@ -48,6 +48,25 @@ class _ModInProgress:
                     self.known_archives[arh] = (ar, 1)
                 self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
 
+    @staticmethod
+    def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,
+                                        arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> None:
+        assert arfh in arfiles_by_hash
+        arfs = arfiles_by_hash[arfh]
+        ok = False
+        for arf in arfs:
+            if arf.intra_path == arintra:
+                ok = True
+                break
+        assert ok
+
+    @staticmethod
+    def _best_unmatched_from_arfiles_by_hash(arfh: bytes, arintra: str,
+                                             arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> str:
+        assert arfh in arfiles_by_hash
+        arfs = arfiles_by_hash[arfh]
+        return arfs[0].intra_path  # TODO! - best matching name?
+
     def resolve_unique(self) -> None:
         assert self.required_archives is None
         assert self.unresolved_retrievers is None
@@ -99,7 +118,8 @@ class _ModInProgress:
                                     else:
                                         candidate_roots[candidate_root] += 1
 
-            assert len(candidate_roots) > 0
+            if len(candidate_roots) == 0:
+                assert False
             best_candidate_root = sorted(candidate_roots.items(), key=lambda x: x[1])[-1]
             ratio = float(best_candidate_root[1]) / float(len(self.files))
             assert ratio <= 1.
@@ -111,8 +131,12 @@ class _ModInProgress:
 
                 arfiles_by_name: dict[str, tuple[FileInArchive, bool]] = {arf.intra_path: (arf, False) for arf in
                                                                           install_from_candidate.files}
-                arfiles_by_hash: dict[bytes, FileInArchive] = {arf.file_hash: arf for arf in
-                                                               install_from_candidate.files}
+                arfiles_by_hash: dict[bytes, list[FileInArchive]] = {}
+                for arf in install_from_candidate.files:
+                    if arf.file_hash not in arfiles_by_hash:
+                        arfiles_by_hash[arf.file_hash] = []
+                    arfiles_by_hash[arf.file_hash].append(arf)
+
                 file_overrides: dict[str, list[FileRetriever]] = {}
                 for intra, rlist in self.files.items():
                     if len(rlist) == 1:
@@ -122,12 +146,14 @@ class _ModInProgress:
                                 arintra = r0.single_archive_retrievers[0].file_in_archive.intra_path
                                 if arintra == self.install_from_root + intra:
                                     if __debug__:
-                                        arf = arfiles_by_hash[truncate_file_hash(r0.single_archive_retrievers[0].file_hash)]
-                                        assert arf.intra_path == arintra
+                                        arfh = truncate_file_hash(r0.single_archive_retrievers[0].file_hash)
+                                        _ModInProgress._assert_arfh_in_arfiles_by_hash(arfh, arintra, arfiles_by_hash)
                                     arfiles_by_name[arintra] = (arfiles_by_name[arintra][0], True)
                                 else:
-                                    arf = arfiles_by_hash[r0.single_archive_retrievers[0].file_hash]
-                                    arfiles_by_name[arf.intra_path] = (arfiles_by_name[arf.intra_path][0], True)
+                                    arfh = truncate_file_hash(r0.single_archive_retrievers[0].file_hash)
+                                    bestname = _ModInProgress._best_unmatched_from_arfiles_by_hash(arfh, arintra,
+                                                                                                   arfiles_by_hash)
+                                    arfiles_by_name[bestname] = (arfiles_by_name[bestname][0], True)
                                     self.remaining_after_install_from[intra] = [r0]
                     elif len(rlist) > 1:
                         processed = False
@@ -137,13 +163,15 @@ class _ModInProgress:
                                 arintra = r.single_archive_retrievers[0].file_in_archive.intra_path
                                 if arintra == self.install_from_root + intra:
                                     if __debug__:
-                                        arf = arfiles_by_hash[r.single_archive_retrievers[0].file_hash]
-                                        assert arf.intra_path == arintra
+                                        arfh = truncate_file_hash(r.single_archive_retrievers[0].file_hash)
+                                        _ModInProgress._assert_arfh_in_arfiles_by_hash(arfh, arintra, arfiles_by_hash)
                                     file_overrides[intra] = [r]
                                     arfiles_by_name[arintra] = (arfiles_by_name[arintra][0], True)
                                 else:
-                                    arf = arfiles_by_hash[r.single_archive_retrievers[0].file_hash]
-                                    arfiles_by_name[arf.intra_path] = (arfiles_by_name[arf.intra_path][0], True)
+                                    arfh = truncate_file_hash(r.single_archive_retrievers[0].file_hash)
+                                    bestname = _ModInProgress._best_unmatched_from_arfiles_by_hash(arfh, arintra,
+                                                                                                   arfiles_by_hash)
+                                    arfiles_by_name[bestname] = (arfiles_by_name[bestname][0], True)
                                     self.remaining_after_install_from[intra] = [r]
                                 processed = True
                                 break  # for r in rlist
