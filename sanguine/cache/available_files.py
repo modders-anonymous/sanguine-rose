@@ -116,6 +116,9 @@ class AvailableFiles:
     def archive_by_hash(self, h: bytes) -> Archive | None:
         return self._root_data.archive_by_hash(h)
 
+    def tentative_names_for_archive(self, h: bytes) -> list[str]:
+        return self._root_data.tentative_names_for_archive(h)
+
     def stats_of_interest(self) -> list[str]:
         return (self._downloads_cache.stats_of_interest() + self._github_cache.stats_of_interest()
                 + self._root_data.stats_of_interest()

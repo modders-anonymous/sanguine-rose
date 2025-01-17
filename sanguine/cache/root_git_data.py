@@ -393,6 +393,9 @@ class RootGitData:
         assert (self._ar_is_ready >= 1) if partialok else (self._ar_is_ready >= 2)
         return self._archives_by_hash.get(arh)
 
+    def tentative_names_for_archive(self, h: bytes) -> list[str]:
+        return self._tentative_archive_names.get(h, [])
+
     def archive_stats(self) -> dict[bytes, tuple[int, int]]:  # hash -> (n,total_size)
         assert self._ar_is_ready == 2
         out: dict[bytes, tuple[int, int]] = {}
