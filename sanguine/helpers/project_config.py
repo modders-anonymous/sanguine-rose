@@ -93,6 +93,10 @@ class ModManagerConfig:
     def parse_source_vfs(self, path: str) -> ModFile:
         pass
 
+    @abstractmethod
+    def modfile_to_source_vfs(self, mf: ModFile) -> str:
+        pass
+
 
 class ModManagerPluginBase(ABC):
     def __init__(self) -> None:

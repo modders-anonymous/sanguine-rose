@@ -5,14 +5,12 @@ from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
-                                             ToolFileRetriever, GithubFileRetriever, ZeroFileRetriever)
+                                             GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 
 
 class _ModInProgress:
-    cfg: LocalProjectConfig
-    available: AvailableFiles
     name: str
     files: dict[str, list[FileRetriever]]  # intramod -> list of retrievers
     known_archives: dict[bytes, tuple[Archive, int]]
@@ -21,12 +19,10 @@ class _ModInProgress:
     install_from: Archive | None
     install_from_root: str | None
     remaining_after_install_from: dict[str, list[FileRetriever]] | None
-    may_be_modified_by_tools: dict[str, bool] | None
+    may_have_been_modified_by_tools: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
     skip_from_install: dict[str, bool] | None
 
-    def __init__(self, cfg: LocalProjectConfig, available: AvailableFiles, name: str) -> None:
-        self.cfg = cfg
-        self.available = available
+    def __init__(self, name: str) -> None:
         self.name = name
         self.files = {}
         self.known_archives = {}
@@ -36,17 +32,17 @@ class _ModInProgress:
         self.install_from = None
         self.install_from_root = None
         self.remaining_after_install_from = None
-        self.may_be_modified_by_tools = None
+        self.may_have_been_modified_by_tools = None
         self.skip_from_install = None
 
-    def add_file(self, intramod: str, retrievers: list[FileRetriever]) -> None:
+    def add_file(self, available: AvailableFiles, intramod: str, retrievers: list[FileRetriever]) -> None:
         assert intramod not in self.files
         self.files[intramod] = retrievers
         for r in retrievers:
             if isinstance(r, ArchiveFileRetriever):
                 arh = r.archive_hash()
                 if arh not in self.known_archives:
-                    ar = self.available.archive_by_hash(arh)
+                    ar = available.archive_by_hash(arh)
                     self.known_archives[arh] = (ar, 1)
                 self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
 
@@ -76,7 +72,7 @@ class _ModInProgress:
         assert self.install_from_root is None
         assert self.remaining_after_install_from is None
         assert self.skip_from_install is None
-        assert self.may_be_modified_by_tools is None
+        assert self.may_have_been_modified_by_tools is None
         self.required_archives = {}
         self.unresolved_retrievers = {}
         for intra, rlist in self.files.items():
@@ -128,7 +124,7 @@ class _ModInProgress:
                     self.install_from = install_from_candidate
                     self.install_from_root = best_candidate_root[0]
                     self.remaining_after_install_from = {}
-                    self.may_be_modified_by_tools = {}
+                    self.may_have_been_modified_by_tools = {}
 
                     arfiles_by_name: dict[str, tuple[FileInArchive, bool]] = {arf.intra_path: (arf, False) for arf in
                                                                               install_from_candidate.files}
@@ -189,7 +185,7 @@ class _ModInProgress:
                         else:
                             assert len(rlist) == 0
                             if self.install_from_root + intra in arfiles_by_name:  # file with such a path exists in archive, but is modified
-                                self.may_be_modified_by_tools[intra] = True
+                                self.may_have_been_modified_by_tools[intra] = (None, CouldBeProducedByTool.NotFound)
                             self.remaining_after_install_from[intra] = rlist
 
                         if not processed:
@@ -255,14 +251,14 @@ class _ModsInProgress:
                 self._all_retrievers[h0] = retrievers
 
         if mf.mod not in self.mods:
-            self.mods[mf.mod] = _ModInProgress(self._cfg, self._available, mf.mod)
-        self.mods[mf.mod].add_file(mf.intramod, retrievers)
+            self.mods[mf.mod] = _ModInProgress(mf.mod)
+        self.mods[mf.mod].add_file(self._available, mf.intramod, retrievers)
 
     def add_dup_file(self, mf: ModFile, h: bytes) -> None:
         assert self.has_retrievers_for(h)
         if mf.mod not in self.mods:
-            self.mods[mf.mod] = _ModInProgress(self._cfg, self._available, mf.mod)
-        self.mods[mf.mod].add_file(mf.intramod, self._all_retrievers[h])
+            self.mods[mf.mod] = _ModInProgress(mf.mod)
+        self.mods[mf.mod].add_file(self._available, mf.intramod, self._all_retrievers[h])
 
     def all_retrievers(self) -> Iterable[tuple[bytes, list[FileRetriever]]]:
         return self._all_retrievers.items()
@@ -287,16 +283,20 @@ class _ToolFinder:
                     self.tools_by_ext[ext] = []
                 self.tools_by_ext[ext].append(pluginex)
 
-    def find_tool_retriever(self, srcfile: FileOnDisk, targetpath: str) -> ToolFileRetriever | None:
-        ext = os.path.splitext(srcfile.file_path)[1]
+    def could_be_produced(self, srcfile: str, targetpath: str) -> tuple[CouldBeProducedByTool, str | None]:
+        ext = os.path.splitext(srcfile)[1]
         assert ext == os.path.splitext(targetpath)[1]
         if ext in self.tools_by_ext:
             plugins = self.tools_by_ext[ext]
+            besttool = None
+            maxcbp = CouldBeProducedByTool.NotFound
             for plugin, ctx in plugins:
-                cbp = plugin.could_be_produced(ctx, srcfile.file_path, targetpath)
-                if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
-                    return ToolFileRetriever((srcfile.file_hash, srcfile.file_size), plugin.name())
-        return None
+                cbp = plugin.could_be_produced(ctx, srcfile, targetpath)
+                if cbp.is_greater_or_eq(maxcbp):
+                    maxcbp = cbp
+                    besttool = plugin.name()
+            return maxcbp, besttool
+        return CouldBeProducedByTool.NotFound, None
 
 
 def _add_ext_stats(stats: dict[str, int], fpath: str) -> None:
@@ -315,7 +315,6 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('Stage 0: collecting retrievers')
     mip = _ModsInProgress(cfg, wcache.available)
     # possibleretrievers: dict[bytes, list[FileRetriever]] = {}
-    ntools = 0
     nzero = 0
     nzerostats = {}
     ndup = 0
@@ -346,20 +345,6 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                     if isinstance(r, (ZeroFileRetriever, GithubFileRetriever)):
                         retr = [r]
                         break
-            '''
-            if len(retr) == 0:
-                mf: ModFile = cfg.parse_source_vfs(f.file_path)
-                targetpath = cfg.modfile_to_target_vfs(mf)
-                assert targetpath is not None
-                r = toolsfinder.find_tool_retriever(f, targetpath)
-                if r is not None:
-                    retr = [r]
-                    ntools += 1
-                    tool = r.tool_name
-                    if tool not in toolstats:
-                        toolstats[tool] = {}
-                    _add_ext_stats(toolstats[tool], f.file_path)
-            '''
             if len(retr) == 0:
                 nzero += 1
                 _add_ext_stats(nzerostats, f.file_path)
@@ -367,8 +352,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             else:
                 mip.add_new_file(mf, retr)
 
-    info('{} files ignored, found {} duplicate files, {} files likely generated by tools'.format(
-        nignored, ndup, ntools))
+    info('{} files ignored, found {} duplicate files'.format(
+        nignored, ndup))
     for tool in toolstats:
         info('tool {}:'.format(tool))
         totaln = 0
@@ -401,6 +386,27 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     ### processing unique retrievers, resolving per-mod install files, etc.
     info('Stage 1: resolve_unique()...')
     mip.resolve_unique()
+
+    ntools = 0
+    for key, mod in mip.mods.items():
+        if mod.may_have_been_modified_by_tools is None:
+            continue
+        may_overrides = {}
+        for ff in mod.may_have_been_modified_by_tools:
+            mf = ModFile(mod.name, ff)
+            targetpath = cfg.modfile_to_target_vfs(mf)
+            assert targetpath is not None
+            srcf = cfg.mod_manager_config.modfile_to_source_vfs(mf)
+            cbp, tool = toolsfinder.could_be_produced(srcf, targetpath)
+            if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
+                ntools += 1
+                may_overrides[key] = (tool, cbp)
+
+                if tool not in toolstats:
+                    toolstats[tool] = {}
+                _add_ext_stats(toolstats[tool], srcf)
+        mod.may_have_been_modified_by_tools |= may_overrides
+    info('{} mod files could have been produced by tools'.format(ntools))
 
     ninstallfrom = 0
     info('per-mod stats:')

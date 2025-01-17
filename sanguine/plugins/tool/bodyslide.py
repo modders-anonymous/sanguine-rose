@@ -8,9 +8,11 @@ from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS, CouldBeProducedB
 
 class _BodySlideToolPluginContext:
     rel_output_files: dict[str, int]
+    target_files: dict[str, bool]
 
     def __init__(self) -> None:
         self.rel_output_files = {}
+        self.target_files = {}
 
 
 def _parse_osp(fname: str) -> list[str]:
@@ -63,6 +65,8 @@ class BodySlideToolPlugin(ToolPluginBase):
         ctx: _BodySlideToolPluginContext = _BodySlideToolPluginContext()
         osppattern = re.compile(r'data\\CalienteTools\\Bodyslide\\SliderSets\\.*\.osp$', re.IGNORECASE)
         for relpath in resolvedvfs.all_target_files():
+            assert relpath not in ctx.target_files
+            ctx.target_files[relpath] = True
             if osppattern.match(relpath):
                 srcfiles = resolvedvfs.target_files(relpath)
                 assert len(srcfiles) > 0
@@ -75,10 +79,23 @@ class BodySlideToolPlugin(ToolPluginBase):
         f, ext = os.path.splitext(targetpath)
         assert ext in self.extensions()
         if ext == '.tri':
-            return CouldBeProducedByTool.WithKnownConfig if f in ctx.rel_output_files else CouldBeProducedByTool.NotFound
+            if f in ctx.rel_output_files:
+                return CouldBeProducedByTool.WithCurrentConfig
+            f0 = f + '_0.nif'
+            f1 = f + '_1.nif'
+            if f0 in ctx.target_files and f1 in ctx.target_files:
+                return CouldBeProducedByTool.Maybe
+            return CouldBeProducedByTool.NotFound
+
         assert ext == '.nif'
         if f.endswith('_0') or f.endswith('_1'):
-            return CouldBeProducedByTool.WithKnownConfig if f[
-                                                            :-2] in ctx.rel_output_files else CouldBeProducedByTool.NotFound
+            if f[:-2] in ctx.rel_output_files:
+                return CouldBeProducedByTool.WithCurrentConfig
+            f0 = f[:-2] + '_0.nif'
+            f1 = f[:-2] + '_1.nif'
+            ftri = f[:-2] + '.tri'
+            if f0 in ctx.target_files and f1 in ctx.target_files and ftri in ctx.target_files:
+                return CouldBeProducedByTool.Maybe
+            return CouldBeProducedByTool.NotFound
         else:
             return CouldBeProducedByTool.NotFound

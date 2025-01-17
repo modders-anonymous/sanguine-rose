@@ -104,6 +104,12 @@ class Mo2ProjectConfig(ModManagerConfig):
 
         return 'data\\' + mf.intramod
 
+    def modfile_to_source_vfs(self, mf: ModFile) -> str:
+        if mf.mod is None:
+            return self.mo2dir + 'overwrite\\' + mf.intramod
+
+        return self.mo2dir + mf.mod + '\\' + mf.intramod
+
     def resolve_vfs(self, sourcevfs: Iterable[FileOnDisk]) -> ResolvedVFS:
         info('MO2: Starting resolving VFS...')
 
