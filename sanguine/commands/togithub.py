@@ -19,7 +19,7 @@ class _ModInProgress:
     install_from: Archive | None
     install_from_root: str | None
     remaining_after_install_from: dict[str, list[FileRetriever]] | None
-    may_have_been_modified_by_tools: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
+    modified_from_install: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
     skip_from_install: dict[str, bool] | None
 
     def __init__(self, name: str) -> None:
@@ -32,7 +32,7 @@ class _ModInProgress:
         self.install_from = None
         self.install_from_root = None
         self.remaining_after_install_from = None
-        self.may_have_been_modified_by_tools = None
+        self.modified_from_install = None
         self.skip_from_install = None
 
     def add_file(self, available: AvailableFiles, intramod: str, retrievers: list[FileRetriever]) -> None:
@@ -72,7 +72,7 @@ class _ModInProgress:
         assert self.install_from_root is None
         assert self.remaining_after_install_from is None
         assert self.skip_from_install is None
-        assert self.may_have_been_modified_by_tools is None
+        assert self.modified_from_install is None
         self.required_archives = {}
         self.unresolved_retrievers = {}
         for intra, rlist in self.files.items():
@@ -124,7 +124,7 @@ class _ModInProgress:
                     self.install_from = install_from_candidate
                     self.install_from_root = best_candidate_root[0]
                     self.remaining_after_install_from = {}
-                    self.may_have_been_modified_by_tools = {}
+                    self.modified_from_install = {}
 
                     arfiles_by_name: dict[str, tuple[FileInArchive, bool]] = {arf.intra_path: (arf, False) for arf in
                                                                               install_from_candidate.files}
@@ -185,7 +185,7 @@ class _ModInProgress:
                         else:
                             assert len(rlist) == 0
                             if self.install_from_root + intra in arfiles_by_name:  # file with such a path exists in archive, but is modified
-                                self.may_have_been_modified_by_tools[intra] = (None, CouldBeProducedByTool.NotFound)
+                                self.modified_from_install[intra] = (None, CouldBeProducedByTool.NotFound)
                             self.remaining_after_install_from[intra] = rlist
 
                         if not processed:
@@ -389,10 +389,10 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     ntools = 0
     for key, mod in mip.mods.items():
-        if mod.may_have_been_modified_by_tools is None:
+        if mod.modified_from_install is None:
             continue
         may_overrides = {}
-        for ff in mod.may_have_been_modified_by_tools:
+        for ff in mod.modified_from_install:
             mf = ModFile(mod.name, ff)
             targetpath = cfg.modfile_to_target_vfs(mf)
             assert targetpath is not None
@@ -400,25 +400,47 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             cbp, tool = toolsfinder.could_be_produced(srcf, targetpath)
             if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
                 ntools += 1
-                may_overrides[key] = (tool, cbp)
+                ext = os.path.splitext(key)[1]
+                may_overrides[ff] = (tool, cbp)
 
                 if tool not in toolstats:
                     toolstats[tool] = {}
                 _add_ext_stats(toolstats[tool], srcf)
-        mod.may_have_been_modified_by_tools |= may_overrides
+        mod.modified_from_install |= may_overrides
     info('{} mod files could have been produced by tools'.format(ntools))
 
     ninstallfrom = 0
     info('per-mod stats:')
+    cleanlyinstalledmods: list[tuple[str, _ModInProgress]] = []
+    healablemods: list[tuple[str, _ModInProgress]] = []
+    othermods: list[tuple[str, _ModInProgress]] = []
     for modname, mod in mip.mods.items():
+        processed = False
         if mod.install_from is not None:
             names = wcache.available.tentative_names_for_archive(mod.install_from.archive_hash)
             info("-> {}: install_from {}, root='{}', installed={}/{}".format(
                 modname, str(names), mod.install_from_root, len(mod.files) - len(mod.remaining_after_install_from),
                 len(mod.files)))
             ninstallfrom += 1
+            if len(mod.remaining_after_install_from) == 0 and len(mod.skip_from_install) == 0:
+                cleanlyinstalledmods.append((modname, mod))
+                processed = True
+            else:
+                ntoheal = 0
+                for _, val in mod.modified_from_install.items():
+                    tool, _1 = val
+                    if tool is not None:
+                        ntoheal += 1
+                if len(mod.remaining_after_install_from) == ntoheal and len(mod.skip_from_install) == ntoheal:
+                    healablemods.append((modname, mod))
+                    processed = True
+
+        if not processed:
+            othermods.append((modname, mod))
     info('found install_from archives for {} mods out of {}, {:.1f}%'.format(ninstallfrom, len(mip.mods),
                                                                              ninstallfrom / len(mip.mods) * 100.))
+    info('{} mod(s) are cleanly installed, {} mod(s) can probably be healed'.format(
+        len(cleanlyinstalledmods), len(healablemods)))
 
     '''
     archives: dict[bytes, int] = {}  # for now, it is archives for unique files
