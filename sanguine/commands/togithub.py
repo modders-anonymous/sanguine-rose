@@ -44,7 +44,7 @@ class _ModInProgress:
     install_from: list[tuple[ArInstaller, _ArInstEx]] | None
     # install_from_root: str | None
     remaining_after_install_from: dict[str, list[FileRetriever]] | None  # only ArchiveFileRetrievers
-    could_be_produced_by_tools: dict[str, bool] | None
+    could_be_produced_by_tools: dict[str, tuple[str,CouldBeProducedByTool]] | None
 
     # modified_from_install: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
     # skip_from_install: dict[str, bool] | None
@@ -356,8 +356,9 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     mip.resolve_unique()
 
     ntools = 0
-    bytools: dict[str, tuple[str, CouldBeProducedByTool]] = {}
     for key, mod in mip.mods.items():
+        assert mod.could_be_produced_by_tools is None
+        mod.could_be_produced_by_tools = {}
         for ff in mod.modified_since_install():
             mf = ModFile(mod.name, ff)
             targetpath = cfg.modfile_to_target_vfs(mf)
@@ -366,7 +367,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             cbp, tool = toolsfinder.could_be_produced(srcf, targetpath)
             if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
                 ntools += 1
-                bytools[ff] = (tool, cbp)
+                mod.could_be_produced_by_tools[ff] = (tool, cbp)
 
                 if tool not in toolstats:
                     toolstats[tool] = {}
