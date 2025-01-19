@@ -100,7 +100,7 @@ class _ModInProgress:
         return arfs[0].intra_path  # TODO! - best matching name?
     '''
 
-    def resolve_unique(self, cfg: LocalProjectConfig, itf: _IgnoredTargetFiles) -> None:
+    def resolve_unique(self, cfg: LocalProjectConfig, itf: _IgnoredTargetFiles, resolvedvfs: ResolvedVFS) -> None:
         assert self.required_archives is None
         assert self.unresolved_retrievers is None
         assert self.install_from is None
@@ -161,18 +161,21 @@ class _ModInProgress:
                             continue
                         rs: list[ArchiveFileRetriever] = files[f]
                         fh = rs[0].file_hash
-                        del files[f]
 
                         mf = ModFile(self.name, f)
                         target = cfg.modfile_to_target_vfs(mf)
                         if itf.ignored(target):
                             aic.ignored[f] = True
-                        if fh != arfiles[f]:
+                        srcfiles = resolvedvfs.files_for_target(target)
+                        if arfiles[f] == srcfiles[-1].file_hash:
+                            del files[f]
+                        else:
                             aic.skip[f] = True
                             aic.modified_since_install[f] = True
 
-                    for f in files:
-                        assert f in arfiles
+                    if __debug__:
+                        for f in files:
+                            assert f in arfiles
                     break
         self.remaining_after_install_from = files
 
@@ -239,10 +242,10 @@ class _ModsInProgress:
     def all_retrievers(self) -> Iterable[tuple[bytes, list[FileRetriever]]]:
         return self._all_retrievers.items()
 
-    def resolve_unique(self) -> None:
+    def resolve_unique(self, resolvedvfs: ResolvedVFS) -> None:
         itf = _IgnoredTargetFiles(self._cfg)
         for mod in self.mods:
-            self.mods[mod].resolve_unique(self._cfg, itf)
+            self.mods[mod].resolve_unique(self._cfg, itf, resolvedvfs)
 
 
 class _ToolFinder:
@@ -357,7 +360,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     ### processing unique retrievers, resolving per-mod install files, etc.
     info('Stage 1: resolve_unique()...')
-    mip.resolve_unique()
+    mip.resolve_unique(wcache.resolved_vfs())
 
     ntools = 0
     for key, mod in mip.mods.items():

@@ -68,7 +68,7 @@ class BodySlideToolPlugin(ToolPluginBase):
             assert relpath not in ctx.target_files
             ctx.target_files[relpath] = True
             if osppattern.match(relpath):
-                srcfiles = resolvedvfs.target_files(relpath)
+                srcfiles = resolvedvfs.files_for_target(relpath)
                 assert len(srcfiles) > 0
                 modified = _parse_osp(srcfiles[-1].file_path)
                 ctx.rel_output_files |= {m: 1 for m in modified}

@@ -130,7 +130,7 @@ class ResolvedVFS:
     def source_to_target(self, path: str) -> str:
         return self._source_to_target[path]
 
-    def target_files(self, relpath: str) -> list[FileOnDisk]:
+    def files_for_target(self, relpath: str) -> list[FileOnDisk]:
         return self._target_files[relpath]
 
 
