@@ -44,7 +44,7 @@ class _ModInProgress:
     install_from: list[tuple[ArInstaller, _ArInstEx]] | None
     # install_from_root: str | None
     remaining_after_install_from: dict[str, list[FileRetriever]] | None  # only ArchiveFileRetrievers
-    could_be_produced_by_tools: dict[str, tuple[str,CouldBeProducedByTool]] | None
+    could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByTool]] | None
 
     # modified_from_install: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
     # skip_from_install: dict[str, bool] | None
@@ -76,8 +76,8 @@ class _ModInProgress:
 
     def modified_since_install(self) -> Iterable[str]:
         out = []
-        for arinst in self.install_from:
-            out += arinst.modified_since_install
+        for arinst, arext in self.install_from:
+            out += arext.modified_since_install
         return out
 
     '''
@@ -153,7 +153,9 @@ class _ModInProgress:
                     aic = _ArInstEx()
                     self.install_from.append((guess, aic))
                     for f in guess.all_desired_files():
-                        assert f in files
+                        if not f in files:
+                            aic.skip[f] = True
+                            continue
                         rs: list[ArchiveFileRetriever] = files[f]
                         fh = rs[0].file_hash
                         del files[f]
@@ -162,13 +164,12 @@ class _ModInProgress:
                         target = cfg.modfile_to_target_vfs(mf)
                         if itf.ignored(target):
                             aic.ignored[f] = True
-                        if fh == arfiles[f]:
+                        if fh != arfiles[f]:
                             aic.skip[f] = True
                             aic.modified_since_install[f] = True
 
                     for f in files:
-                        if f not in arfiles[f]:
-                            aic.skip[f] = True
+                        assert f in arfiles
                     break
         self.remaining_after_install_from = files
 
@@ -382,8 +383,9 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     for modname, mod in mip.mods.items():
         processed = False
         if mod.install_from is not None:
-            names = [wcache.available.tentative_names_for_archive(arinst.archive_hash) for arinst in mod.install_from]
-            instdata = [arinst.install_data() for arinst in mod.install_from]
+            names = [wcache.available.tentative_names_for_archive(arinst.archive.archive_hash) for arinst, _ in
+                     mod.install_from]
+            instdata = [arinst.install_data() for arinst, _ in mod.install_from]
             info("-> {}: install_from {}, install_data='{}'".format(
                 modname, str(names), str(instdata)))
             ninstallfrom += 1

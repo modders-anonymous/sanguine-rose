@@ -14,8 +14,8 @@ class SimpleArInstaller(ArInstaller):
         out: list[str] = []
         lifr = len(self.install_from_root)
         for fia in self.archive.files:
-            assert fia.intra_path.startswith(self.install_from_root)
-            out.append(fia.intra_path[lifr:])
+            if fia.intra_path.startswith(self.install_from_root):
+                out.append(fia.intra_path[lifr:])
         return out
 
     def install_data(self) -> str:
@@ -64,7 +64,8 @@ class SimpleArInstallerPlugin(ArInstallerPluginBase):
                             else:
                                 candidate_roots[candidate_root] += 1
 
-        assert len(candidate_roots) > 0
+        if len(candidate_roots) == 0:
+            return None
         out = SimpleArInstaller(archive)
         out.install_from_root = sorted(candidate_roots.items(), key=lambda x: x[1])[-1][0]
 
