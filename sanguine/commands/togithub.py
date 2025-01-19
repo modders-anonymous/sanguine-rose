@@ -3,11 +3,36 @@ import re
 from sanguine.cache.available_files import AvailableFiles
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
-from sanguine.helpers.archives import Archive, FileInArchive
+from sanguine.helpers.archives import Archive
+from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
+
+
+class _IgnoredTargetFiles:
+    ignored_file_patterns: list
+
+    def __init__(self, cfg: LocalProjectConfig) -> None:
+        self.ignored_file_patterns = [re.compile(p) for p in cfg.root_modpack_config().ignored_file_patterns]
+
+    def ignored(self, fpath: str) -> bool:
+        for p in self.ignored_file_patterns:
+            if p.match(fpath):
+                return True
+        return False
+
+
+class _ArInstEx:
+    ignored: dict[str, bool]
+    skip: dict[str, bool]
+    modified_since_install: dict[str, bool]
+
+    def __init__(self) -> None:
+        self.ignored = {}
+        self.skip = {}
+        self.modified_since_install = {}
 
 
 class _ModInProgress:
@@ -16,11 +41,13 @@ class _ModInProgress:
     known_archives: dict[bytes, tuple[Archive, int]]
     required_archives: dict[bytes, tuple[Archive, int]] | None
     unresolved_retrievers: dict[str, list[FileRetriever]] | None
-    install_from: Archive | None
-    install_from_root: str | None
-    remaining_after_install_from: dict[str, list[FileRetriever]] | None
-    modified_from_install: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
-    skip_from_install: dict[str, bool] | None
+    install_from: list[tuple[ArInstaller, _ArInstEx]] | None
+    # install_from_root: str | None
+    remaining_after_install_from: dict[str, list[FileRetriever]] | None  # only ArchiveFileRetrievers
+    could_be_produced_by_tools: dict[str, bool] | None
+
+    # modified_from_install: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
+    # skip_from_install: dict[str, bool] | None
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -30,10 +57,11 @@ class _ModInProgress:
         self.required_archives = None
 
         self.install_from = None
-        self.install_from_root = None
+        # self.install_from_root = None
         self.remaining_after_install_from = None
-        self.modified_from_install = None
-        self.skip_from_install = None
+        # self.modified_from_install = None
+        # self.skip_from_install = None
+        self.could_be_produced_by_tools = None
 
     def add_file(self, available: AvailableFiles, intramod: str, retrievers: list[FileRetriever]) -> None:
         assert intramod not in self.files
@@ -46,6 +74,13 @@ class _ModInProgress:
                     self.known_archives[arh] = (ar, 1)
                 self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
 
+    def modified_since_install(self) -> Iterable[str]:
+        out = []
+        for arinst in self.install_from:
+            out += arinst.modified_since_install
+        return out
+
+    '''
     @staticmethod
     def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,
                                         arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> None:
@@ -57,29 +92,28 @@ class _ModInProgress:
                 ok = True
                 break
         assert ok
-
     @staticmethod
     def _best_unmatched_from_arfiles_by_hash(arfh: bytes, arintra: str,
                                              arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> str:
         assert arfh in arfiles_by_hash
         arfs = arfiles_by_hash[arfh]
         return arfs[0].intra_path  # TODO! - best matching name?
+    '''
 
-    def resolve_unique(self, cfg: LocalProjectConfig, itf: "_IgnoredTargetFiles") -> None:
+    def resolve_unique(self, cfg: LocalProjectConfig, itf: _IgnoredTargetFiles) -> None:
         assert self.required_archives is None
         assert self.unresolved_retrievers is None
         assert self.install_from is None
-        assert self.install_from_root is None
         assert self.remaining_after_install_from is None
-        assert self.skip_from_install is None
-        assert self.modified_from_install is None
+        assert self.could_be_produced_by_tools is None
         self.required_archives = {}
         self.unresolved_retrievers = {}
+
         for intra, rlist in self.files.items():
             if len(rlist) == 0:
                 pass
             elif len(rlist) == 1:
-                r0 = rlist[0]
+                r0: FileRetriever = rlist[0]
                 if isinstance(r0, ArchiveFileRetriever):
                     arh = r0.archive_hash()
                     assert arh in self.known_archives
@@ -92,154 +126,74 @@ class _ModInProgress:
                 assert intra not in self.unresolved_retrievers
                 self.unresolved_retrievers[intra] = rlist
 
-        if len(self.required_archives) == 1:
-            install_from_candidate: Archive = next(iter(self.required_archives.values()))[0]
-            candidate_roots: dict[str, int] = {}
-            for modpath, rlist in self.files.items():
-                if len(rlist) == 0:
-                    continue
-                r0 = rlist[0]
-                if __debug__:
+        # noinspection PyTypeChecker
+        files: dict[str, list[ArchiveFileRetriever]] = {}
+        for f, rlist in self.files.items():
+            if __debug__:
+                if len(rlist) > 0:
+                    assert len(rlist) == 1 or isinstance(rlist[0], ArchiveFileRetriever)
+                    r0 = rlist[0]
                     for r in rlist:
                         assert r.file_hash == r0.file_hash
-                assert len(rlist) == 1 or isinstance(r0, ArchiveFileRetriever)
-                if isinstance(r0, ArchiveFileRetriever):
-                    for r in rlist:
-                        assert isinstance(r, ArchiveFileRetriever)
-                        if r.archive_hash() == install_from_candidate.archive_hash:
-                            inarrpath = r.single_archive_retrievers[0].file_in_archive.intra_path
-                            if inarrpath.endswith(modpath):
-                                candidate_root = inarrpath[:-len(modpath)]
-                                if candidate_root == '' or candidate_root.endswith('\\'):
-                                    if candidate_root not in candidate_roots:
-                                        candidate_roots[candidate_root] = 1
-                                    else:
-                                        candidate_roots[candidate_root] += 1
 
-            if len(candidate_roots) > 0:
-                best_candidate_root = sorted(candidate_roots.items(), key=lambda x: x[1])[-1]
-                ratio = float(best_candidate_root[1]) / float(len(self.files))
-                assert ratio <= 1.
-                if ratio > 0.7:  # quite arbitrary, though should be bigger than 0.5 to ensure that it is the best anyway
-                    self.install_from = install_from_candidate
-                    self.install_from_root = best_candidate_root[0]
-                    self.remaining_after_install_from = {}
-                    self.modified_from_install = {}
+            if len(rlist) > 0 and isinstance(rlist[0], ArchiveFileRetriever):
+                # noinspection PyTypeChecker
+                files[f] = rlist
 
-                    arfiles_by_name: dict[str, tuple[FileInArchive, bool]] = {arf.intra_path: (arf, False) for arf in
-                                                                              install_from_candidate.files}
-                    arfiles_by_hash: dict[bytes, list[FileInArchive]] = {}
-                    for arf in install_from_candidate.files:
-                        if arf.file_hash not in arfiles_by_hash:
-                            arfiles_by_hash[arf.file_hash] = []
-                        arfiles_by_hash[arf.file_hash].append(arf)
+        self.install_from = []
+        arfiles: dict[str, bytes] = {}
+        for f, retr in files.items():
+            r0: ArchiveFileRetriever = retr[0]
+            arfiles[f] = r0.file_hash
+        for rav in self.required_archives.values():
+            ra: Archive = rav[0]
+            for plugin in all_arinstaller_plugins():
+                guess = plugin.guess_arinstaller_from_vfs(ra, self.name, files)
+                if guess is not None:
+                    aic = _ArInstEx()
+                    self.install_from.append((guess, aic))
+                    for f in guess.all_desired_files():
+                        assert f in files
+                        rs: list[ArchiveFileRetriever] = files[f]
+                        fh = rs[0].file_hash
+                        del files[f]
 
-                    file_overrides: dict[str, list[FileRetriever]] = {}
-                    for intra, rlist in self.files.items():
-                        # if intra == 'meshes\\actors\\character\\animations\\openanimationreplacer\\evg animated traversal\\deep walk\\evgat - deep walk.txt':
-                        #    pass
-                        processed = False
-                        if len(rlist) == 1:
-                            r0 = rlist[0]
-                            if isinstance(r0, ArchiveFileRetriever):
-                                if r0.archive_hash() == install_from_candidate.archive_hash:
-                                    arintra = r0.single_archive_retrievers[0].file_in_archive.intra_path
-                                    if arintra == self.install_from_root + intra:
-                                        if __debug__:
-                                            arfh = truncate_file_hash(r0.single_archive_retrievers[0].file_hash)
-                                            _ModInProgress._assert_arfh_in_arfiles_by_hash(arfh, arintra,
-                                                                                           arfiles_by_hash)
-                                        assert arfiles_by_name[arintra][1] == False
-                                        arfiles_by_name[arintra] = (arfiles_by_name[arintra][0], True)
-                                        processed = True
-                                    else:
-                                        # arfh = truncate_file_hash(r0.single_archive_retrievers[0].file_hash)
-                                        # bestname = _ModInProgress._best_unmatched_from_arfiles_by_hash(arfh, arintra,
-                                        #                                                               arfiles_by_hash)
-                                        # arfiles_by_name[bestname] = (arfiles_by_name[bestname][0], True)
-                                        # self.remaining_after_install_from[intra] = [r0]
-                                        pass
-                        elif len(rlist) > 1:
-                            for r in rlist:
-                                assert isinstance(r, ArchiveFileRetriever)
-                                if r.archive_hash() == install_from_candidate.archive_hash:
-                                    arintra = r.single_archive_retrievers[0].file_in_archive.intra_path
-                                    if arintra == self.install_from_root + intra:
-                                        if __debug__:
-                                            arfh = truncate_file_hash(r.single_archive_retrievers[0].file_hash)
-                                            _ModInProgress._assert_arfh_in_arfiles_by_hash(arfh, arintra,
-                                                                                           arfiles_by_hash)
-                                        file_overrides[intra] = [r]
-                                        assert arfiles_by_name[arintra][1] == False
-                                        arfiles_by_name[arintra] = (arfiles_by_name[arintra][0], True)
-                                        processed = True
-                                    else:
-                                        # arfh = truncate_file_hash(r.single_archive_retrievers[0].file_hash)
-                                        # bestname = _ModInProgress._best_unmatched_from_arfiles_by_hash(arfh, arintra,
-                                        #                                                               arfiles_by_hash)
-                                        # arfiles_by_name[bestname] = (arfiles_by_name[bestname][0], True)
-                                        # self.remaining_after_install_from[intra] = [r]
-                                        pass
-                                if processed:
-                                    break  # for r in rlist
-                        else:
-                            assert len(rlist) == 0
-                            if self.install_from_root + intra in arfiles_by_name:  # file with such a path exists in archive, but is modified
-                                self.modified_from_install[intra] = (None, CouldBeProducedByTool.NotFound)
-                            self.remaining_after_install_from[intra] = rlist
+                        mf = ModFile(self.name, f)
+                        target = cfg.modfile_to_target_vfs(mf)
+                        if itf.ignored(target):
+                            aic.ignored[f] = True
+                        if fh == arfiles[f]:
+                            aic.skip[f] = True
+                            aic.modified_since_install[f] = True
 
-                        if not processed:
-                            self.remaining_after_install_from[intra] = rlist
+                    for f in files:
+                        if f not in arfiles[f]:
+                            aic.skip[f] = True
+                    break
+        self.remaining_after_install_from = files
 
-                    self.files |= file_overrides
+        if __debug__:
+            fromarch: dict[str, bool] = {}
+            for arinst, arinstx0 in self.install_from:
+                arinstx: _ArInstEx = arinstx0
+                for f in arinst.all_desired_files():
+                    if f not in arinstx.ignored and f not in arinstx.skip:
+                        fromarch[f] = True
+                        assert f in self.files
 
-                    self.skip_from_install = {}
-                    for arfile in arfiles_by_name.values():
-                        if not arfile[1]:
-                            fia: FileInArchive = arfile[0]
-                            if not fia.intra_path.startswith(self.install_from_root):
-                                self.skip_from_install[arfile[0].intra_path] = True
-                                continue
-                            intramod = fia.intra_path[len(self.install_from_root):]
-                            mf = ModFile(self.name, intramod)
-                            target = cfg.mod_manager_config.modfile_to_target_vfs(mf)
-                            if not itf.ignored(target):
-                                self.skip_from_install[arfile[0].intra_path] = True
+            for f, rlist in self.files.items():
+                if len(rlist) == 0 or not isinstance(rlist[0], ArchiveFileRetriever):
+                    continue
 
-                    if __debug__:
-                        fromarch: list[str] = []
-                        for f in self.install_from.files:
-                            if f.intra_path not in self.skip_from_install:
-                                if not f.intra_path.startswith(self.install_from_root):
-                                    assert False
-                                fromarch.append(f.intra_path[len(self.install_from_root):])
-                        assert len(fromarch) == len(self.install_from.files) - len(self.skip_from_install)
-                        for fname in self.remaining_after_install_from.keys():
-                            fromarch.append(fname)
-                        assert len(fromarch) == len(self.install_from.files) - len(self.skip_from_install) + len(
-                            self.remaining_after_install_from)
+                if f not in fromarch and f not in self.remaining_after_install_from:
+                    assert False
 
-                        fromarch0 = sorted(fromarch)
-                        fromarch = []
-                        nignored = 0
-                        for f in fromarch0:
-                            mf = ModFile(self.name, f)
-                            if itf.ignored(cfg.mod_manager_config.modfile_to_target_vfs(mf)):
-                                nignored += 1
-                            else:
-                                fromarch.append(f)
+    def is_cleanly_installed(self) -> bool:
+        return len(self.unresolved_retrievers) == 0 and len(self.remaining_after_install_from) == 0
 
-                        origf = sorted(self.files.keys())
-                        assert len(origf) == len(self.files)
-                        if len(fromarch) != len(origf):
-                            assert False
-                        for i in range(len(fromarch)):
-                            if fromarch[i] != origf[i]:
-                                assert False
-
-                        assert len(self.files) == len(self.install_from.files) - nignored - len(
-                            self.skip_from_install) + len(
-                            self.remaining_after_install_from)
+    def is_fully_healable(self) -> bool:
+        return len(self.unresolved_retrievers) == 0 and len(self.remaining_after_install_from) == len(
+            self.could_be_produced_by_tools)
 
 
 class _ModsInProgress:
@@ -328,19 +282,6 @@ def _add_ext_stats(stats: dict[str, int], fpath: str) -> None:
         stats[ext] += 1
 
 
-class _IgnoredTargetFiles:
-    ignored_file_patterns: list
-
-    def __init__(self, cfg: LocalProjectConfig) -> None:
-        self.ignored_file_patterns = [re.compile(p) for p in cfg.root_modpack_config().ignored_file_patterns]
-
-    def ignored(self, fpath: str) -> bool:
-        for p in self.ignored_file_patterns:
-            if p.match(fpath):
-                return True
-        return False
-
-
 def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     toolsfinder: _ToolFinder = _ToolFinder(cfg, wcache.resolved_vfs())
 
@@ -415,11 +356,9 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     mip.resolve_unique()
 
     ntools = 0
+    bytools: dict[str, tuple[str, CouldBeProducedByTool]] = {}
     for key, mod in mip.mods.items():
-        if mod.modified_from_install is None:
-            continue
-        may_overrides = {}
-        for ff in mod.modified_from_install:
+        for ff in mod.modified_since_install():
             mf = ModFile(mod.name, ff)
             targetpath = cfg.modfile_to_target_vfs(mf)
             assert targetpath is not None
@@ -427,12 +366,11 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             cbp, tool = toolsfinder.could_be_produced(srcf, targetpath)
             if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
                 ntools += 1
-                may_overrides[ff] = (tool, cbp)
+                bytools[ff] = (tool, cbp)
 
                 if tool not in toolstats:
                     toolstats[tool] = {}
                 _add_ext_stats(toolstats[tool], srcf)
-        mod.modified_from_install |= may_overrides
     info('{} mod files could have been produced by tools'.format(ntools))
 
     ninstallfrom = 0
@@ -443,21 +381,16 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     for modname, mod in mip.mods.items():
         processed = False
         if mod.install_from is not None:
-            names = wcache.available.tentative_names_for_archive(mod.install_from.archive_hash)
-            info("-> {}: install_from {}, root='{}', installed={}/{}".format(
-                modname, str(names), mod.install_from_root, len(mod.files) - len(mod.remaining_after_install_from),
-                len(mod.files)))
+            names = [wcache.available.tentative_names_for_archive(arinst.archive_hash) for arinst in mod.install_from]
+            instdata = [arinst.install_data() for arinst in mod.install_from]
+            info("-> {}: install_from {}, install_data='{}'".format(
+                modname, str(names), str(instdata)))
             ninstallfrom += 1
-            if len(mod.remaining_after_install_from) == 0 and len(mod.skip_from_install) == 0:
+            if mod.is_cleanly_installed():
                 cleanlyinstalledmods.append((modname, mod))
                 processed = True
             else:
-                ntoheal = 0
-                for _, val in mod.modified_from_install.items():
-                    tool, _1 = val
-                    if tool is not None:
-                        ntoheal += 1
-                if len(mod.remaining_after_install_from) == ntoheal and len(mod.skip_from_install) == ntoheal:
+                if mod.is_fully_healable():
                     healablemods.append((modname, mod))
                     processed = True
 
