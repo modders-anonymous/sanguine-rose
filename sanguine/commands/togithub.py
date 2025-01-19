@@ -118,7 +118,10 @@ class _ModInProgress:
                     arh = r0.archive_hash()
                     assert arh in self.known_archives
                     self.required_archives[arh] = self.known_archives[arh]
+            elif len(rlist) > 1:
+                pass
             else:
+                assert len(rlist) == 0
                 if __debug__:
                     for r in rlist:
                         assert isinstance(r, ArchiveFileRetriever)
@@ -382,7 +385,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     othermods: list[tuple[str, _ModInProgress]] = []
     for modname, mod in mip.mods.items():
         processed = False
-        if mod.install_from is not None:
+        if len(mod.install_from) > 0:
             names = [wcache.available.tentative_names_for_archive(arinst.archive.archive_hash) for arinst, _ in
                      mod.install_from]
             instdata = [arinst.install_data() for arinst, _ in mod.install_from]
