@@ -1,6 +1,7 @@
 import re
 
 from sanguine.cache.available_files import AvailableFiles
+from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.helpers.archives import Archive
@@ -100,7 +101,7 @@ class _ModInProgress:
         return arfs[0].intra_path  # TODO! - best matching name?
     '''
 
-    def resolve_unique(self, cfg: LocalProjectConfig, itf: _IgnoredTargetFiles, resolvedvfs: ResolvedVFS) -> None:
+    def resolve_unique(self, cfg: LocalProjectConfig, itf: _IgnoredTargetFiles, srccache: FolderCache) -> None:
         assert self.required_archives is None
         assert self.unresolved_retrievers is None
         assert self.install_from is None
@@ -159,15 +160,17 @@ class _ModInProgress:
                         if not f in files:
                             aic.skip[f] = True
                             continue
-                        rs: list[ArchiveFileRetriever] = files[f]
-                        fh = rs[0].file_hash
+                        # rs: list[ArchiveFileRetriever] = files[f]
+                        # fh = rs[0].file_hash
 
                         mf = ModFile(self.name, f)
                         target = cfg.modfile_to_target_vfs(mf)
                         if itf.ignored(target):
                             aic.ignored[f] = True
-                        srcfiles = resolvedvfs.files_for_target(target)
-                        if arfiles[f] == srcfiles[-1].file_hash:
+                        src = cfg.modfile_to_source_vfs(mf)
+                        srcfile = srccache.file_by_path(src)
+                        assert srcfile is not None
+                        if arfiles[f] == srcfile.file_hash:
                             del files[f]
                         else:
                             aic.skip[f] = True
@@ -196,7 +199,7 @@ class _ModInProgress:
                     assert False
 
     def _has_skips(self) -> bool:
-        for _,arext in self.install_from:
+        for _, arext in self.install_from:
             if len(arext.skip) > 0:
                 return True
         return False
@@ -251,10 +254,10 @@ class _ModsInProgress:
     def all_retrievers(self) -> Iterable[tuple[bytes, list[FileRetriever]]]:
         return self._all_retrievers.items()
 
-    def resolve_unique(self, resolvedvfs: ResolvedVFS) -> None:
+    def resolve_unique(self, srccache: FolderCache) -> None:
         itf = _IgnoredTargetFiles(self._cfg)
         for mod in self.mods:
-            self.mods[mod].resolve_unique(self._cfg, itf, resolvedvfs)
+            self.mods[mod].resolve_unique(self._cfg, itf, srccache)
 
 
 class _ToolFinder:
@@ -369,7 +372,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     ### processing unique retrievers, resolving per-mod install files, etc.
     info('Stage 1: resolve_unique()...')
-    mip.resolve_unique(wcache.resolved_vfs())
+    mip.resolve_unique(wcache._source_vfs_cache)
 
     ntools = 0
     for key, mod in mip.mods.items():
@@ -400,7 +403,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     for modname, mod in mip.mods.items():
         allgithub = True
         for rlist in mod.files.values():
-            if len(rlist) == 0 or not isinstance(rlist[0],(ZeroFileRetriever, GithubFileRetriever)):
+            if len(rlist) == 0 or not isinstance(rlist[0], (ZeroFileRetriever, GithubFileRetriever)):
                 allgithub = False
                 break
         if allgithub:
@@ -432,8 +435,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     info('found install_from archives for {} mods out of {}, {:.1f}%'.format(ninstallfrom, len(mip.mods),
                                                                              ninstallfrom / len(mip.mods) * 100.))
-    info('{} mod(s) are github-only, {} mod(s) are trivially installed, {} mod(s) can probably be healed to trivial install'.format(
-        len(fullygithubmods), len(triviallyinstalledmods), len(healabletotrivialmods)))
+    info(
+        '{} mod(s) are github-only, {} mod(s) are trivially installed, {} mod(s) can probably be healed to trivial install'.format(
+            len(fullygithubmods), len(triviallyinstalledmods), len(healabletotrivialmods)))
     info('{} mod(s) are fully installed (with unexplained skips)'.format(len(fullyinstalledmods)))
     alert('{} mod(s) remaining'.format(len(othermods)))
-

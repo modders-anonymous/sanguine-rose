@@ -324,6 +324,9 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         assert (self._state & 0x3) == 0x3
         return self._files_by_path.values()
 
+    def file_by_path(self, fpath: str) -> FileOnDisk:
+        return self._files_by_path.get(fpath)
+
     # private functions
 
     @staticmethod
