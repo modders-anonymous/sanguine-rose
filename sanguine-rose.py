@@ -82,3 +82,4 @@ if __name__ == '__main__':
         except Exception as e:
             alert('Exception {}: {!r}'.format(type(e), e.args))
             warn(traceback.format_exc())
+            pass

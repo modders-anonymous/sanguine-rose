@@ -1,5 +1,5 @@
 from sanguine.common import *
-from sanguine.helpers.archives import Archive
+from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 from sanguine.helpers.plugin_handler import load_plugins
 
@@ -11,7 +11,7 @@ class ArInstaller:
         self.archive = archive
 
     @abstractmethod
-    def all_desired_files(self) -> list[str]:  # list[relpath]
+    def all_desired_files(self) -> list[tuple[str, FileInArchive]]:  # list[relpath]
         pass
 
     @abstractmethod

@@ -4,12 +4,13 @@ from sanguine.cache.available_files import AvailableFiles
 from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
-from sanguine.helpers.archives import Archive
+from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
+from sanguine.plugins.arinstaller.x99simple import SimpleArInstaller
 
 
 class _IgnoredTargetFiles:
@@ -26,25 +27,31 @@ class _IgnoredTargetFiles:
 
 
 class _ArInstEx:
-    ignored: dict[str, bool]
-    skip: dict[str, bool]
-    modified_since_install: dict[str, bool]
+    ignored: set[str]
+    skip: set[str]
+    files: dict[str, FileInArchive]
+    modified_since_install: set[str]
 
     def __init__(self) -> None:
-        self.ignored = {}
-        self.skip = {}
-        self.modified_since_install = {}
+        self.ignored = set()
+        self.skip = set()
+        self.files = {}
+        self.modified_since_install = set()
 
 
 class _ModInProgress:
     name: str
-    files: dict[str, list[FileRetriever]]  # intramod -> list of retrievers
+    # all *_files members use intramod as 1st parameter
+    unknown_files: set[str]
+    zero_files: set[str]
+    github_files: dict[str, list[GithubFileRetriever]]
+    archive_files: dict[str, list[ArchiveFileRetriever]]
+
+    # files: dict[str, list[FileRetriever]]  # intramod -> list of retrievers
     known_archives: dict[bytes, tuple[Archive, int]]
     required_archives: dict[bytes, tuple[Archive, int]] | None
-    unresolved_retrievers: dict[str, list[FileRetriever]] | None
     install_from: list[tuple[ArInstaller, _ArInstEx]] | None
-    # install_from_root: str | None
-    remaining_after_install_from: dict[str, list[FileRetriever]] | None  # only ArchiveFileRetrievers
+    remaining_after_install_from: dict[str, list[ArchiveFileRetriever]] | None
     could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByTool]] | None
 
     # modified_from_install: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
@@ -52,9 +59,13 @@ class _ModInProgress:
 
     def __init__(self, name: str) -> None:
         self.name = name
-        self.files = {}
+        # self.files = {}
+        self.unknown_files = set()
+        self.zero_files = set()
+        self.github_files = {}
+        self.archive_files = {}
+
         self.known_archives = {}
-        self.unresolved_retrievers = None
         self.required_archives = None
 
         self.install_from = None
@@ -65,15 +76,42 @@ class _ModInProgress:
         self.could_be_produced_by_tools = None
 
     def add_file(self, available: AvailableFiles, intramod: str, retrievers: list[FileRetriever]) -> None:
-        assert intramod not in self.files
-        self.files[intramod] = retrievers
-        for r in retrievers:
-            if isinstance(r, ArchiveFileRetriever):
-                arh = r.archive_hash()
-                if arh not in self.known_archives:
-                    ar = available.archive_by_hash(arh)
-                    self.known_archives[arh] = (ar, 1)
-                self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
+        assert intramod not in self.unknown_files
+        assert intramod not in self.zero_files
+        assert intramod not in self.github_files
+        assert intramod not in self.archive_files
+
+        if len(retrievers) == 0:
+            self.unknown_files.add(intramod)
+        else:
+            r0 = retrievers[0]
+            if isinstance(r0, ZeroFileRetriever):
+                assert len(retrievers) == 1
+                self.zero_files.add(intramod)
+            elif isinstance(r0, GithubFileRetriever):
+                if __debug__:
+                    for r in retrievers:
+                        assert r.file_hash == r0.file_hash
+                        assert isinstance(r, GithubFileRetriever)
+                # noinspection PyTypeChecker
+                # we just asserted it in a loop above
+                self.github_files[intramod] = retrievers
+            else:
+                assert isinstance(r0, ArchiveFileRetriever)
+                for r in retrievers:
+                    assert r.file_hash == r0.file_hash
+                    assert isinstance(r, ArchiveFileRetriever)
+                    arh = r.archive_hash()
+                    if arh not in self.known_archives:
+                        ar = available.archive_by_hash(arh)
+                        self.known_archives[arh] = (ar, 1)
+                    self.known_archives[arh] = (self.known_archives[arh][0], self.known_archives[arh][1] + 1)
+                # noinspection PyTypeChecker
+                # we just asserted it in a loop above
+                self.archive_files[intramod] = retrievers
+
+    def total_files(self) -> int:
+        return len(self.unknown_files) + len(self.zero_files) + len(self.github_files) + len(self.archive_files)
 
     def modified_since_install(self) -> Iterable[str]:
         out = []
@@ -101,102 +139,133 @@ class _ModInProgress:
         return arfs[0].intra_path  # TODO! - best matching name?
     '''
 
+    def _process_aic_clearing_remaining_after(self, cfg: LocalProjectConfig, srccache: FolderCache, aic: _ArInstEx):
+        for f in aic.files:
+            mf = ModFile(self.name, f)
+            src = cfg.modfile_to_source_vfs(mf)
+            srcfile = srccache.file_by_path(src)
+            assert srcfile is not None
+            if aic.files[f].file_hash == truncate_file_hash(srcfile.file_hash):
+                if f in self.remaining_after_install_from: # might have already been deleted if identical file is present in multiple archives
+                    del self.remaining_after_install_from[f]
+            else:
+                aic.skip.add(f)
+                aic.modified_since_install.add(f)
+
+    def _inter_dependency(self, cfg: LocalProjectConfig, srccache: FolderCache, ar0: tuple[ArInstaller, _ArInstEx],
+                          ar1: tuple[ArInstaller, _ArInstEx]) -> tuple[bool, bool]:
+        aoverb = 0
+        bovera = 0
+        files0: dict[str, FileInArchive] = ar0[1].files
+        files1: dict[str, FileInArchive] = ar1[1].files
+        commonfiles: set[str] = set(files0).intersection(set(files1))
+        for cf in commonfiles:
+            if files0[cf].file_hash == files1[cf].file_hash:
+                continue
+            mf = ModFile(self.name, cf)
+            src = cfg.modfile_to_source_vfs(mf)
+            srcfile = srccache.file_by_path(src)
+            assert srcfile is not None
+            if files0[cf].file_hash == truncate_file_hash(srcfile.file_hash):
+                aoverb += 1
+            elif files1[cf].file_hash == truncate_file_hash(srcfile.file_hash):
+                bovera += 1
+        return aoverb, bovera
+
     def resolve_unique(self, cfg: LocalProjectConfig, itf: _IgnoredTargetFiles, srccache: FolderCache) -> None:
         assert self.required_archives is None
-        assert self.unresolved_retrievers is None
         assert self.install_from is None
         assert self.remaining_after_install_from is None
         assert self.could_be_produced_by_tools is None
         self.required_archives = {}
-        self.unresolved_retrievers = {}
 
-        for intra, rlist in self.files.items():
-            if len(rlist) == 0:
-                pass
-            elif len(rlist) == 1:
-                r0: FileRetriever = rlist[0]
-                if isinstance(r0, ArchiveFileRetriever):
-                    arh = r0.archive_hash()
-                    assert arh in self.known_archives
-                    self.required_archives[arh] = self.known_archives[arh]
-            elif len(rlist) > 1:
-                pass
-            else:
-                assert len(rlist) == 0
-                if __debug__:
-                    for r in rlist:
-                        assert isinstance(r, ArchiveFileRetriever)
-
-                assert intra not in self.unresolved_retrievers
-                self.unresolved_retrievers[intra] = rlist
-
-        # noinspection PyTypeChecker
-        files: dict[str, list[ArchiveFileRetriever]] = {}
-        for f, rlist in self.files.items():
-            if __debug__:
-                if len(rlist) > 0:
-                    assert len(rlist) == 1 or isinstance(rlist[0], ArchiveFileRetriever)
-                    r0 = rlist[0]
-                    for r in rlist:
-                        assert r.file_hash == r0.file_hash
-
-            if len(rlist) > 0 and isinstance(rlist[0], ArchiveFileRetriever):
-                # noinspection PyTypeChecker
-                files[f] = rlist
+        for intra, rlist in self.archive_files.items():
+            assert len(rlist) > 0
+            if len(rlist) == 1:
+                r0: ArchiveFileRetriever = rlist[0]
+                arh = r0.archive_hash()
+                assert arh in self.known_archives
+                self.required_archives[arh] = self.known_archives[arh]
 
         self.install_from = []
-        arfiles: dict[str, bytes] = {}
-        for f, retr in files.items():
-            r0: ArchiveFileRetriever = retr[0]
-            arfiles[f] = r0.file_hash
         for rav in self.required_archives.values():
             ra: Archive = rav[0]
             for plugin in all_arinstaller_plugins():
-                guess = plugin.guess_arinstaller_from_vfs(ra, self.name, files)
+                guess = plugin.guess_arinstaller_from_vfs(ra, self.name, self.archive_files)
                 if guess is not None:
+                    if isinstance(guess, SimpleArInstaller) and guess.install_from_root != '':
+                        pass
                     aic = _ArInstEx()
                     self.install_from.append((guess, aic))
-                    for f in guess.all_desired_files():
-                        if not f in files:
-                            aic.skip[f] = True
+                    for f, fia in guess.all_desired_files():
+                        if not f in self.archive_files:
+                            aic.skip.add(f)
                             continue
-                        # rs: list[ArchiveFileRetriever] = files[f]
-                        # fh = rs[0].file_hash
 
                         mf = ModFile(self.name, f)
                         target = cfg.modfile_to_target_vfs(mf)
                         if itf.ignored(target):
-                            aic.ignored[f] = True
-                        src = cfg.modfile_to_source_vfs(mf)
-                        srcfile = srccache.file_by_path(src)
-                        assert srcfile is not None
-                        if arfiles[f] == srcfile.file_hash:
-                            del files[f]
+                            aic.ignored.add(f)
                         else:
-                            aic.skip[f] = True
-                            aic.modified_since_install[f] = True
-
-                    if __debug__:
-                        for f in files:
-                            assert f in arfiles
+                            aic.files[f] = fia
                     break
-        self.remaining_after_install_from = files
+
+        assert self.remaining_after_install_from is None
+        self.remaining_after_install_from = self.archive_files.copy()
+        if len(self.install_from) == 1:
+            ar0: tuple[ArInstaller, _ArInstEx] = self.install_from[0]
+            _, aic = ar0
+            self._process_aic_clearing_remaining_after(cfg, srccache, aic)
+        elif len(self.install_from) > 1:
+            dependencies: set[tuple[int, int]] = set()
+            for i in range(len(self.install_from)):
+                for j in range(i + 1, len(self.install_from)):
+                    assert j != i
+                    ioverj, joveri = self._inter_dependency(cfg, srccache, self.install_from[i], self.install_from[j])
+                    if ioverj:
+                        dependencies.add((i, j))
+                    if joveri:
+                        dependencies.add((j, i))
+
+            ordered: list[int] = []
+            while len(ordered) < len(self.install_from):
+                # looking for non-dependent one
+                roundok = False
+                for i in range(len(self.install_from)):
+                    if i in ordered:
+                        continue
+                    iok = True
+                    for j in range(len(self.install_from)):
+                        if j not in ordered and (i, j) in dependencies:
+                            iok = False
+                            break  # for j
+                    if iok:
+                        ordered.append(i)
+                        roundok = True
+                        break  # for i
+                abort_if_not(roundok)  # circular dependency, TODO: handle it
+
+            assert len(ordered) == len(self.install_from)
+            assert len(ordered) == len(set(ordered))
+            newsif = [self.install_from[i] for i in ordered]
+            assert len(newsif) == len(self.install_from)
+            self.install_from = newsif
+
+            for _, arx in self.install_from:
+                self._process_aic_clearing_remaining_after(cfg, srccache, arx)
 
         if __debug__:
-            fromarch: dict[str, bool] = {}
+            fromarch: set[str] = set(self.remaining_after_install_from.keys())
             for arinst, arinstx0 in self.install_from:
                 arinstx: _ArInstEx = arinstx0
-                for f in arinst.all_desired_files():
-                    if f not in arinstx.ignored and f not in arinstx.skip:
-                        fromarch[f] = True
-                        assert f in self.files
 
-            for f, rlist in self.files.items():
-                if len(rlist) == 0 or not isinstance(rlist[0], ArchiveFileRetriever):
-                    continue
+                for f in arinstx.files:
+                    if f not in arinstx.modified_since_install:
+                        fromarch.add(f)
 
-                if f not in fromarch and f not in self.remaining_after_install_from:
-                    assert False
+            if len(fromarch) != len(self.archive_files):
+                assert False
+            assert len(fromarch.intersection(self.archive_files)) == len(fromarch)
 
     def _has_skips(self) -> bool:
         for _, arext in self.install_from:
@@ -204,14 +273,17 @@ class _ModInProgress:
                 return True
         return False
 
+    def is_fully_github(self) -> bool:
+        return len(self.archive_files) == 0
+
     def is_trivially_installed(self) -> bool:
         return self.is_fully_installed() and not self._has_skips()
 
     def is_fully_installed(self) -> bool:
-        return len(self.unresolved_retrievers) == 0 and len(self.remaining_after_install_from) == 0
+        return len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == 0
 
     def is_healable_to_trivial_install(self) -> bool:
-        return len(self.unresolved_retrievers) == 0 and len(self.remaining_after_install_from) == len(
+        return len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == len(
             self.could_be_produced_by_tools) and not self._has_skips()
 
 
@@ -401,12 +473,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     fullygithubmods: list[tuple[str, _ModInProgress]] = []
     othermods: list[tuple[str, _ModInProgress]] = []
     for modname, mod in mip.mods.items():
-        allgithub = True
-        for rlist in mod.files.values():
-            if len(rlist) == 0 or not isinstance(rlist[0], (ZeroFileRetriever, GithubFileRetriever)):
-                allgithub = False
-                break
-        if allgithub:
+        if mod.is_fully_github():
             fullygithubmods.append((modname, mod))
             continue
 
@@ -440,3 +507,4 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             len(fullygithubmods), len(triviallyinstalledmods), len(healabletotrivialmods)))
     info('{} mod(s) are fully installed (with unexplained skips)'.format(len(fullyinstalledmods)))
     alert('{} mod(s) remaining'.format(len(othermods)))
+    pass

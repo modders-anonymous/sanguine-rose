@@ -10,12 +10,12 @@ class SimpleArInstaller(ArInstaller):
     def __init__(self, archive: Archive):
         super().__init__(archive)
 
-    def all_desired_files(self) -> Iterable[str]:  # list[relpath]
-        out: list[str] = []
+    def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
+        out: list[tuple[str, FileInArchive]] = []
         lifr = len(self.install_from_root)
         for fia in self.archive.files:
             if fia.intra_path.startswith(self.install_from_root):
-                out.append(fia.intra_path[lifr:])
+                out.append((fia.intra_path[lifr:], fia))
         return out
 
     def install_data(self) -> str:
