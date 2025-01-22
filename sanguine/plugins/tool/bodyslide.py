@@ -8,11 +8,11 @@ from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS, CouldBeProducedB
 
 class _BodySlideToolPluginContext:
     rel_output_files: dict[str, int]
-    target_files: dict[str, bool]
+    target_files: set[str]
 
     def __init__(self) -> None:
         self.rel_output_files = {}
-        self.target_files = {}
+        self.target_files = set()
 
 
 def _parse_osp(fname: str) -> list[str]:
@@ -66,7 +66,9 @@ class BodySlideToolPlugin(ToolPluginBase):
         osppattern = re.compile(r'data\\CalienteTools\\Bodyslide\\SliderSets\\.*\.osp$', re.IGNORECASE)
         for relpath in resolvedvfs.all_target_files():
             assert relpath not in ctx.target_files
-            ctx.target_files[relpath] = True
+            ext = os.path.splitext(relpath)[1]
+            if ext in ['.tri', '.nif']:
+                ctx.target_files.add(relpath)
             if osppattern.match(relpath):
                 srcfiles = resolvedvfs.files_for_target(relpath)
                 assert len(srcfiles) > 0
@@ -85,6 +87,10 @@ class BodySlideToolPlugin(ToolPluginBase):
             f1 = f + '_1.nif'
             if f0 in ctx.target_files and f1 in ctx.target_files:
                 return CouldBeProducedByTool.Maybe
+
+            fnif = f + '.nif'
+            if fnif in ctx.target_files:
+                return CouldBeProducedByTool.Maybe
             return CouldBeProducedByTool.NotFound
 
         assert ext == '.nif'
@@ -98,4 +104,9 @@ class BodySlideToolPlugin(ToolPluginBase):
                 return CouldBeProducedByTool.Maybe
             return CouldBeProducedByTool.NotFound
         else:
+            if f in ctx.rel_output_files:
+                return CouldBeProducedByTool.WithCurrentConfig
+            ftri = f + '.tri'
+            if ftri in ctx.target_files:
+                return CouldBeProducedByTool.Maybe
             return CouldBeProducedByTool.NotFound

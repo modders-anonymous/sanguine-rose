@@ -1,3 +1,4 @@
+import logging
 import re
 
 from sanguine.cache.available_files import AvailableFiles
@@ -11,6 +12,52 @@ from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 from sanguine.plugins.arinstaller.x99simple import SimpleArInstaller
+
+
+def _log_stats(stats: dict[str, int], level: int, title: str) -> None:
+    log_with_level(level, title)
+    total = 0
+    for zext, zn in sorted(stats.items(), key=lambda x: -x[1]):
+        log_with_level(level, '-> {} -> {}'.format(zext, zn))
+        total += zn
+    log_with_level(level, '-> TOTAL: {}'.format(total))
+
+
+class _ExtStats:
+    stats: dict[str, int]
+
+    def __init__(self):
+        self.stats = {}
+
+    def add(self, fpath: str) -> None:
+        ext = os.path.splitext(fpath)[1]
+        if len(ext) > 6:
+            ext = '.LONGER'
+        if ext not in self.stats:
+            self.stats[ext] = 1
+        else:
+            self.stats[ext] += 1
+
+    def log_me(self, title: str, level: int) -> None:
+        _log_stats(self.stats, level, title)
+
+
+class _PerModStats:
+    stats: dict[str, int]
+
+    def __init__(self):
+        self.stats = {}
+
+    def add(self, modname: str, n: int) -> None:
+        if n == 0:
+            return
+        if modname not in self.stats:
+            self.stats[modname] = n
+        else:
+            self.stats[modname] += n
+
+    def log_me(self, title: str, level: int) -> None:
+        _log_stats(self.stats, level, title)
 
 
 class _IgnoredTargetFiles:
@@ -53,9 +100,6 @@ class _ModInProgress:
     install_from: list[tuple[ArInstaller, _ArInstEx]] | None
     remaining_after_install_from: dict[str, list[ArchiveFileRetriever]] | None
     could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByTool]] | None
-
-    # modified_from_install: dict[str, tuple[str | None, CouldBeProducedByTool] | None] | None
-    # skip_from_install: dict[str, bool] | None
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -119,6 +163,25 @@ class _ModInProgress:
             out += arext.modified_since_install
         return out
 
+    def collect_extension_stats(self, unknownstats: _ExtStats, archivestats: _ExtStats,
+                                modifiedsincestats: _ExtStats) -> None:
+        for infr in self.install_from:
+            aic: _ArInstEx = infr[1]
+            for f in aic.files:
+                archivestats.add(f)
+            for msi in aic.modified_since_install:
+                modifiedsincestats.add(msi)
+        for uf in self.unknown_files:
+            unknownstats.add(uf)
+
+    def collect_mod_stats(self, unknownstats: _PerModStats, archivestats: _PerModStats,
+                          modifiedsincestats: _PerModStats) -> None:
+        for infr in self.install_from:
+            aic: _ArInstEx = infr[1]
+            archivestats.add(self.name, len(aic.files))
+            modifiedsincestats.add(self.name, len(aic.modified_since_install))
+        unknownstats.add(self.name, len(self.unknown_files))
+
     '''
     @staticmethod
     def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,
@@ -146,7 +209,7 @@ class _ModInProgress:
             srcfile = srccache.file_by_path(src)
             assert srcfile is not None
             if aic.files[f].file_hash == truncate_file_hash(srcfile.file_hash):
-                if f in self.remaining_after_install_from: # might have already been deleted if identical file is present in multiple archives
+                if f in self.remaining_after_install_from:  # might have already been deleted if identical file is present in multiple archives
                     del self.remaining_after_install_from[f]
             else:
                 aic.skip.add(f)
@@ -363,25 +426,15 @@ class _ToolFinder:
         return CouldBeProducedByTool.NotFound, None
 
 
-def _add_ext_stats(stats: dict[str, int], fpath: str) -> None:
-    ext = os.path.splitext(fpath)[1]
-    if len(ext) > 6:
-        ext = '.longer.'
-    if ext not in stats:
-        stats[ext] = 1
-    else:
-        stats[ext] += 1
-
-
 def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     toolsfinder: _ToolFinder = _ToolFinder(cfg, wcache.resolved_vfs())
 
     info('Stage 0: collecting retrievers')
     mip = _ModsInProgress(cfg, wcache.available)
     nzero = 0
-    nzerostats = {}
+    nzerostats = _ExtStats()
     ndup = 0
-    toolstats = {}
+    toolstats: dict[str, _ExtStats] = {}
     nignored = 0
     itf = _IgnoredTargetFiles(cfg)
     for f in wcache.all_source_vfs_files():
@@ -406,7 +459,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                         break
             if len(retr) == 0:
                 nzero += 1
-                _add_ext_stats(nzerostats, f.file_path)
+                nzerostats.add(f.file_path)
                 mip.add_new_file(mf, [])
             else:
                 mip.add_new_file(mf, retr)
@@ -414,16 +467,9 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('{} files ignored, found {} duplicate files'.format(
         nignored, ndup))
     for tool in toolstats:
-        info('tool {}:'.format(tool))
-        totaln = 0
-        for text, tn in sorted(toolstats[tool].items(), key=lambda x: -x[1]):
-            info('-> {} -> {}'.format(text, tn))
-            totaln += tn
-        info('-> total: {}'.format(totaln))
+        toolstats[tool].log_me('tool {}:'.format(tool), logging.INFO)
     if nzero > 0:
-        warn('did not find retrievers for {} files'.format(nzero))
-        for zext, zn in sorted(nzerostats.items(), key=lambda x: -x[1]):
-            warn('-> {} -> {}'.format(zext, zn))
+        nzerostats.log_me('did not find retrievers for {} files'.format(nzero), logging.WARNING)
 
     info('stats (nretrievers->ntimes):')
     stats = {}
@@ -461,8 +507,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                 mod.could_be_produced_by_tools[ff] = (tool, cbp)
 
                 if tool not in toolstats:
-                    toolstats[tool] = {}
-                _add_ext_stats(toolstats[tool], srcf)
+                    toolstats[tool] = _ExtStats()
+                toolstats[tool].add(srcf)
     info('{} mod files could have been produced by tools'.format(ntools))
 
     ninstallfrom = 0
@@ -507,4 +553,20 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             len(fullygithubmods), len(triviallyinstalledmods), len(healabletotrivialmods)))
     info('{} mod(s) are fully installed (with unexplained skips)'.format(len(fullyinstalledmods)))
     alert('{} mod(s) remaining'.format(len(othermods)))
+
+    unknownextstats = _ExtStats()
+    archivefilesextstats = _ExtStats()
+    modifiedsinceextstats = _ExtStats()
+    unknownmodstats = _PerModStats()
+    archivefilesmodstats = _PerModStats()
+    modifiedsincemodstats = _PerModStats()
+    for mod in mip.mods.values():
+        mod.collect_extension_stats(unknownextstats, archivefilesextstats, modifiedsinceextstats)
+        mod.collect_mod_stats(unknownmodstats, archivefilesmodstats, modifiedsincemodstats)
+    unknownextstats.log_me('Unknown files stats:', logging.INFO)
+    archivefilesextstats.log_me('Archive files stats:', logging.INFO)
+    modifiedsinceextstats.log_me('Modified files stats:', logging.INFO)
+    unknownmodstats.log_me('Unknown files stats:', logging.INFO)
+    archivefilesmodstats.log_me('Archive files stats:', logging.INFO)
+    modifiedsincemodstats.log_me('Modified files stats:', logging.INFO)
     pass
