@@ -11,15 +11,22 @@ from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever
                                              GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
-from sanguine.plugins.arinstaller.x99simple import SimpleArInstaller
 
 
-def _log_stats(stats: dict[str, int], level: int, title: str) -> None:
+def _log_stats(stats: dict[str, int], level: int, title: str, max_lines: int) -> None:
     log_with_level(level, title)
     total = 0
+    i = 0
+    maxreached = False
     for zext, zn in sorted(stats.items(), key=lambda x: -x[1]):
+        if i >= max_lines:
+            maxreached = True
+            break
+        i += 1
         log_with_level(level, '-> {} -> {}'.format(zext, zn))
         total += zn
+    if maxreached:
+        log_with_level(level, '-> ...')
     log_with_level(level, '-> TOTAL: {}'.format(total))
 
 
@@ -39,7 +46,7 @@ class _ExtStats:
             self.stats[ext] += 1
 
     def log_me(self, title: str, level: int) -> None:
-        _log_stats(self.stats, level, title)
+        _log_stats(self.stats, level, title, max_lines=1000)
 
 
 class _PerModStats:
@@ -56,8 +63,8 @@ class _PerModStats:
         else:
             self.stats[modname] += n
 
-    def log_me(self, title: str, level: int) -> None:
-        _log_stats(self.stats, level, title)
+    def log_me(self, title: str, level: int, max_lines: int = 1000) -> None:
+        _log_stats(self.stats, level, title, max_lines)
 
 
 class _IgnoredTargetFiles:
@@ -256,8 +263,8 @@ class _ModInProgress:
             for plugin in all_arinstaller_plugins():
                 guess = plugin.guess_arinstaller_from_vfs(ra, self.name, self.archive_files)
                 if guess is not None:
-                    if isinstance(guess, SimpleArInstaller) and guess.install_from_root != '':
-                        pass
+                    # if isinstance(guess, SimpleArInstaller) and guess.install_from_root != '':
+                    #    pass
                     aic = _ArInstEx()
                     self.install_from.append((guess, aic))
                     for f, fia in guess.all_desired_files():
@@ -512,7 +519,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('{} mod files could have been produced by tools'.format(ntools))
 
     ninstallfrom = 0
-    info('per-mod stats:')
+    # info('per-mod stats:')
     triviallyinstalledmods: list[tuple[str, _ModInProgress]] = []
     healabletotrivialmods: list[tuple[str, _ModInProgress]] = []
     fullyinstalledmods: list[tuple[str, _ModInProgress]] = []
@@ -525,11 +532,11 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
         processed = False
         if len(mod.install_from) > 0:
-            names = [wcache.available.tentative_names_for_archive(arinst.archive.archive_hash) for arinst, _ in
-                     mod.install_from]
-            instdata = [arinst.install_data() for arinst, _ in mod.install_from]
-            info("-> {}: install_from {}, install_data='{}'".format(
-                modname, str(names), str(instdata)))
+            # names = [wcache.available.tentative_names_for_archive(arinst.archive.archive_hash) for arinst, _ in
+            #         mod.install_from]
+            # instdata = [arinst.install_data() for arinst, _ in mod.install_from]
+            # info("-> {}: install_from {}, install_data='{}'".format(
+            #    modname, str(names), str(instdata)))
             ninstallfrom += 1
             if mod.is_trivially_installed():
                 triviallyinstalledmods.append((modname, mod))
@@ -567,6 +574,6 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     archivefilesextstats.log_me('Archive files stats:', logging.INFO)
     modifiedsinceextstats.log_me('Modified files stats:', logging.INFO)
     unknownmodstats.log_me('Unknown files stats:', logging.INFO)
-    archivefilesmodstats.log_me('Archive files stats:', logging.INFO)
+    archivefilesmodstats.log_me('Archive files stats:', logging.INFO, 20)
     modifiedsincemodstats.log_me('Modified files stats:', logging.INFO)
     pass
