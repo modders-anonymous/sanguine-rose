@@ -10,6 +10,9 @@ class SimpleArInstaller(ArInstaller):
     def __init__(self, archive: Archive):
         super().__init__(archive)
 
+    def name(self) -> str:
+        return 'SIMPLE'
+
     def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
         out: list[tuple[str, FileInArchive]] = []
         lifr = len(self.install_from_root)
@@ -18,8 +21,8 @@ class SimpleArInstaller(ArInstaller):
                 out.append((fia.intra_path[lifr:], fia))
         return out
 
-    def install_data(self) -> str:
-        return as_json({'root': self.install_from_root})
+    def install_params(self) -> dict[str, Any]:
+        return {'root': self.install_from_root}
 
 
 def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,

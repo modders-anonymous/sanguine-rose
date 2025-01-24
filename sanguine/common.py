@@ -276,6 +276,14 @@ def unused_config_warning(where: str, cfg: ConfigData, known: list[str]) -> None
 
 ### JSON-related
 
+def open_git_data_file_for_writing(fpath: str) -> typing.TextIO:
+    return open(fpath, 'wt', encoding='utf-8', newline='\n')
+
+
+def open_git_data_file_for_reading(fpath: str) -> typing.TextIO:
+    return open(fpath, 'rt', encoding='utf-8')
+
+
 def to_json_hash(h: bytes) -> str:
     b64 = base64.b64encode(h).decode('ascii')
     # print(b64)
@@ -344,24 +352,3 @@ def is_esl_flagged(filename: str) -> bool:
 def is_esx(path: str) -> bool:
     ext = os.path.splitext(path)[1].lower()
     return ext == '.esl' or ext == '.esp' or ext == '.esm'
-
-
-'''
-### unused, candidates for removal
-def escape_json(s: Any) -> str:
-    return json.dumps(s)
-
-def all_esxs(mod: str, mo2: str) -> list[str]:
-    esxs = glob.glob(mo2 + 'mods/' + mod + '/*.esl')
-    esxs = esxs + glob.glob(mo2 + 'mods/' + mod + '/*.esp')
-    esxs = esxs + glob.glob(mo2 + 'mods/' + mod + '/*.esm')
-    return esxs
-
-def read_dict_from_json_file(fpath: str) -> dict[Any, Any]:
-    try:
-        with open(fpath, 'rt', encoding='utf-8') as rfile:
-            return json.load(rfile)
-    except Exception as e:
-        warn('error loading ' + fpath + ': ' + str(e) + '. Will continue without it')
-        return {}
-'''

@@ -6,12 +6,13 @@ from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.gitdata.project_json import (ProjectJson, ProjectMod, ProjectInstaller,
-                                           to_stable_json, write_stable_json, ProjectArchiveRemaining)
+                                           ProjectArchiveRemaining)
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
+from sanguine.helpers.stable_json import to_stable_json, write_stable_json
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 
 
@@ -631,11 +632,10 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         pm.github_files = {k: v[0] for k, v in mod.github_files.items()}
         pm.installers = []
         for infr in mod.install_from:
-            pa = ProjectInstaller()
-            pm.installers.append(pa)
             ainst, aex = infr
-            pa.archive_hash = ainst.archive.archive_hash
-            pa.skip = [s for s in aex.skip]
+            skip = [s for s in aex.skip]
+            pa = ProjectInstaller(ainst.archive.archive_hash,ainst.name(),ainst.install_params(),skip)
+            pm.installers.append(pa)
         pm.remaining_archive_files = []
         installerarchives = [x[0].archive.archive_hash for x in mod.install_from]
         for f, retr in mod.remaining_after_install_from.items():

@@ -15,7 +15,11 @@ class ArInstaller:
         pass
 
     @abstractmethod
-    def install_data(self) -> str:
+    def name(self) -> str:
+        pass
+
+    @abstractmethod
+    def install_params(self) -> dict[str, Any]:
         pass
 
 
