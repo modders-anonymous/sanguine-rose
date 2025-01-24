@@ -6,7 +6,7 @@ from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.gitdata.project_json import (ProjectJson, ProjectMod, ProjectInstaller,
-                                           ProjectArchiveRemaining)
+                                           ProjectExtraArchive, ProjectExtraArchiveFile)
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
@@ -634,16 +634,25 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         for infr in mod.install_from:
             ainst, aex = infr
             skip = [s for s in aex.skip]
-            pa = ProjectInstaller(ainst.archive.archive_hash,ainst.name(),ainst.install_params(),skip)
+            pa = ProjectInstaller(ainst.archive.archive_hash, ainst.name(), ainst.install_params(), skip)
             pm.installers.append(pa)
-        pm.remaining_archive_files = []
-        installerarchives = [x[0].archive.archive_hash for x in mod.install_from]
+        pm.remaining_archives = []
+        installerarchives: list[bytes] = [x[0].archive.archive_hash for x in mod.install_from]
+        extraarchives: dict[bytes, ProjectExtraArchive] = {}
         for f, retr in mod.remaining_after_install_from.items():
             assert len(retr) == 1
             r0 = retr[0]
             assert isinstance(r0, ArchiveFileRetriever)
-            pr = ProjectArchiveRemaining(f, r0, installerarchives)
-            pm.remaining_archive_files.append(pr)
+            arh = r0.archive_hash()
+            arid = arh
+            if arh in installerarchives:
+                arid = installerarchives.index(arh)
+            if arh not in extraarchives:
+                extraarchives[arh] = ProjectExtraArchive(arid)
+            extraarchives[arh].extra_files.append(ProjectExtraArchiveFile(f, truncate_file_hash(r0.file_hash)))
+
+        for xa in extraarchives.values():
+            pm.remaining_archives.append(xa)
         pm.unknown_files = [u for u in mod.unknown_files]
 
     jdata = to_stable_json(pj)

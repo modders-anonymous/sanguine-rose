@@ -1,5 +1,6 @@
 from sanguine.common import *
 
+
 def _stable_json_sort_list(data: list[Any]) -> list[Any]:
     if len(data) == 0:
         return []
@@ -16,7 +17,8 @@ def _stable_json_sort_list(data: list[Any]) -> list[Any]:
             assert d0.sanguine_json == i.sanguine_json
     firstfield = d0.sanguine_json[0][1]
     data2 = [to_stable_json(d) for d in data]
-    return sorted(data2, key=lambda x: x[firstfield])
+    return sorted(data2, key=lambda x: 'i{:09d}'.format(x[firstfield]) if isinstance(x[firstfield], int) else 's' + x[
+        firstfield])
 
 
 def to_stable_json(data: Any) -> dict[str, Any] | list[Any] | str:
@@ -52,4 +54,3 @@ def write_stable_json(fname: str, data: dict[str, Any]) -> None:
     with open_git_data_file_for_writing(fname) as f:
         # noinspection PyTypeChecker
         json.dump(data, f, indent=1)
-

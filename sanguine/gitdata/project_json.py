@@ -1,25 +1,25 @@
 from sanguine.common import *
-from sanguine.helpers.file_retriever import GithubFileRetriever, ArchiveFileRetriever
+from sanguine.helpers.file_retriever import GithubFileRetriever
 
 
-class ProjectArchiveRemaining:
-    sanguine_json: list[tuple[str, str]] = [('file_name', 'f'), ('file_hash', 'h'), ('archive_hash', 'arh'),
-                                            ('archive_num', 'from')]
-    file_name: str
-    archive_hash: bytes | None
-    archive_num: int | None
+class ProjectExtraArchiveFile:
+    sanguine_json: list[tuple[str, str]] = [('target_file_name', 't'), ('file_hash', 'h')]
+    target_file_name: str
     file_hash: bytes
 
-    def __init__(self, fname: str, r: ArchiveFileRetriever, installerarchives: list[bytes]) -> None:
-        self.file_name = fname
-        self.file_hash = truncate_file_hash(r.file_hash)
-        arh = r.archive_hash()
-        if arh in installerarchives:
-            self.archive_num = installerarchives.index(arh)
-            self.archive_hash = None
-        else:
-            self.archive_hash = arh
-            self.archive_num = None
+    def __init__(self, targetfname: str, h: bytes) -> None:
+        self.target_file_name = targetfname
+        self.file_hash = h
+
+
+class ProjectExtraArchive:
+    sanguine_json: list[tuple[str, str]] = [('archive_id', 'arid'), ('extra_files', 'files')]
+    archive_id: bytes | int
+    extra_files: list[ProjectExtraArchiveFile]
+
+    def __init__(self, aid: bytes | int) -> None:
+        self.archive_id = aid
+        self.extra_files = []
 
 
 class ProjectInstaller:
@@ -41,13 +41,13 @@ class ProjectInstaller:
 class ProjectMod:
     sanguine_json: list[tuple[str, str]] = [('mod_name', 'name'), ('zero_files', 'zero'),
                                             ('github_files', 'github'), ('installers', 'installers'),
-                                            ('remaining_archive_files', 'arfiles'),
+                                            ('remaining_archives', 'xarchives'),
                                             ('unknown_files', 'unknown')]
     mod_name: str | None
     zero_files: list[str] | None
     github_files: dict[str, GithubFileRetriever] | None
     installers: list[ProjectInstaller] | None
-    remaining_archive_files: list[ProjectArchiveRemaining] | None
+    remaining_archives: list[ProjectExtraArchive] | None
     unknown_files: list[str] | None
 
     def __init__(self) -> None:
@@ -55,7 +55,7 @@ class ProjectMod:
         self.zero_files = None
         self.github_files = None
         self.installers = None
-        self.remaining_archive_files = None
+        self.remaining_archives = None
         self.unknown_files = None
 
 
