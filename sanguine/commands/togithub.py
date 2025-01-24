@@ -5,7 +5,8 @@ from sanguine.cache.available_files import AvailableFiles
 from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
-from sanguine.gitdata.project_json import ProjectJson, ProjectMod, ProjectArchive, to_stable_json, write_stable_json
+from sanguine.gitdata.project_json import (ProjectJson, ProjectMod, ProjectInstaller,
+                                           to_stable_json, write_stable_json, ProjectArchiveRemaining)
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
@@ -500,6 +501,47 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('Stage 1: resolve_unique()...')
     mip.resolve_unique(wcache._source_vfs_cache)
 
+    info('Stage 2: using already-required archives...')
+    required_archives = {}
+    for mod in mip.mods.values():
+        for infr in mod.install_from:
+            arh = infr[0].archive.archive_hash
+            if arh in required_archives:
+                required_archives[arh].append(mod.name)
+            else:
+                required_archives[arh] = [mod.name]
+        # at this point, we're looking ONLY for this-mod archives; required_archives are not fully known yet
+        overwrite: dict[str, list[ArchiveFileRetriever]] = {}
+        for f, retr in mod.remaining_after_install_from.items():
+            if len(retr) > 1:
+                found = None
+                for r in retr:
+                    assert isinstance(r, ArchiveFileRetriever)
+                    arh = r.archive_hash()
+                    if arh in required_archives:
+                        if required_archives[arh][-1] == mod.name:
+                            found = r
+                            break
+                if found is not None:
+                    overwrite[f] = [found]
+
+        mod.remaining_after_install_from |= overwrite
+
+    # now, re-using ALL the required_archives...
+    for mod in mip.mods.values():
+        overwrite: dict[str, list[ArchiveFileRetriever]] = {}
+        for f, retr in mod.remaining_after_install_from.items():
+            if len(retr) > 1:
+                found = None
+                for r in retr:
+                    assert isinstance(r, ArchiveFileRetriever)
+                    arh = r.archive_hash()
+                    if arh in required_archives:
+                        found = r
+                assert found is not None  # TODO: handle not-required-archives
+                overwrite[f] = [found]
+        mod.remaining_after_install_from |= overwrite
+
     ntools = 0
     for key, mod in mip.mods.items():
         assert mod.could_be_produced_by_tools is None
@@ -587,13 +629,21 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         pm.mod_name = mod.name
         pm.zero_files = [z for z in mod.zero_files]
         pm.github_files = {k: v[0] for k, v in mod.github_files.items()}
-        pm.archives = []
+        pm.installers = []
         for infr in mod.install_from:
-            pa = ProjectArchive()
-            pm.archives.append(pa)
+            pa = ProjectInstaller()
+            pm.installers.append(pa)
             ainst, aex = infr
             pa.archive_hash = ainst.archive.archive_hash
             pa.skip = [s for s in aex.skip]
+        pm.remaining_archive_files = []
+        installerarchives = [x[0].archive.archive_hash for x in mod.install_from]
+        for f, retr in mod.remaining_after_install_from.items():
+            assert len(retr) == 1
+            r0 = retr[0]
+            assert isinstance(r0, ArchiveFileRetriever)
+            pr = ProjectArchiveRemaining(f, r0, installerarchives)
+            pm.remaining_archive_files.append(pr)
         pm.unknown_files = [u for u in mod.unknown_files]
 
     jdata = to_stable_json(pj)
