@@ -5,6 +5,7 @@ from sanguine.cache.available_files import AvailableFiles
 from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
+from sanguine.gitdata.project_json import ProjectJson, ProjectMod, ProjectArchive, to_stable_json, write_stable_json
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
@@ -576,4 +577,24 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     unknownmodstats.log_me('Unknown files stats:', logging.INFO)
     archivefilesmodstats.log_me('Archive files stats:', logging.INFO, 20)
     modifiedsincemodstats.log_me('Modified files stats:', logging.INFO)
-    pass
+
+    # preparing ProjectJson object
+    pj = ProjectJson()
+    pj.mods = []
+    for mod in mip.mods.values():
+        pm = ProjectMod()
+        pj.mods.append(pm)
+        pm.mod_name = mod.name
+        pm.zero_files = [z for z in mod.zero_files]
+        pm.github_files = {k: v[0] for k, v in mod.github_files.items()}
+        pm.archives = []
+        for infr in mod.install_from:
+            pa = ProjectArchive()
+            pm.archives.append(pa)
+            ainst, aex = infr
+            pa.archive_hash = ainst.archive.archive_hash
+            pa.skip = [s for s in aex.skip]
+        pm.unknown_files = [u for u in mod.unknown_files]
+
+    jdata = to_stable_json(pj)
+    write_stable_json(cfg.this_modpack_folder() + "project.json", jdata)

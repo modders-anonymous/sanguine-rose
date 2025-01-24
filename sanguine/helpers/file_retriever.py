@@ -58,6 +58,8 @@ class ZeroFileRetriever(FileRetriever):
 
 
 class GithubFileRetriever(FileRetriever):
+    sanguine_json: list[tuple[str, str]] = [('github_author', 'author'), ('github_project', 'project'),
+                                            ('from_path', 'p')]
     github_author: str  # '' for 'this project'
     github_project: str  # '' means 'this project'
     from_path: str
