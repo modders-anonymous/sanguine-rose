@@ -270,15 +270,11 @@ class _ModInProgress:
                     aic = _ArInstEx()
                     self.install_from.append((guess, aic))
                     for f, fia in guess.all_desired_files():
-                        # if f.endswith('_0.nif'):
-                        #    pass
-
                         mf = ModFile(self.name, f)
                         target = cfg.modfile_to_target_vfs(mf)
                         if itf.ignored(target):
                             aic.ignored.add(f)
                         elif not f in self.archive_files:
-                            aic.skip.add(f)
                             src = cfg.modfile_to_source_vfs(mf)
                             srcfile = srccache.file_by_path(src)
                             if srcfile is None:
@@ -286,7 +282,9 @@ class _ModInProgress:
                             else:
                                 if fia.file_hash == truncate_file_hash(srcfile.file_hash):
                                     assert fia.file_hash == truncate_file_hash(ZeroFileRetriever.ZEROHASH)
-                                    # do nothing else, we prefer intra-archive zero-length file
+                                    # we prefer intra-archive zero-length file
+                                    assert f in self.zero_files
+                                    self.zero_files.remove(f)
                                 else:
                                     aic.skip.add(f)
                                     aic.modified_since_install.add(f)
