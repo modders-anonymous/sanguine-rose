@@ -215,15 +215,14 @@ class _ModInProgress:
     def _process_aic_clearing_remaining_after(self, cfg: LocalProjectConfig, srccache: FolderCache, aic: _ArInstEx):
         for f in aic.files:
             mf = ModFile(self.name, f)
-            src = cfg.modfile_to_source_vfs(mf)
-            srcfile = srccache.file_by_path(src)
-            assert srcfile is not None
-            if aic.files[f].file_hash == truncate_file_hash(srcfile.file_hash):
-                if f in self.remaining_after_install_from:  # might have already been deleted if identical file is present in multiple archives
-                    del self.remaining_after_install_from[f]
-            else:
-                aic.skip.add(f)
-                aic.modified_since_install.add(f)
+            if __debug__:
+                src = cfg.modfile_to_source_vfs(mf)
+                srcfile = srccache.file_by_path(src)
+                assert srcfile is not None
+                if aic.files[f].file_hash != truncate_file_hash(srcfile.file_hash):
+                    pass
+            if f in self.remaining_after_install_from:  # might have already been deleted if identical file is present in multiple archives
+                del self.remaining_after_install_from[f]
 
     def _inter_dependency(self, cfg: LocalProjectConfig, srccache: FolderCache, ar0: tuple[ArInstaller, _ArInstEx],
                           ar1: tuple[ArInstaller, _ArInstEx]) -> tuple[bool, bool]:
@@ -271,16 +270,35 @@ class _ModInProgress:
                     aic = _ArInstEx()
                     self.install_from.append((guess, aic))
                     for f, fia in guess.all_desired_files():
-                        if not f in self.archive_files:
-                            aic.skip.add(f)
-                            continue
+                        # if f.endswith('_0.nif'):
+                        #    pass
 
                         mf = ModFile(self.name, f)
                         target = cfg.modfile_to_target_vfs(mf)
                         if itf.ignored(target):
                             aic.ignored.add(f)
+                        elif not f in self.archive_files:
+                            aic.skip.add(f)
+                            src = cfg.modfile_to_source_vfs(mf)
+                            srcfile = srccache.file_by_path(src)
+                            if srcfile is None:
+                                aic.skip.add(f)
+                            else:
+                                if fia.file_hash == truncate_file_hash(srcfile.file_hash):
+                                    assert fia.file_hash == truncate_file_hash(ZeroFileRetriever.ZEROHASH)
+                                    # do nothing else, we prefer intra-archive zero-length file
+                                else:
+                                    aic.skip.add(f)
+                                    aic.modified_since_install.add(f)
                         else:
-                            aic.files[f] = fia
+                            src = cfg.modfile_to_source_vfs(mf)
+                            srcfile = srccache.file_by_path(src)
+                            assert srcfile is not None
+                            if fia.file_hash == truncate_file_hash(srcfile.file_hash):
+                                aic.files[f] = fia
+                            else:
+                                aic.skip.add(f)
+                                aic.modified_since_install.add(f)
                     break
 
         assert self.remaining_after_install_from is None
@@ -504,6 +522,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     info('Stage 2: using already-required archives...')
     required_archives = {}
+    nresolvedinmods = 0
     for mod in mip.mods.values():
         for infr in mod.install_from:
             arh = infr[0].archive.archive_hash
@@ -524,11 +543,13 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                             found = r
                             break
                 if found is not None:
+                    nresolvedinmods += 1
                     overwrite[f] = [found]
 
         mod.remaining_after_install_from |= overwrite
 
     # now, re-using ALL the required_archives...
+    nresolvedoutofmods = 0
     for mod in mip.mods.values():
         overwrite: dict[str, list[ArchiveFileRetriever]] = {}
         for f, retr in mod.remaining_after_install_from.items():
@@ -541,7 +562,10 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                         found = r
                 assert found is not None  # TODO: handle not-required-archives
                 overwrite[f] = [found]
+                nresolvedoutofmods += 1
         mod.remaining_after_install_from |= overwrite
+    info('Resolved {} ambiguous files within mod archives, {} from other mod archives'.format(nresolvedinmods,
+                                                                                              nresolvedoutofmods))
 
     ntools = 0
     for key, mod in mip.mods.items():
