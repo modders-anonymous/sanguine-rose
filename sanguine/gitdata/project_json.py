@@ -42,6 +42,7 @@ class ProjectMod:
     sanguine_json: list[tuple[str, str]] = [('mod_name', 'name'), ('zero_files', 'zero'),
                                             ('github_files', 'github'), ('installers', 'installers'),
                                             ('remaining_archives', 'xarchives'),
+                                            ('unknown_files_by_tools', 'unknownbytools'),
                                             ('unknown_files', 'unknown')]
     mod_name: str | None
     zero_files: list[str] | None
@@ -49,6 +50,7 @@ class ProjectMod:
     installers: list[ProjectInstaller] | None
     remaining_archives: list[ProjectExtraArchive] | None
     unknown_files: list[str] | None
+    unknown_files_by_tools: list[str] | None
 
     def __init__(self) -> None:
         self.mod_name = None
@@ -57,6 +59,7 @@ class ProjectMod:
         self.installers = None
         self.remaining_archives = None
         self.unknown_files = None
+        self.unknown_files_by_tools = None
 
 
 class ProjectJson:

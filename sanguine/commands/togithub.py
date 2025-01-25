@@ -109,7 +109,7 @@ class _ModInProgress:
     required_archives: dict[bytes, tuple[Archive, int]] | None
     install_from: list[tuple[ArInstaller, _ArInstEx]] | None
     remaining_after_install_from: dict[str, list[ArchiveFileRetriever]] | None
-    could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByTool]] | None
+    unknown_files_could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByTool]] | None
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -127,7 +127,7 @@ class _ModInProgress:
         self.remaining_after_install_from = None
         # self.modified_from_install = None
         # self.skip_from_install = None
-        self.could_be_produced_by_tools = None
+        self.unknown_files_could_be_produced_by_tools = None
 
     def add_file(self, available: AvailableFiles, intramod: str, retrievers: list[FileRetriever]) -> None:
         assert intramod not in self.unknown_files
@@ -248,7 +248,7 @@ class _ModInProgress:
         assert self.required_archives is None
         assert self.install_from is None
         assert self.remaining_after_install_from is None
-        assert self.could_be_produced_by_tools is None
+        assert self.unknown_files_could_be_produced_by_tools is None
         self.required_archives = {}
 
         for intra, rlist in self.archive_files.items():
@@ -358,24 +358,30 @@ class _ModInProgress:
                 assert False
             assert len(fromarch.intersection(self.archive_files)) == len(fromarch)
 
-    def _has_skips(self) -> bool:
+    def _num_skips(self) -> bool:
+        out = 0
         for _, arext in self.install_from:
-            if len(arext.skip) > 0:
-                return True
-        return False
+            out += len(arext.skip)
+        return out
 
     def is_fully_github(self) -> bool:
         return len(self.archive_files) == 0
 
     def is_trivially_installed(self) -> bool:
-        return self.is_fully_installed() and not self._has_skips()
+        return self.is_fully_installed() and self._num_skips() == 0
 
     def is_fully_installed(self) -> bool:
         return len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == 0
 
     def is_healable_to_trivial_install(self) -> bool:
-        return len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == len(
-            self.could_be_produced_by_tools) and not self._has_skips()
+        assert len(self.unknown_files_could_be_produced_by_tools) <= self._num_skips()
+        if len(self.remaining_after_install_from) != 0 or len(
+                self.unknown_files_could_be_produced_by_tools) != self._num_skips():
+            return False
+        for f in self.unknown_files:
+            if f not in self.unknown_files_could_be_produced_by_tools:
+                return False
+        return True
 
 
 class _ModsInProgress:
@@ -569,9 +575,12 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     ntools = 0
     for key, mod in mip.mods.items():
-        assert mod.could_be_produced_by_tools is None
-        mod.could_be_produced_by_tools = {}
+        assert mod.unknown_files_could_be_produced_by_tools is None
+        mod.unknown_files_could_be_produced_by_tools = {}
         for ff in mod.modified_since_install():
+            if not ff in mod.unknown_files:
+                continue  # TODO: double-check that we don't want to do anything about such strange (usually spurious) files
+
             mf = ModFile(mod.name, ff)
             targetpath = cfg.modfile_to_target_vfs(mf)
             assert targetpath is not None
@@ -579,12 +588,13 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             cbp, tool = toolsfinder.could_be_produced(srcf, targetpath)
             if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
                 ntools += 1
-                mod.could_be_produced_by_tools[ff] = (tool, cbp)
+                mod.unknown_files_could_be_produced_by_tools[ff] = (tool, cbp)
+                mod.unknown_files.remove(ff)
 
                 if tool not in toolstats:
                     toolstats[tool] = _ExtStats()
                 toolstats[tool].add(srcf)
-    info('{} mod files could have been produced by tools'.format(ntools))
+    info('{} unknown mod files could have been produced by tools'.format(ntools))
 
     ninstallfrom = 0
     # info('per-mod stats:')
@@ -677,7 +687,9 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
         for xa in extraarchives.values():
             pm.remaining_archives.append(xa)
+
         pm.unknown_files = [u for u in mod.unknown_files]
+        pm.unknown_files_by_tools = [t for t in mod.unknown_files_could_be_produced_by_tools]
 
     jdata = to_stable_json(pj)
     write_stable_json(cfg.this_modpack_folder() + "project.json", jdata)
