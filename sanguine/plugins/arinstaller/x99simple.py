@@ -25,6 +25,7 @@ class SimpleArInstaller(ArInstaller):
         return {'root': self.install_from_root}
 
 
+'''
 def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,
                                     arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> None:
     assert arfh in arfiles_by_hash
@@ -35,14 +36,6 @@ def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,
             ok = True
             break
     assert ok
-
-
-'''
-def _best_unmatched_from_arfiles_by_hash(arfh: bytes, arintra: str,
-                                         arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> str:
-    assert arfh in arfiles_by_hash
-    arfs = arfiles_by_hash[arfh]
-    return arfs[0].intra_path  # TODO! - best matching name?
 '''
 
 

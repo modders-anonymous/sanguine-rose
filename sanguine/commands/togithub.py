@@ -278,6 +278,7 @@ class _ModInProgress:
                             src = cfg.modfile_to_source_vfs(mf)
                             srcfile = srccache.file_by_path(src)
                             if srcfile is None:
+                                assert f not in aic.skip
                                 aic.skip.add(f)
                             else:
                                 if fia.file_hash == truncate_file_hash(srcfile.file_hash):
@@ -286,6 +287,7 @@ class _ModInProgress:
                                     assert f in self.zero_files
                                     self.zero_files.remove(f)
                                 else:
+                                    assert f not in aic.skip
                                     aic.skip.add(f)
                                     aic.modified_since_install.add(f)
                         else:
@@ -293,8 +295,10 @@ class _ModInProgress:
                             srcfile = srccache.file_by_path(src)
                             assert srcfile is not None
                             if fia.file_hash == truncate_file_hash(srcfile.file_hash):
+                                assert f not in aic.files
                                 aic.files[f] = fia
                             else:
+                                assert f not in aic.skip
                                 aic.skip.add(f)
                                 aic.modified_since_install.add(f)
                     break
