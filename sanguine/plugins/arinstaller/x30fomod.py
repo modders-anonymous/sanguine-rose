@@ -28,7 +28,7 @@ class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
         fname = fullarchivedir + 'fomod\\moduleconfig.xml'
         if os.path.isfile(fname):
             moduleconfig: list[str] = []
-            with open_3rdparty_txt_file(fname) as f:
+            with open_3rdparty_txt_file_autodetect(fname) as f:
                 for ln in f:
                     moduleconfig.append(ln)
             return {'moduleconfig': moduleconfig}

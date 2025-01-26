@@ -47,6 +47,7 @@ class GitParamStrCompressor(GitParamCompressor):
         self.prev = None
 
     def compress(self, val: str) -> str:
+        # warn(repr(val))
         assert isinstance(val, str)
         if self.can_skip and self.prev == val:
             return ''

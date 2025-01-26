@@ -44,7 +44,7 @@ if __name__ == '__main__':
 
     with TmpPath(cfg.tmp_dir) as tmp:
         wcache = WholeCache(cfg, tmp)
-        with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=False) as tparallel:
+        with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=True) as tparallel:
             t0 = time.perf_counter()
             wcache.start_tasks(tparallel)
             tparallel.run([])

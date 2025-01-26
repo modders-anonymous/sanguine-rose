@@ -9,7 +9,7 @@ from sanguine.helpers.archives import Archive, FileInArchive, normalize_archive_
 from sanguine.helpers.archives import ArchivePluginBase, all_archive_plugins_extensions, archive_plugin_for
 from sanguine.helpers.arinstallers import all_arinstaller_plugins, arinstaller_plugin_by_name, ExtraArchiveDataFactory, \
     arinstaller_plugin_add_extra_data
-from sanguine.helpers.stable_json import write_stable_json_opened
+from sanguine.helpers.stable_json import write_stable_json_opened, to_stable_json
 from sanguine.helpers.tmp_path import TmpPath
 
 ### RootGitData Helpers
@@ -243,7 +243,8 @@ def _save_some_plugin_data_task_func(param: tuple[str, str, Callable, Any]) -> N
     _write_some_plugin_data(rootgitdir, fname, wrfunc, wrdata)
 
 
-def _save_stable_json(f: typing.TextIO, data: dict[str, Any]) -> None:
+def _save_stable_json(f: typing.TextIO, data0: dict[str, Any]) -> None:
+    data = to_stable_json(data0)
     write_stable_json_opened(f, data)
 
 
@@ -414,16 +415,6 @@ class RootGitData:
                                            datadeps=self._done_hashing_owntask_datadeps())
         parallel.add_task(donehashingowntask)
 
-        for plugin in all_arinstaller_plugins():
-            if plugin.extra_data_factory() is None:
-                continue
-            savefotaskname = 'sanguine.rootgit.savearinst.' + plugin.name()
-            savefotask = tasks.Task(savefotaskname, _save_some_plugin_data_task_func,
-                                    (self._root_git_dir, _known_fo_plugin_fname(plugin.name()),
-                                     _save_stable_json, plugin.data_for_saving()),
-                                    [])
-            parallel.add_task(savefotask)
-
         return donehashingowntaskname
 
     def start_done_adding_file_origins_task(self,  # should be called only after all add_file_origin() calls are done
@@ -537,6 +528,16 @@ class RootGitData:
             savetask = tasks.Task(savetaskname, _save_archives_task_func,
                                   (self._root_git_dir, list(self._archives_by_hash.values())), [])
             parallel.add_task(savetask)
+
+            for plugin in all_arinstaller_plugins():
+                if plugin.extra_data_factory() is None:
+                    continue
+                savefotaskname = 'sanguine.rootgit.savearinst.' + plugin.name()
+                savefotask = tasks.Task(savefotaskname, _save_some_plugin_data_task_func,
+                                        (self._root_git_dir, _known_fo_plugin_fname(plugin.name()),
+                                         _save_stable_json, plugin.data_for_saving()),
+                                        [])
+                parallel.add_task(savefotask)
 
     def _loadtan_owntask_datadeps(self) -> tasks.TaskDataDependencies:
         return tasks.TaskDataDependencies(

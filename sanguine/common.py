@@ -1,9 +1,12 @@
 import base64
+import codecs
 import hashlib
 import json
 import pickle
 from bisect import bisect_right
 from stat import S_ISREG, S_ISLNK
+
+import chardet
 
 # noinspection PyUnresolvedReferences
 from sanguine.install.install_checks import check_sanguine_prerequisites
@@ -282,6 +285,18 @@ def open_git_data_file_for_writing(fpath: str) -> typing.TextIO:
 
 def open_git_data_file_for_reading(fpath: str) -> typing.TextIO:
     return open(fpath, 'rt', encoding='utf-8')
+
+
+def open_3rdparty_txt_file_autodetect(fname: str) -> typing.TextIO:
+    n = min(32, os.path.getsize(fname))
+    with open(fname, 'rb') as fb:
+        raw = fb.read(n)
+
+    if raw.startswith(codecs.BOM_UTF8):
+        enc = 'utf-8-sig'
+    else:
+        enc = chardet.detect(raw)['encoding']
+    return open(fname, 'rt', encoding=enc, errors='replace')
 
 
 def to_json_hash(h: bytes) -> str:

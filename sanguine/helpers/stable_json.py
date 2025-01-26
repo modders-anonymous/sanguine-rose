@@ -39,10 +39,10 @@ def to_stable_json(data: Any) -> dict[str, Any] | list[Any] | str:
     if isinstance(data, list):
         return _stable_json_sort_list(data)
     if isinstance(data, dict):
-        if __debug__:
-            for k in data:
-                assert isinstance(k, str)
-        return {k: to_stable_json(v) for k, v in sorted(data.items(), key=lambda x: x[0])}
+        # if __debug__:
+        #    for k in data:
+        #        assert isinstance(k, str)
+        return {to_stable_json(k): to_stable_json(v) for k, v in sorted(data.items(), key=lambda x: x[0])}
     if isinstance(data, (str, int, float)):
         return data
     if isinstance(data, bytes):

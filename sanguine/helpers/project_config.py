@@ -261,7 +261,7 @@ class LocalProjectConfig:
             jsonconfig = json5.loads(f.read())
             unused_config_warning(jsonconfigfname, jsonconfig,
                                   ['modmanager', 'downloads', 'cache', 'tmp', 'githubroot', 'modpack',
-                                   'github_username'] + _all_config_names())
+                                   'githubusername'] + _all_config_names())
 
             abort_if_not('modmanager' in jsonconfig, "'modmanager' must be present in config")
             modmanager = jsonconfig['modmanager']
@@ -314,7 +314,8 @@ class LocalProjectConfig:
             assert self.root_modpack in self.all_modpack_configs
             config_file_origin_plugins(self.all_modpack_configs[self.root_modpack].origin_configs)
 
-            self.github_username = jsonconfig.get('github_username')
+            abort_if_not('githubusername' in jsonconfig)
+            self.github_username = jsonconfig['githubusername']
 
     def root_modpack_config(self) -> GithubModpackConfig:
         assert self.root_modpack is not None
