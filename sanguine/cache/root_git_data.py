@@ -137,7 +137,7 @@ def _read_some_cached_plugin_data(rootgitdir: str, name: str, fname: str, rdfunc
 def _write_some_plugin_data(rootgitdir: str, fname: str, wrfunc: Callable[[typing.TextIO, Any], None],
                             wrdata: Any) -> None:
     assert is_normalized_dir_path(rootgitdir)
-    fpath = rootgitdir + fname
+    fpath = rootgitdir + fname.lower()
     assert is_normalized_file_path(fpath)
     with gitdatafile.open_git_data_file_for_writing(fpath) as wf:
         wrfunc(wf, wrdata)
@@ -337,7 +337,7 @@ class RootGitData:
         loadarowntaskname = RootGitData._LOADAROWNTASKNAME
         loadarowntask = tasks.OwnTask(loadarowntaskname,
                                       lambda _, out: self._load_archives_own_task_func(out), None,
-                                      [loadartaskname,loadarinstowntasknamepattern],
+                                      [loadartaskname, loadarinstowntasknamepattern],
                                       datadeps=self._loadar_owntask_datadeps())
         parallel.add_task(loadarowntask)
 
@@ -410,7 +410,7 @@ class RootGitData:
         donehashingowntaskname = 'sanguine.rootgit.donehashing'
         donehashingowntask = tasks.OwnTask(donehashingowntaskname,
                                            lambda _, _1: self._done_hashing_own_task_func(parallel), None,
-                                           [RootGitData._LOADAROWNTASKNAME, 'sanguine.rootgit.hashown.*'],
+                                           [RootGitData._LOADAROWNTASKNAME, 'sanguine.rootgit.ownhash.*'],
                                            datadeps=self._done_hashing_owntask_datadeps())
         parallel.add_task(donehashingowntask)
 
@@ -516,9 +516,9 @@ class RootGitData:
         (archives, extradata) = out
         for ar in archives:
             _append_archive(self._archives_by_hash, self._archived_files_by_hash, self._archived_files_by_name, ar)
-        for pluginname, data0 in extradata:
-            arh, data = data0
-            arinstaller_plugin_add_extra_data(pluginname, arh, data)
+        for pluginname, data0 in extradata.items():
+            for arh, data in data0.items():
+                arinstaller_plugin_add_extra_data(pluginname, arh, data)
         self._dirty_ar = True
 
     def _done_hashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:

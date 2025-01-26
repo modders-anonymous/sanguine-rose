@@ -17,6 +17,7 @@ class FomodArInstaller(ArInstaller):
     def install_params(self) -> dict[str, Any]:
         assert False
 
+
 class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
     def name(self) -> str:
         return 'FOMOD'
@@ -24,9 +25,10 @@ class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
     @abstractmethod
     def extra_data(self, fullarchivedir: str) -> dict[str, Any] | None:  # returns stable_json data
         assert is_normalized_dir_path(fullarchivedir)
-        if os.path.isfile(fullarchivedir+'fomod\\moduleconfig.xml'):
+        fname = fullarchivedir + 'fomod\\moduleconfig.xml'
+        if os.path.isfile(fname):
             moduleconfig: list[str] = []
-            with open_3rdparty_txt_file('fomod\\moduleconfig.xml') as f:
+            with open_3rdparty_txt_file(fname) as f:
                 for ln in f:
                     moduleconfig.append(ln)
             return {'moduleconfig': moduleconfig}
@@ -34,6 +36,12 @@ class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
 
 
 class FomodArInstallerPlugin(ArInstallerPluginBase):
+    extra_data: dict[bytes, Any] | None
+
+    def __init__(self):
+        super().__init__()
+        self.extra_data = None
+
     def name(self) -> str:
         return 'FOMOD'
 
@@ -42,13 +50,15 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
         return None
 
     def got_loaded_data(self, data: Any) -> None:
-        pass
+        assert isinstance(data, dict)
+        self.extra_data = data
 
     def data_for_saving(self) -> Any:
-        return None
+        return self.extra_data
 
     def extra_data_factory(self) -> ExtraArchiveDataFactory | None:
         return FomodExtraArchiveDataFactory()
 
     def add_extra_data(self, arh: bytes, data: dict[str, Any]) -> None:
-        assert False
+        assert arh not in self.extra_data
+        self.extra_data[arh] = data
