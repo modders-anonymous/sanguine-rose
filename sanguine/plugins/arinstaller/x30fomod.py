@@ -42,13 +42,13 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
         return None
 
     def got_loaded_data(self, data: Any) -> None:
-        assert False
+        pass
 
     def data_for_saving(self) -> Any:
-        assert False
+        return None
 
     def extra_data_factory(self) -> ExtraArchiveDataFactory | None:
-        return None
+        return FomodExtraArchiveDataFactory()
 
     def add_extra_data(self, arh: bytes, data: dict[str, Any]) -> None:
         assert False

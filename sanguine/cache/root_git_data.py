@@ -313,13 +313,13 @@ class RootGitData:
                                           [loadfotaskname])
             parallel.add_task(loadfoowntask)
 
-        loadarinstowntasknames = []
+        loadarinstowntasknamepattern = 'sanguine.rootgit.loadarinst.*'
         for plugin in all_arinstaller_plugins():
             if plugin.extra_data_factory() is None:
                 continue
             loadarinsttaskname = 'sanguine.rootgit.loadarinst.' + plugin.name()
             loadarinsttask = tasks.Task(loadarinsttaskname, _load_some_plugin_data_task_func,
-                                        (self._root_git_dir, _known_arinst_plugin_fname(plugin.name()),
+                                        (self._root_git_dir, plugin.name(), _known_arinst_plugin_fname(plugin.name()),
                                          _load_stable_json, self._cache_dir, self._cache_data),
                                         [])
             parallel.add_task(loadarinsttask)
@@ -329,7 +329,6 @@ class RootGitData:
                                               lambda _, out: self._load_own_arinst_plugin_data_task_func(out), None,
                                               [loadarinsttaskname])
             parallel.add_task(loadarinstowntask)
-            loadarinstowntasknames.append(loadarinstowntaskname)
 
         loadartaskname = 'sanguine.rootgit.loadar'
         loadartask = tasks.Task(loadartaskname, _load_archives_task_func,
@@ -338,7 +337,7 @@ class RootGitData:
         loadarowntaskname = RootGitData._LOADAROWNTASKNAME
         loadarowntask = tasks.OwnTask(loadarowntaskname,
                                       lambda _, out: self._load_archives_own_task_func(out), None,
-                                      [loadartaskname] + loadarinstowntasknames,
+                                      [loadartaskname,loadarinstowntasknamepattern],
                                       datadeps=self._loadar_owntask_datadeps())
         parallel.add_task(loadarowntask)
 

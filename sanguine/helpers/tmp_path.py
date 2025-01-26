@@ -6,7 +6,7 @@ from sanguine.common import *
 
 class TmpPath:  # as we're playing with rmtree() here, we need to be super-careful not to delete too much
     tmpdir: str
-    ADDED_FOLDER: str = 'JBSLtet9'  # seriously unique
+    ADDED_FOLDER: str = 'jbsltet9'  # seriously unique
     MAX_RMTREE_RETRIES: int = 3
     MAX_RESERVE_FOLDERS: int = 10
 
@@ -49,7 +49,8 @@ class TmpPath:  # as we're playing with rmtree() here, we need to be super-caref
     @staticmethod
     def tmp_in_tmp(tmpbase: str, prefix: str, num: int) -> str:
         assert tmpbase.endswith('\\')
-        assert '\\' + TmpPath.ADDED_FOLDER + '\\' in tmpbase
+        if '\\' + TmpPath.ADDED_FOLDER + '\\' not in tmpbase:
+            assert False
         return tmpbase + prefix + str(num) + '\\'
 
     def __exit__(self, exc_type, exc_val, exc_tb) -> None:

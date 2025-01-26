@@ -4,6 +4,7 @@ from sanguine.cache.folder_cache import FolderCache
 from sanguine.common import *
 from sanguine.common import SanguineJsonEncoder
 from sanguine.helpers.project_config import LocalProjectConfig, GithubModpack
+from sanguine.helpers.tmp_path import TmpPath
 
 
 class WholeCache:
@@ -16,7 +17,7 @@ class WholeCache:
     _resolved_vfs: ResolvedVFS | None
     _SYNCOWNTASKNAME: str = 'sanguine.wholecache.sync'
 
-    def __init__(self, projectcfg: LocalProjectConfig) -> None:
+    def __init__(self, projectcfg: LocalProjectConfig, tmp: TmpPath) -> None:
         self._project_config = projectcfg
         try:
             with open(self._cache_data_fname(), 'r') as f:
@@ -26,7 +27,7 @@ class WholeCache:
             self._cache_data = {}
 
         rootmodpackdir = GithubModpack(projectcfg.root_modpack).folder(projectcfg.github_root_dir)
-        self.available = AvailableFiles(projectcfg.github_username, projectcfg.cache_dir, projectcfg.tmp_dir,
+        self.available = AvailableFiles(projectcfg.github_username, projectcfg.cache_dir, tmp.tmpdir,
                                         projectcfg.github_root_dir, rootmodpackdir,
                                         projectcfg.download_dirs, projectcfg.github_folders(), self._cache_data)
 

@@ -4,6 +4,8 @@ import os
 import sys
 import time
 
+from sanguine.helpers.tmp_path import TmpPath
+
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.common import *
@@ -40,12 +42,13 @@ if __name__ == '__main__':
     add_file_logging(cfg.tmp_dir + 'sanguine.log.html')
     enable_ex_logging()
 
-    wcache = WholeCache(cfg)
-    with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=False) as tparallel:
-        t0 = time.perf_counter()
-        wcache.start_tasks(tparallel)
-        tparallel.run([])
-    wcache.done()
+    with TmpPath(cfg.tmp_dir) as tmp:
+        wcache = WholeCache(cfg, tmp)
+        with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=True) as tparallel:
+            t0 = time.perf_counter()
+            wcache.start_tasks(tparallel)
+            tparallel.run([])
+        wcache.done()
 
     while True:
         cmd = input_box('Enter Command:', '')
