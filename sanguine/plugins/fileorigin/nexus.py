@@ -270,7 +270,7 @@ class NexusFileOriginPlugin(FileOriginPluginBase):
         self.nexus_file_origins = {}
 
     def name(self) -> str:
-        return 'nexus'
+        return 'NEXUS'
 
     def config(self, cfg: ConfigData) -> None:
         unused_config_warning('origins.nexus', cfg, ['gameids'])

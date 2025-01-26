@@ -7,6 +7,9 @@ from sanguine.gitdata.file_origin import (FileOrigin, GitTentativeArchiveNames,
 from sanguine.gitdata.root_git_archives import GitArchivesJson
 from sanguine.helpers.archives import Archive, FileInArchive, normalize_archive_intra_path
 from sanguine.helpers.archives import ArchivePluginBase, all_archive_plugins_extensions, archive_plugin_for
+from sanguine.helpers.arinstallers import all_arinstaller_plugins, arinstaller_plugin_by_name, ExtraArchiveDataFactory, \
+    arinstaller_plugin_add_extra_data
+from sanguine.helpers.stable_json import write_stable_json_opened
 from sanguine.helpers.tmp_path import TmpPath
 
 ### RootGitData Helpers
@@ -17,6 +20,10 @@ _KNOWN_TENTATIVE_ARCHIVE_NAMES_FNAME = 'known-tentative-archive-names.json5'
 
 def _known_fo_plugin_fname(name: str) -> str:
     return 'known-fileorigin-{}-data.json5'.format(name)
+
+
+def _known_arinst_plugin_fname(name: str) -> str:
+    return 'known-arinstaller-{}-data.json'.format(name)
 
 
 def _processing_archive_time_estimate(fsize: int):
@@ -46,9 +53,9 @@ def _write_git_archives(rootgitdir: str, archives: list[Archive]) -> None:
         GitArchivesJson().write(wf, archives)
 
 
-def _hash_archive(archives: list[Archive], by: str, tmppath: str,  # recursive!
+def _hash_archive(archives: list[Archive], extradata: dict[str, dict[bytes, Any]], by: str, tmppath: str,  # recursive!
                   plugin: ArchivePluginBase,
-                  archivepath: str, arhash: bytes, arsize: int) -> None:
+                  archivepath: str, arhash: bytes, arsize: int, extrafactories: list[ExtraArchiveDataFactory]) -> None:
     assert os.path.isdir(tmppath)
     plugin.extract_all(archivepath, tmppath)
     pluginexts = all_archive_plugins_extensions()  # for nested archives
@@ -74,7 +81,16 @@ def _hash_archive(archives: list[Archive], by: str, tmppath: str,  # recursive!
                                                 nf)
                 assert not os.path.isdir(newtmppath)
                 os.makedirs(newtmppath)
-                _hash_archive(archives, by, newtmppath, nested_plugin, fpath, h, s)
+                _hash_archive(archives, extradata, by, newtmppath, nested_plugin, fpath, h, s, extrafactories)
+    for xf in extrafactories:
+        xd = xf.extra_data(tmppath)
+        if xd is None:
+            continue
+        if xf.name() not in extradata:
+            extradata[xf.name()] = {}
+        xfbyname = extradata[xf.name()]
+        assert arhash not in xfbyname
+        xfbyname[arhash] = xd
 
 
 def _read_git_tentative_names(params: tuple[str]) -> dict[bytes, list[str]]:
@@ -100,27 +116,28 @@ def _write_git_tentative_names(rootgitdir: str, tanames: dict[bytes, list[str]])
         GitTentativeArchiveNames().write(wf, tanames)
 
 
-def _read_fo_plugin_data(params: tuple[str, str, Callable[[typing.TextIO], Any]]) -> Any:
+# plugin data
+
+def _read_some_plugin_data(params: tuple[str, str, Callable[[typing.TextIO], Any]]) -> Any:
     (name, rootgitfile, rdfunc) = params
     assert is_normalized_file_path(rootgitfile)
     with gitdatafile.open_git_data_file_for_reading(rootgitfile) as rf:
         return name, rdfunc(rf)
 
 
-def _read_cached_fo_plugin_data(rootgitdir: str, name: str, rdfunc: Callable[[typing.TextIO], Any],
-                                cachedir: str, cachedata: ConfigData) -> tuple[Any, ConfigData]:
+def _read_some_cached_plugin_data(rootgitdir: str, name: str, fname: str, rdfunc: Callable[[typing.TextIO], Any],
+                                  cachedir: str, cachedata: ConfigData) -> tuple[Any, ConfigData]:
     assert is_normalized_dir_path(rootgitdir)
-    fn = _known_fo_plugin_fname(name)
-    rootgitfile = rootgitdir + fn
-    pickledprefix = os.path.splitext(fn)[0]
+    rootgitfile = rootgitdir + fname.lower()
+    pickledprefix = os.path.splitext(fname)[0]
     return pickled_cache(cachedir, cachedata, pickledprefix, [rootgitfile],
-                         _read_fo_plugin_data, (name, rootgitfile, rdfunc))
+                         _read_some_plugin_data, (name, rootgitfile, rdfunc))
 
 
-def _write_fo_plugin_data(rootgitdir: str, name: str, wrfunc: Callable[[typing.TextIO, Any], None],
-                          wrdata: Any) -> None:
+def _write_some_plugin_data(rootgitdir: str, fname: str, wrfunc: Callable[[typing.TextIO, Any], None],
+                            wrdata: Any) -> None:
     assert is_normalized_dir_path(rootgitdir)
-    fpath = rootgitdir + _known_fo_plugin_fname(name)
+    fpath = rootgitdir + fname
     assert is_normalized_file_path(fpath)
     with gitdatafile.open_git_data_file_for_writing(fpath) as wf:
         wrfunc(wf, wrdata)
@@ -154,17 +171,19 @@ def _load_archives_task_func(param: tuple[str, str, dict[str, Any]]) -> tuple[di
     return archives_by_hash, archived_files_by_hash, archived_files_by_name, cacheoverrides
 
 
-def _archive_hashing_task_func(param: tuple[str, str, bytes, int, str]) -> tuple[list[Archive]]:
-    (by, arpath, arhash, arsize, tmppath) = param
+def _archive_hashing_task_func(param: tuple[str, str, bytes, int, str, list[ExtraArchiveDataFactory]]) -> tuple[
+    list[Archive], dict[str, dict[bytes, Any]]]:
+    (by, arpath, arhash, arsize, tmppath, extrafactories) = param
     assert not os.path.isdir(tmppath)
     os.makedirs(tmppath)
     plugin = archive_plugin_for(arpath)
     assert plugin is not None
     archives = []
-    _hash_archive(archives, by, tmppath, plugin, arpath, arhash, arsize)
+    extradata: dict[str, dict[bytes, Any]] = {}
+    _hash_archive(archives, extradata, by, tmppath, plugin, arpath, arhash, arsize, extrafactories)
     debug('RootGitData: about to remove temporary tree {}'.format(tmppath))
     TmpPath.rm_tmp_tree(tmppath)
-    return (archives,)
+    return archives, extradata
 
 
 def _debug_assert_eq_list(saved_loaded: list, sorted_data: list) -> None:
@@ -214,14 +233,22 @@ def _save_tentative_names_task_func(param: tuple[str, dict[bytes, list[str]]]) -
         _debug_assert_eq_list(saved_loaded, sorted_tanames)
 
 
-def _load_plugin_data_task_func(param: tuple[str, str, Callable, str, ConfigData]) -> Any:
-    (rootgitdir, name, rdfunc, cachedir, cachedata) = param
-    return _read_cached_fo_plugin_data(rootgitdir, name, rdfunc, cachedir, cachedata)
+def _load_some_plugin_data_task_func(param: tuple[str, str, str, Callable, str, ConfigData]) -> Any:
+    (rootgitdir, name, fname, rdfunc, cachedir, cachedata) = param
+    return _read_some_cached_plugin_data(rootgitdir, name, fname, rdfunc, cachedir, cachedata)
 
 
-def _save_plugin_data_task_func(param: tuple[str, str, Callable, Any]) -> None:
-    (rootgitdir, name, wrfunc, wrdata) = param
-    _write_fo_plugin_data(rootgitdir, name, wrfunc, wrdata)
+def _save_some_plugin_data_task_func(param: tuple[str, str, Callable, Any]) -> None:
+    (rootgitdir, fname, wrfunc, wrdata) = param
+    _write_some_plugin_data(rootgitdir, fname, wrfunc, wrdata)
+
+
+def _save_stable_json(f: typing.TextIO, data: dict[str, Any]) -> None:
+    write_stable_json_opened(f, data)
+
+
+def _load_stable_json(f: typing.TextIO) -> dict[str, Any]:
+    return json.load(f)
 
 
 ### RootGitData itself
@@ -241,6 +268,7 @@ class RootGitData:
     _dirty_fo: bool
     _ar_is_ready: int  # 0 - not ready, 1 - partially ready, 2 - fully ready
     _fo_is_ready: int
+    _n_ready_arinst_plugins: int  # counter
 
     _LOADAROWNTASKNAME = 'sanguine.rootgit.ownloadar'
     _LOADFOOWNTASKNAME = 'sanguine.rootgit.ownloadfo'
@@ -261,19 +289,9 @@ class RootGitData:
         self._dirty_fo = False
         self._ar_is_ready = 0
         self._fo_is_ready = 0
+        self._n_ready_arinst_plugins = False
 
     def start_tasks(self, parallel: tasks.Parallel) -> None:
-        loadtaskname = 'sanguine.rootgit.loadar'
-        loadtask = tasks.Task(loadtaskname, _load_archives_task_func,
-                              (self._root_git_dir, self._cache_dir, self._cache_data), [])
-        parallel.add_task(loadtask)
-        loadowntaskname = RootGitData._LOADAROWNTASKNAME
-        loadowntask = tasks.OwnTask(loadowntaskname,
-                                    lambda _, out: self._load_archives_own_task_func(out), None,
-                                    [loadtaskname],
-                                    datadeps=self._loadar_owntask_datadeps())
-        parallel.add_task(loadowntask)
-
         load2taskname = 'sanguine.rootgit.loadtan'
         load2task = tasks.Task(load2taskname, _load_tentative_names_task_func,
                                (self._root_git_dir, self._cache_dir, self._cache_data), [])
@@ -283,17 +301,46 @@ class RootGitData:
             loadfotaskname = 'sanguine.rootgit.loadfo.' + plugin.name()
             rdfunc = plugin.load_json5_file_func()
             assert callable(rdfunc) and not tasks.is_lambda(rdfunc)
-            loadfotask = tasks.Task(loadfotaskname, _load_plugin_data_task_func,
-                                    (self._root_git_dir, plugin.name(),
+            loadfotask = tasks.Task(loadfotaskname, _load_some_plugin_data_task_func,
+                                    (self._root_git_dir, plugin.name(), _known_fo_plugin_fname(plugin.name()),
                                      rdfunc, self._cache_dir, self._cache_data),
                                     [])
             parallel.add_task(loadfotask)
 
             loadfoowntaskname = 'sanguine.rootgit.ownloadfo.' + plugin.name()
             loadfoowntask = tasks.OwnTask(loadfoowntaskname,
-                                          lambda _, out: self._load_own_plugin_data_task_func(out), None,
+                                          lambda _, out: self._load_own_fo_plugin_data_task_func(out), None,
                                           [loadfotaskname])
             parallel.add_task(loadfoowntask)
+
+        loadarinstowntasknames = []
+        for plugin in all_arinstaller_plugins():
+            if plugin.extra_data_factory() is None:
+                continue
+            loadarinsttaskname = 'sanguine.rootgit.loadarinst.' + plugin.name()
+            loadarinsttask = tasks.Task(loadarinsttaskname, _load_some_plugin_data_task_func,
+                                        (self._root_git_dir, _known_arinst_plugin_fname(plugin.name()),
+                                         _load_stable_json, self._cache_dir, self._cache_data),
+                                        [])
+            parallel.add_task(loadarinsttask)
+
+            loadarinstowntaskname = 'sanguine.rootgit.ownloadarinst.' + plugin.name()
+            loadarinstowntask = tasks.OwnTask(loadarinstowntaskname,
+                                              lambda _, out: self._load_own_arinst_plugin_data_task_func(out), None,
+                                              [loadarinsttaskname])
+            parallel.add_task(loadarinstowntask)
+            loadarinstowntasknames.append(loadarinstowntaskname)
+
+        loadartaskname = 'sanguine.rootgit.loadar'
+        loadartask = tasks.Task(loadartaskname, _load_archives_task_func,
+                                (self._root_git_dir, self._cache_dir, self._cache_data), [])
+        parallel.add_task(loadartask)
+        loadarowntaskname = RootGitData._LOADAROWNTASKNAME
+        loadarowntask = tasks.OwnTask(loadarowntaskname,
+                                      lambda _, out: self._load_archives_own_task_func(out), None,
+                                      [loadartaskname] + loadarinstowntasknames,
+                                      datadeps=self._loadar_owntask_datadeps())
+        parallel.add_task(loadarowntask)
 
         load2owntaskname = RootGitData._LOADFOOWNTASKNAME
         load2owntask = tasks.OwnTask(load2owntaskname,
@@ -315,12 +362,15 @@ class RootGitData:
         return RootGitData._LOADFOOWNTASKNAME
 
     def start_hashing_archive(self, parallel: tasks.Parallel, arpath: str, arhash: bytes, arsize: int) -> None:
-        assert self._ar_is_ready == 1
+        assert self._ar_is_ready == 1 and self._n_ready_arinst_plugins == sum(
+            1 if plg.extra_data_factory() else 0 for plg in all_arinstaller_plugins())
         hashingtaskname = 'sanguine.rootgit.hash.' + arpath
         self._nhashes_requested += 1
         tmp_dir = TmpPath.tmp_in_tmp(self._tmp_dir, 'ah.', self._nhashes_requested)
+        extrafactories0 = [plugin.extra_data_factory() for plugin in all_arinstaller_plugins()]
+        extrafactories = [xf for xf in extrafactories0 if xf is not None]
         hashingtask = tasks.Task(hashingtaskname, _archive_hashing_task_func,
-                                 (self._new_hashes_by, arpath, arhash, arsize, tmp_dir), [])
+                                 (self._new_hashes_by, arpath, arhash, arsize, tmp_dir, extrafactories), [])
         parallel.add_task(hashingtask)
         hashingowntaskname = 'sanguine.rootgit.ownhash.' + arpath
         hashingowntask = tasks.OwnTask(hashingowntaskname,
@@ -365,6 +415,16 @@ class RootGitData:
                                            datadeps=self._done_hashing_owntask_datadeps())
         parallel.add_task(donehashingowntask)
 
+        for plugin in all_arinstaller_plugins():
+            if plugin.extra_data_factory() is None:
+                continue
+            savefotaskname = 'sanguine.rootgit.savearinst.' + plugin.name()
+            savefotask = tasks.Task(savefotaskname, _save_some_plugin_data_task_func,
+                                    (self._root_git_dir, _known_fo_plugin_fname(plugin.name()),
+                                     _save_stable_json, plugin.data_for_saving()),
+                                    [])
+            parallel.add_task(savefotask)
+
         return donehashingowntaskname
 
     def start_done_adding_file_origins_task(self,  # should be called only after all add_file_origin() calls are done
@@ -381,8 +441,8 @@ class RootGitData:
                 savefotaskname = 'sanguine.rootgit.savefo.' + plugin.name()
                 wrfunc = plugin.save_json5_file_func()
                 assert callable(wrfunc) and not tasks.is_lambda(wrfunc)
-                savefotask = tasks.Task(savefotaskname, _save_plugin_data_task_func,
-                                        (self._root_git_dir, plugin.name(),
+                savefotask = tasks.Task(savefotaskname, _save_some_plugin_data_task_func,
+                                        (self._root_git_dir, _known_fo_plugin_fname(plugin.name()),
                                          wrfunc, plugin.data_for_saving()),
                                         [])
                 parallel.add_task(savefotask)
@@ -452,11 +512,14 @@ class RootGitData:
             ['sanguine.rootgit.done_hashing()'],
             [])
 
-    def _archive_hashing_own_task_func(self, out: tuple[list[Archive]]):
+    def _archive_hashing_own_task_func(self, out: tuple[list[Archive], dict[str, dict[bytes, Any]]]):
         assert self._ar_is_ready == 1
-        (archives,) = out
+        (archives, extradata) = out
         for ar in archives:
             _append_archive(self._archives_by_hash, self._archived_files_by_hash, self._archived_files_by_name, ar)
+        for pluginname, data0 in extradata:
+            arh, data = data0
+            arinstaller_plugin_add_extra_data(pluginname, arh, data)
         self._dirty_ar = True
 
     def _done_hashing_owntask_datadeps(self) -> tasks.TaskDataDependencies:
@@ -490,10 +553,18 @@ class RootGitData:
         self._tentative_archive_names = tanames
         self._cache_data |= cacheoverrides
 
-    def _load_own_plugin_data_task_func(self, out: tuple[Any, ConfigData]) -> None:
+    def _load_own_fo_plugin_data_task_func(self, out: tuple[Any, ConfigData]) -> None:
         assert self._fo_is_ready == 0
         (loadret, cacheoverrides) = out
         (name, plugindata) = loadret
         plugin = file_origin_plugin_by_name(name)
+        plugin.got_loaded_data(plugindata)
+        self._cache_data |= cacheoverrides
+
+    def _load_own_arinst_plugin_data_task_func(self, out: tuple[Any, ConfigData]) -> None:
+        self._n_ready_arinst_plugins += 1
+        (loadret, cacheoverrides) = out
+        (name, plugindata) = loadret
+        plugin = arinstaller_plugin_by_name(name)
         plugin.got_loaded_data(plugindata)
         self._cache_data |= cacheoverrides

@@ -52,5 +52,9 @@ def to_stable_json(data: Any) -> dict[str, Any] | list[Any] | str:
 
 def write_stable_json(fname: str, data: dict[str, Any]) -> None:
     with open_git_data_file_for_writing(fname) as f:
-        # noinspection PyTypeChecker
-        json.dump(data, f, indent=1)
+        write_stable_json_opened(f, data)
+
+
+def write_stable_json_opened(f: typing.TextIO, data: dict[str, Any]) -> None:
+    # noinspection PyTypeChecker
+    json.dump(data, f, indent=1)

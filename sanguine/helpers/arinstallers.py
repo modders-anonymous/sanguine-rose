@@ -23,8 +23,22 @@ class ArInstaller:
         pass
 
 
+class ExtraArchiveDataFactory:
+    @abstractmethod
+    def name(self) -> str:
+        pass
+
+    @abstractmethod
+    def extra_data(self, fullarchivedir: str) -> dict[str, Any] | None:  # returns stable_json data
+        pass
+
+
 class ArInstallerPluginBase(ABC):
     def __init__(self) -> None:
+        pass
+
+    @abstractmethod
+    def name(self) -> str:
         pass
 
     @abstractmethod
@@ -32,18 +46,44 @@ class ArInstallerPluginBase(ABC):
                                    modfiles: dict[str, list[ArchiveFileRetriever]]) -> ArInstaller | None:
         pass
 
+    @abstractmethod
+    def got_loaded_data(self, data: Any) -> None:
+        pass
 
-_arinstaller_plugins: list[ArInstallerPluginBase] = []
+    @abstractmethod
+    def data_for_saving(self) -> Any:
+        pass
+
+    @abstractmethod
+    def extra_data_factory(self) -> ExtraArchiveDataFactory | None:
+        pass
+
+    @abstractmethod
+    def add_extra_data(self, arh: bytes, data: dict[str, Any]) -> None:
+        pass
+
+
+_arinstaller_plugins: dict[str, ArInstallerPluginBase] = {}
 
 
 def _found_arinstaller_plugin(plugin: ArInstallerPluginBase):
     global _arinstaller_plugins
-    _arinstaller_plugins.append(plugin)
+    _arinstaller_plugins[plugin.name()] = plugin  # order is preserved since Python 3.6 or so
 
 
 load_plugins('plugins/arinstaller/', ArInstallerPluginBase, lambda plugin: _found_arinstaller_plugin(plugin))
 
 
-def all_arinstaller_plugins() -> list[ArInstallerPluginBase]:
+def all_arinstaller_plugins() -> Iterable[ArInstallerPluginBase]:
     global _arinstaller_plugins
-    return _arinstaller_plugins
+    return _arinstaller_plugins.values()
+
+
+def arinstaller_plugin_by_name(name: str) -> ArInstallerPluginBase:
+    global _arinstaller_plugins
+    return _arinstaller_plugins[name]
+
+
+def arinstaller_plugin_add_extra_data(name: str, arh: bytes, data: Any) -> None:
+    global _arinstaller_plugins
+    _arinstaller_plugins[name].add_extra_data(arh, data)

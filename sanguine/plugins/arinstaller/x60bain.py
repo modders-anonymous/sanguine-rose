@@ -2,7 +2,7 @@ import re
 
 from sanguine.common import *
 from sanguine.helpers.archives import Archive, FileInArchive
-from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller
+from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 
 
@@ -46,6 +46,9 @@ class BainArInstaller(ArInstaller):
 
 
 class BainArInstallerPlugin(ArInstallerPluginBase):
+    def name(self) -> str:
+        return 'BAIN'
+
     def guess_arinstaller_from_vfs(self, archive: Archive, modname: str,
                                    modfiles: dict[str, list[ArchiveFileRetriever]]) -> ArInstaller | None:
         bainfolders: dict[str, int] = {}
@@ -96,3 +99,15 @@ class BainArInstallerPlugin(ArInstallerPluginBase):
         out = BainArInstaller(archive)
         out.bain_folders = sorted([bf for bf in bainfolders if bainfolders[bf] > 0])
         return out
+
+    def got_loaded_data(self, data: Any) -> None:
+        assert False
+
+    def data_for_saving(self) -> Any:
+        assert False
+
+    def extra_data_factory(self) -> ExtraArchiveDataFactory | None:
+        return None
+
+    def add_extra_data(self, arh: bytes, data: dict[str, Any]) -> None:
+        assert False
