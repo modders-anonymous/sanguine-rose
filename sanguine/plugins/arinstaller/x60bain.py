@@ -61,7 +61,7 @@ class BainArInstallerPlugin(ArInstallerPluginBase):
                     bainfolders[m1] = 0
                 nbain += 1
 
-        if len(bainfolders) == 0:
+        if len(bainfolders) < 2:
             return None
 
         bfsorted = sorted([bf for bf in bainfolders])
@@ -95,5 +95,4 @@ class BainArInstallerPlugin(ArInstallerPluginBase):
 
         out = BainArInstaller(archive)
         out.bain_folders = sorted([bf for bf in bainfolders if bainfolders[bf] > 0])
-        # TODO: check that overwrites are correct
         return out
