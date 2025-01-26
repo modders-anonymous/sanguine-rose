@@ -15,8 +15,8 @@ _KNOWN_ARCHIVES_FNAME = 'known-archives.json5'
 _KNOWN_TENTATIVE_ARCHIVE_NAMES_FNAME = 'known-tentative-archive-names.json5'
 
 
-def _known_plugin_fname(name: str) -> str:
-    return 'known-{}-data.json5'.format(name)
+def _known_fo_plugin_fname(name: str) -> str:
+    return 'known-fileorigin-{}-data.json5'.format(name)
 
 
 def _processing_archive_time_estimate(fsize: int):
@@ -35,7 +35,7 @@ def _read_cached_git_archives(rootgitdir: str, cachedir: str,
                               cachedata: ConfigData) -> tuple[list[Archive], ConfigData]:
     assert is_normalized_dir_path(rootgitdir)
     rootgitfile = rootgitdir + _KNOWN_ARCHIVES_FNAME
-    return pickled_cache(cachedir, cachedata, 'known_archives', [rootgitfile],
+    return pickled_cache(cachedir, cachedata, 'known-archives', [rootgitfile],
                          _read_git_archives, (rootgitfile,))
 
 
@@ -89,7 +89,7 @@ def _read_cached_git_tentative_names(rootgitdir: str, cachedir: str,
                                      cachedata: ConfigData) -> tuple[dict[bytes, list[str]], ConfigData]:
     assert is_normalized_dir_path(rootgitdir)
     rootgitfile = rootgitdir + _KNOWN_TENTATIVE_ARCHIVE_NAMES_FNAME
-    return pickled_cache(cachedir, cachedata, 'known_tentative_archive_names', [rootgitfile],
+    return pickled_cache(cachedir, cachedata, 'known-tentative-archive-names', [rootgitfile],
                          _read_git_tentative_names, (rootgitfile,))
 
 
@@ -110,15 +110,17 @@ def _read_fo_plugin_data(params: tuple[str, str, Callable[[typing.TextIO], Any]]
 def _read_cached_fo_plugin_data(rootgitdir: str, name: str, rdfunc: Callable[[typing.TextIO], Any],
                                 cachedir: str, cachedata: ConfigData) -> tuple[Any, ConfigData]:
     assert is_normalized_dir_path(rootgitdir)
-    rootgitfile = rootgitdir + _known_plugin_fname(name)
-    return pickled_cache(cachedir, cachedata, 'known_' + name + '_data', [rootgitfile],
+    fn = _known_fo_plugin_fname(name)
+    rootgitfile = rootgitdir + fn
+    pickledprefix = os.path.splitext(fn)[0]
+    return pickled_cache(cachedir, cachedata, pickledprefix, [rootgitfile],
                          _read_fo_plugin_data, (name, rootgitfile, rdfunc))
 
 
 def _write_fo_plugin_data(rootgitdir: str, name: str, wrfunc: Callable[[typing.TextIO, Any], None],
                           wrdata: Any) -> None:
     assert is_normalized_dir_path(rootgitdir)
-    fpath = rootgitdir + _known_plugin_fname(name)
+    fpath = rootgitdir + _known_fo_plugin_fname(name)
     assert is_normalized_file_path(fpath)
     with gitdatafile.open_git_data_file_for_writing(fpath) as wf:
         wrfunc(wf, wrdata)
