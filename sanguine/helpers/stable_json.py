@@ -107,7 +107,7 @@ def _stable_json_list(data: list[Any], typ: _StableJsonType) -> list[Any]:
     if typ.flags & StableJsonFlags.Unsorted:
         return data2
     else:
-        info(repr(data2))
+        # info(repr(data2))
         return sorted(data2, key=lambda x: _to_sort_key(x, d0.SANGUINE_JSON))
 
 
@@ -139,7 +139,16 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
     elif isinstance(data, list):
         return _stable_json_list(data, typ)
     elif isinstance(data, dict):
-        return {to_stable_json(k): to_stable_json(v) for k, v in sorted(data.items(), key=lambda x: x[0])}
+        if len(data) == 0:
+            return {}
+        k0 = next(iter(data))  # just any key; all others are assumed to have the same type
+        if hasattr(k0, 'SANGUINE_JSON'):
+            sjlist = k0.SANGUINE_JSON
+        else:
+            sjlist = None
+        data2 = sorted([(to_stable_json(k), to_stable_json(v)) for k, v in data.items()],
+                       key=lambda x: _to_sort_key(x[0], sjlist))
+        return {k: v for k, v in data2}
     elif isinstance(data, bytes):
         return to_json_hash(data)
     elif isinstance(data, _PRIMITIVE_TYPES):
