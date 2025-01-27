@@ -243,9 +243,9 @@ def _save_some_plugin_data_task_func(param: tuple[str, str, Callable, Any]) -> N
     _write_some_plugin_data(rootgitdir, fname, wrfunc, wrdata)
 
 
-def _save_stable_json(f: typing.TextIO, data0: dict[str, Any]) -> None:
-    data = to_stable_json(data0)
-    write_stable_json_opened(f, data)
+def _save_stable_json(f: typing.TextIO, data: Any) -> None:
+    data1 = to_stable_json(data)
+    write_stable_json_opened(f, data1)
 
 
 def _load_stable_json(f: typing.TextIO) -> dict[str, Any]:
@@ -532,12 +532,12 @@ class RootGitData:
             for plugin in all_arinstaller_plugins():
                 if plugin.extra_data_factory() is None:
                     continue
-                savefotaskname = 'sanguine.rootgit.savearinst.' + plugin.name()
-                savefotask = tasks.Task(savefotaskname, _save_some_plugin_data_task_func,
-                                        (self._root_git_dir, _known_fo_plugin_fname(plugin.name()),
-                                         _save_stable_json, plugin.data_for_saving()),
-                                        [])
-                parallel.add_task(savefotask)
+                savearinsttaskname = 'sanguine.rootgit.savearinst.' + plugin.name()
+                savearinsttask = tasks.Task(savearinsttaskname, _save_some_plugin_data_task_func,
+                                            (self._root_git_dir, _known_arinst_plugin_fname(plugin.name()),
+                                             _save_stable_json, plugin.data_for_saving()),
+                                            [])
+                parallel.add_task(savearinsttask)
 
     def _loadtan_owntask_datadeps(self) -> tasks.TaskDataDependencies:
         return tasks.TaskDataDependencies(

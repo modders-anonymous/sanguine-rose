@@ -58,7 +58,7 @@ class ZeroFileRetriever(FileRetriever):
 
 
 class GithubFileRetriever(FileRetriever):
-    sanguine_json: list[tuple[str, str]] = [('github_author', 'author'), ('github_project', 'project'),
+    SANGUINE_JSON: list[tuple[str, str]] = [('github_author', 'author'), ('github_project', 'project'),
                                             ('from_path', 'p')]
     github_author: str  # '' for 'this project'
     github_project: str  # '' means 'this project'
@@ -70,6 +70,10 @@ class GithubFileRetriever(FileRetriever):
         self.github_author = githubauthor
         self.github_project = githubproject
         self.from_path = frompath
+
+    @classmethod
+    def for_stable_json_load(cls) -> "GithubFileRetriever":
+        return cls((b'', 0), '', '', '')
 
     def _full_path(self) -> str:
         pass  # TODO!
@@ -156,6 +160,7 @@ class ToolFileRetriever(FileRetriever):
         pass  # do nothing, will be generated when the tool is running
 
 
+'''
 class UnknownFileRetriever(FileRetriever):
     def __init__(self, base_retriever_param: FileRetriever.BaseRetrieverParam) -> None:
         super().__init__(base_retriever_param)
@@ -165,3 +170,4 @@ class UnknownFileRetriever(FileRetriever):
 
     def fetch_for_reading(self, available: "AvailableFiles", tmpdirpath: str) -> str:
         pass  # do nothing, will be generated when the tool is running
+'''

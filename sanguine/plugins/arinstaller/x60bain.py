@@ -6,6 +6,18 @@ from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, Ex
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 
 
+class _BainArInstallerInstallData:
+    SANGUINE_JSON: list[tuple] = [('bain_folders', 'bain', str)]
+    bain_folders: list[str]
+
+    def __init__(self, bf: list[str]) -> None:
+        self.bain_folders = bf
+
+    @classmethod
+    def for_stable_json_load(cls):
+        return cls([])
+
+
 class BainArInstaller(ArInstaller):
     bain_folders: list[str]
 
@@ -41,8 +53,8 @@ class BainArInstaller(ArInstaller):
                     returned[rpath] = fia.file_hash
         return out
 
-    def install_params(self) -> dict[str, Any]:
-        return {'bain': self.bain_folders}
+    def install_params(self) -> Any:
+        return _BainArInstallerInstallData(self.bain_folders)
 
 
 class BainArInstallerPlugin(ArInstallerPluginBase):

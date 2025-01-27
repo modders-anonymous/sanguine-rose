@@ -9,7 +9,7 @@ from abc import ABC, abstractmethod
 # noinspection PyUnresolvedReferences
 from collections.abc import Callable, Generator, Iterable
 # noinspection PyUnresolvedReferences
-from enum import Enum, IntEnum
+from enum import Enum, IntEnum, Flag
 # noinspection PyUnresolvedReferences
 from types import TracebackType
 

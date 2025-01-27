@@ -1,9 +1,50 @@
 from sanguine.common import *
 from sanguine.helpers.file_retriever import GithubFileRetriever
 
+'''
+def _sort_list(l: list[str]) -> list[str]:
+    if __debug__:
+        for e in l:
+            assert isinstance(e, str)
+    return sorted(l)
+
+
+def _sort_dict(d: dict[str, Any]) -> dict[str, Any]:
+    out: dict[str, Any] = {}
+    if __debug__:
+        for k in d:
+            assert isinstance(k, str)
+    srt = sorted([(k, v) for k, v in d.items()], key=lambda item: item[0])
+    for k, v in srt:
+        if isinstance(v, dict):
+            v = _sort_dict(v)
+        elif isinstance(v, list):
+            v = _sort_list(v)
+        out[k] = v
+    return out
+
+
+class GenericJsonParams:
+    data: dict[str, Any]
+
+    def __init__(self, data: dict[str, Any]) -> None:
+        self.data = data
+
+    def from_sanguine_stable_json(self, data: dict[str, Any]) -> None:
+        assert len(self.data) == 0
+        self.data = data
+
+    def to_sanguine_stable_json(self) -> dict[str, Any]:
+        return _sort_dict(self.data)
+
+    @classmethod
+    def for_stable_json_load(cls) -> "GenericJsonParams":
+        return cls({})
+'''
+
 
 class ProjectExtraArchiveFile:
-    sanguine_json: list[tuple[str, str]] = [('target_file_name', 't'), ('file_hash', 'h')]
+    SANGUINE_JSON: list[tuple] = [('target_file_name', 't'), ('file_hash', 'h')]
     target_file_name: str
     file_hash: bytes
 
@@ -11,39 +52,64 @@ class ProjectExtraArchiveFile:
         self.target_file_name = targetfname
         self.file_hash = h
 
+    @classmethod
+    def for_stable_json_load(cls) -> "ProjectExtraArchiveFile":
+        return cls('', b'')
+
 
 class ProjectExtraArchive:
-    sanguine_json: list[tuple[str, str]] = [('archive_id', 'arid'), ('extra_files', 'files')]
-    archive_id: bytes | int
+    SANGUINE_JSON: list[tuple[str, str]] = [('archive_hash', 'arh'), ('archive_idx', 'ar'),
+                                            ('extra_files', 'files', ProjectExtraArchiveFile)]
+    archive_hash: bytes | None
+    archive_idx: int | None
     extra_files: list[ProjectExtraArchiveFile]
 
     def __init__(self, aid: bytes | int) -> None:
-        self.archive_id = aid
+        if isinstance(aid, bytes):
+            self.archive_hash = aid
+            self.archive_idx = None
+        else:
+            assert isinstance(aid, int)
+            self.archive_hash = None
+            self.archive_idx = aid
         self.extra_files = []
+
+    @classmethod
+    def for_stable_json_load(cls) -> "ProjectExtraArchive":
+        out = cls(0)
+        out.archive_idx = 0
+        out.archive_hash = b''
+        return out
 
 
 class ProjectInstaller:
-    sanguine_json: list[tuple[str, str]] = [('archive_hash', 'h'),
-                                            ('installer_type', 'type'), ('installer_params', 'params'),
-                                            ('skip', 'skip')]
+    SANGUINE_JSON: list[tuple[str, str]] = [('archive_hash', 'h'), ('installer_type', 'type'),
+                                            ('installer_params', 'params'),
+                                            ('skip', 'skip', str)]
     archive_hash: bytes
     installer_type: str
-    installer_params: dict[str, Any]
+    installer_params: Any
     skip: list[str]
 
-    def __init__(self, arhash: bytes, insttype: str, instparams: dict[str, Any], skip: list[str]) -> None:
+    def __init__(self, arhash: bytes, insttype: str, instparams: Any, skip: list[str]) -> None:
         self.archive_hash = arhash
         self.installer_type = insttype
         self.installer_params = instparams
         self.skip = skip
 
+    @classmethod
+    def for_stable_json_load(cls) -> "ProjectInstaller":
+        return cls(b'', '', {}, [])
+
 
 class ProjectMod:
-    sanguine_json: list[tuple[str, str]] = [('mod_name', 'name'), ('zero_files', 'zero'),
-                                            ('github_files', 'github'), ('installers', 'installers'),
-                                            ('remaining_archives', 'xarchives'),
-                                            ('unknown_files_by_tools', 'unknownbytools'),
-                                            ('unknown_files', 'unknown')]
+    SANGUINE_JSON: list[tuple[str, str]] = [('mod_name', 'name'),
+                                            ('zero_files', 'zero', str),
+                                            ('github_files', 'github', (str, GithubFileRetriever)),
+                                            ('installers', 'installers', ProjectInstaller),
+                                            ('remaining_archives', 'xarchives', ProjectExtraArchive),
+                                            ('unknown_files_by_tools', 'unknownbytools', str),
+                                            ('unknown_files', 'unknown', str)]
     mod_name: str | None
     zero_files: list[str] | None
     github_files: dict[str, GithubFileRetriever] | None
@@ -61,9 +127,21 @@ class ProjectMod:
         self.unknown_files = None
         self.unknown_files_by_tools = None
 
+    @classmethod
+    def for_stable_json_load(cls) -> "ProjectMod":
+        out = cls()
+        out.mod_name = ''
+        out.zero_files = []
+        out.github_files = {}
+        out.installers = []
+        out.remaining_archives = []
+        out.unknown_files = []
+        out.unknown_files_by_tools = []
+        return out
+
 
 class ProjectJson:
-    sanguine_json: list[tuple[str, str]] = [('mods', 'mods')]
+    SANGUINE_JSON: list[tuple[str, str]] = [('mods', 'mods', ProjectMod)]
     # intermediate_archives: list[bytes] | None
     mods: list[ProjectMod] | None
 

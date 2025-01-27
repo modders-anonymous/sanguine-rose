@@ -4,11 +4,23 @@ from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, Ex
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 
 
-class SimpleArInstaller(ArInstaller):
+class _SimpleArInstallerInstallData:
     install_from_root: str
+
+    def __init__(self, ifr: str) -> None:
+        self.install_from_root = ifr
+
+    @classmethod
+    def for_stable_json_load(cls):
+        return cls('')
+
+
+class SimpleArInstaller(ArInstaller):
+    install_from_root: str | None
 
     def __init__(self, archive: Archive):
         super().__init__(archive)
+        self.install_from_root = None
 
     def name(self) -> str:
         return 'SIMPLE'
@@ -21,8 +33,8 @@ class SimpleArInstaller(ArInstaller):
                 out.append((fia.intra_path[lifr:], fia))
         return out
 
-    def install_params(self) -> dict[str, Any]:
-        return {'root': self.install_from_root}
+    def install_params(self) -> Any:
+        return _SimpleArInstallerInstallData(self.install_from_root)
 
 
 '''

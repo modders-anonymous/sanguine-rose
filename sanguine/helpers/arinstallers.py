@@ -19,7 +19,7 @@ class ArInstaller:
         pass
 
     @abstractmethod
-    def install_params(self) -> dict[str, Any]:
+    def install_params(self) -> Any:  # return must be stable_json-compatible
         pass
 
 
@@ -51,7 +51,7 @@ class ArInstallerPluginBase(ABC):
         pass
 
     @abstractmethod
-    def data_for_saving(self) -> Any:
+    def data_for_saving(self) -> Any:  # return value must be stable_json-compatible
         pass
 
     @abstractmethod
