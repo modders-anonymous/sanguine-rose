@@ -64,11 +64,27 @@ def _validate_sjdecl(obj: Any) -> None:
         elif hasattr(target, 'SANGUINE_JSON'):
             assert len(sj) == 2
         else:
-            assert isinstance(target, _PRIMITIVE_TYPES)
+            if target is not None and not isinstance(target, _PRIMITIVE_TYPES):
+                assert False
             assert len(sj) == 2
 
 
+def _to_sort_key(jsonobj: Any, sjlist: list[tuple] | None) -> Any:
+    if sjlist is not None:
+        for sj in sjlist:
+            if sj[1] in jsonobj:
+                return _to_sort_key(jsonobj[sj[1]], None)
+        assert False  # no field found
+    elif isinstance(jsonobj, str):
+        return 's' + jsonobj
+    elif isinstance(jsonobj, int):
+        return 'i{:09d}'.format(jsonobj)
+    else:
+        assert False
+
+
 def _stable_json_list(data: list[Any], typ: _StableJsonType) -> list[Any]:
+    assert isinstance(data, list)
     if len(data) == 0:
         return []
     d0 = data[0]
@@ -77,19 +93,22 @@ def _stable_json_list(data: list[Any], typ: _StableJsonType) -> list[Any]:
             for i in data:
                 assert isinstance(i, str)
         return data if (typ.flags & StableJsonFlags.Unsorted) else sorted(data)
+    elif isinstance(d0, int):
+        if __debug__:
+            for i in data:
+                assert isinstance(i, int)
+        return data if (typ.flags & StableJsonFlags.Unsorted) else sorted(data)
 
     assert hasattr(d0, 'SANGUINE_JSON')
     if __debug__:
         for i in data:
             assert d0.SANGUINE_JSON == i.SANGUINE_JSON
-    firstfield = d0.SANGUINE_JSON[0][1]
     data2 = [to_stable_json(d) for d in data]
     if typ.flags & StableJsonFlags.Unsorted:
         return data2
     else:
-        return sorted(data2, key=lambda x: 'i{:09d}'.format(x[firstfield]
-                                                            ) if isinstance(x[firstfield], int) else 's' + x[
-            firstfield])
+        info(repr(data2))
+        return sorted(data2, key=lambda x: _to_sort_key(x, d0.SANGUINE_JSON))
 
 
 def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:

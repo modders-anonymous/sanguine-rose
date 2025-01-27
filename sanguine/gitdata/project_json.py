@@ -1,5 +1,6 @@
 from sanguine.common import *
 from sanguine.helpers.file_retriever import GithubFileRetriever
+from sanguine.helpers.stable_json import StableJsonFlags
 
 '''
 def _sort_list(l: list[str]) -> list[str]:
@@ -106,7 +107,7 @@ class ProjectMod:
     SANGUINE_JSON: list[tuple[str, str]] = [('mod_name', 'name'),
                                             ('zero_files', 'zero', str),
                                             ('github_files', 'github', (str, GithubFileRetriever)),
-                                            ('installers', 'installers', ProjectInstaller),
+                                            ('installers', 'installers', ProjectInstaller, StableJsonFlags.Unsorted),
                                             ('remaining_archives', 'xarchives', ProjectExtraArchive),
                                             ('unknown_files_by_tools', 'unknownbytools', str),
                                             ('unknown_files', 'unknown', str)]
