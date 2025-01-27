@@ -5,3 +5,4 @@ __pycache__/
 /pyinstaller/dist/
 *.log.html
 
+sanguine/plugins/arinstaller/ModuleConfig.xml
