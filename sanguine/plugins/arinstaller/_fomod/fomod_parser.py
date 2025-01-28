@@ -44,7 +44,7 @@ class _SrcDstFlags(IntFlag):
 
 
 class _SrcDst:
-    SANGUINE_JSON: list[tuple] = [('src', 'src'), ('dst', 'dst'),
+    SANGUINE_JSON: list[tuple] = [('src', 'src', ''), ('dst', 'dst', ''),
                                   ('priority', 'pri', -1), ('flags', 'flags', _SrcDstFlags.NoFlags)]
     src: str | None
     dst: str | None
@@ -524,12 +524,11 @@ def _parse_order_attr(e, av: str) -> _FomodOrder:
 
 
 class _Group:
-    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('select', 'sel', _GroupSelect.NotInitialized),
-                                  ('order', 'ord', _FomodOrder.Explicit),
+    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('select', 'sel', _GroupSelect.SelectAny),
+                                  ('order', 'ord', _FomodOrder.Ascending),
                                   ('plugins', 'plugins', _Plugin, StableJsonFlags.Unsorted)]
     name: str | None
     select: _GroupSelect
-    order: _FomodOrder
     plugins: list[_Plugin]
 
     def __init__(self) -> None:
@@ -640,7 +639,7 @@ def _parse_install_step(e: ElementTree.Element) -> _InstallStep:
     return out
 
 
-class _FomodConfig:
+class FomodModuleConfig:
     SANGUINE_JSON: list[tuple] = [('module_name', 'modulename'), ('eye_candy_attr', 'eyecandy', (str, str)),
                                   ('module_dependencies', 'deps', _FileDependency, StableJsonFlags.Unsorted),
                                   ('required', 'required'), ('install_steps_order', 'order', _FomodOrder.Ascending),
@@ -664,14 +663,14 @@ class _FomodConfig:
         self.conditional_file_installs = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "_FomodConfig":
+    def for_stable_json_load(cls) -> "FomodModuleConfig":
         out = cls()
         out.module_name = ''
         return out
 
 
-def parse_fomod_moduleconfig(root: ElementTree.Element) -> _FomodConfig:
-    out = _FomodConfig()
+def parse_fomod_moduleconfig(root: ElementTree.Element) -> FomodModuleConfig:
+    out = FomodModuleConfig()
     if root.tag != 'config':
         _raise_unknown_tag(None, root)
     for child in root:

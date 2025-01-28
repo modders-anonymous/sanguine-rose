@@ -1,9 +1,12 @@
+# noinspection PyUnresolvedReferences
+import xml.etree.ElementTree as ElementTree
+
 from sanguine.common import *
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
-from sanguine.helpers.stable_json import from_stable_json, StableJsonFlags, to_stable_json
-from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig
+from sanguine.helpers.stable_json import from_stable_json, to_stable_json
+from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig, FomodModuleConfig
 
 
 class FomodArInstaller(ArInstaller):
@@ -21,41 +24,48 @@ class FomodArInstaller(ArInstaller):
 
 
 class _FomodArInstallerPluginExtraData:
-    SANGUINE_JSON: list[tuple] = [('module_config', 'moduleconfig', str, StableJsonFlags.Unsorted)
-                                  ]
-    module_config: list[str]
+    SANGUINE_JSON: list[tuple] = [('module_config', None)]
+    module_config: FomodModuleConfig
 
-    def __init__(self, mconfig: list[str]) -> None:
+    def __init__(self, mconfig: FomodModuleConfig) -> None:
         self.module_config = mconfig
 
     @classmethod
     def for_stable_json_load(cls) -> "_FomodArInstallerPluginExtraData":
-        return cls([])
+        return cls(FomodModuleConfig())
 
 
 class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
     def name(self) -> str:
         return 'FOMOD'
 
-    @abstractmethod
     def extra_data(self, fullarchivedir: str) -> _FomodArInstallerPluginExtraData | None:  # returns stable_json data
         assert is_normalized_dir_path(fullarchivedir)
         fname = fullarchivedir + 'fomod\\moduleconfig.xml'
         if os.path.isfile(fname):
-            moduleconfig: list[str] = []
             with open_3rdparty_txt_file_autodetect(fname) as f:
+                xml = ''
                 for ln in f:
-                    moduleconfig.append(ln)
-            return _FomodArInstallerPluginExtraData(moduleconfig)
+                    xml += ln
+                root = ElementTree.fromstring(xml)
+                modulecfg = parse_fomod_moduleconfig(root)
+            return _FomodArInstallerPluginExtraData(modulecfg)
         return None
 
 
 class _FomodArInstallerPluginInstallData:
-    SANGUINE_JSON: list[tuple] = [('extra_data', None, (bytes, _FomodArInstallerPluginExtraData))]
+    SANGUINE_JSON: list[tuple] = [('extra_data', 'data', (bytes, _FomodArInstallerPluginExtraData)),
+                                  ('no_extra_data', 'empty', bytes),
+                                  ('exceptions', 'exceptions', (bytes, str))]
     extra_data: dict[bytes, _FomodArInstallerPluginExtraData]
+    no_extra_data: list[bytes]
+    exceptions: dict[bytes, str]
 
-    def __init__(self, extradata: dict[bytes, _FomodArInstallerPluginExtraData]) -> None:
+    def __init__(self, extradata: dict[bytes, _FomodArInstallerPluginExtraData], noextradata: list[bytes],
+                 exceptions: dict[bytes, str]) -> None:
         self.extra_data = extradata
+        self.no_extra_data = noextradata
+        self.exceptions = exceptions
 
     # @classmethod
     # def for_stable_json_load(cls) -> "_FomodArInstallerPluginInstallData":
@@ -64,10 +74,14 @@ class _FomodArInstallerPluginInstallData:
 
 class FomodArInstallerPlugin(ArInstallerPluginBase):
     extra_data: dict[bytes, _FomodArInstallerPluginExtraData] | None
+    no_extra_data: list[bytes]
+    exceptions: dict[bytes, str]
 
     def __init__(self):
         super().__init__()
         self.extra_data = None
+        self.no_extra_data = []
+        self.exceptions = {}
 
     def name(self) -> str:
         return 'FOMOD'
@@ -77,17 +91,25 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
         return None
 
     def got_loaded_data(self, data: dict[str, Any]) -> None:
-        target = _FomodArInstallerPluginInstallData({})
+        target = _FomodArInstallerPluginInstallData({}, [], {})
         from_stable_json(target, data)
         self.extra_data = target.extra_data
+        self.no_extra_data = target.no_extra_data
+        self.exceptions = target.exceptions
 
     def data_for_saving(self) -> Any:
-        return _FomodArInstallerPluginInstallData(self.extra_data)
+        return _FomodArInstallerPluginInstallData(self.extra_data, self.no_extra_data, self.exceptions)
 
     def extra_data_factory(self) -> ExtraArchiveDataFactory | None:
         return FomodExtraArchiveDataFactory()
 
-    def add_extra_data(self, arh: bytes, data: _FomodArInstallerPluginExtraData) -> None:
+    def add_extra_data(self, arh: bytes, data: _FomodArInstallerPluginExtraData | None | Exception) -> None:
+        if data is None:
+            self.no_extra_data.append(truncate_file_hash(arh))
+            return
+        if isinstance(data, Exception):
+            self.exceptions[arh] = repr(data)
+            return
         assert isinstance(data, _FomodArInstallerPluginExtraData)
         assert arh not in self.extra_data
         self.extra_data[arh] = data
@@ -112,13 +134,14 @@ if __name__ == '__main__':
             known_json = json.load(tf)
         for h, v in known_json.items():
             mc = v['moduleconfig']
-            xml = ''
+            txml = ''
             for tln in mc:
-                xml += tln
-            tree = ElementTree.fromstring(xml)
-            modulecfg = parse_fomod_moduleconfig(tree)
+                txml += tln
+            ttree = ElementTree.fromstring(txml)
+            tmodulecfg = parse_fomod_moduleconfig(ttree)
 
             # asjson = as_json(modulecfg)
             # info(asjson)
-            stable = to_stable_json(modulecfg)
-            info(stable)
+            stable = to_stable_json(tmodulecfg)
+            stablestr = json.dumps(stable, indent=1)
+            info(stablestr)

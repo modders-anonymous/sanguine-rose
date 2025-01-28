@@ -106,6 +106,12 @@ def _stable_json_list(data: list[Any], typ: _StableJsonType) -> list[Any]:
             for i in data:
                 assert isinstance(i, int)
         return data if (typ.flags & StableJsonFlags.Unsorted) else sorted(data)
+    elif isinstance(d0, bytes):
+        if __debug__:
+            for i in data:
+                assert isinstance(i, bytes)
+        data1 = [to_json_hash(x) for x in data]
+        return data1 if (typ.flags & StableJsonFlags.Unsorted) else sorted(data1)
 
     assert hasattr(d0, 'SANGUINE_JSON')
     if __debug__:
@@ -145,16 +151,14 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
                 ftyp = _get_type(v, sj)
                 if v != ftyp.default:
                     vjson = to_stable_json(v, ftyp)
-                    if vjson is None:
-                        pass
-                    elif isinstance(vjson, list) and len(vjson) == 0:
-                        pass
-                    elif isinstance(vjson, dict) and len(vjson) == 0:
-                        pass
-                    elif isinstance(vjson, str) and len(vjson) == 0:
-                        pass
-                    else:
-                        out[jfield] = vjson
+                    # if vjson is None:
+                    #    pass
+                    # elif isinstance(vjson, list) and len(vjson) == 0:
+                    #    pass
+                    # elif isinstance(vjson, dict) and len(vjson) == 0:
+                    #    pass
+                    # else:
+                    out[jfield] = vjson
         return out
     elif isinstance(data, list):
         return _stable_json_list(data, typ)

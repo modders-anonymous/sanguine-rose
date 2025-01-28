@@ -59,7 +59,7 @@ class ArInstallerPluginBase(ABC):
         pass
 
     @abstractmethod
-    def add_extra_data(self, arh: bytes, data: dict[str, Any]) -> None:
+    def add_extra_data(self, arh: bytes, data: Any | None | Exception) -> None:
         pass
 
 

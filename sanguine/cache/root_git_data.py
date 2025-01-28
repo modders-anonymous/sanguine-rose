@@ -83,14 +83,16 @@ def _hash_archive(archives: list[Archive], extradata: dict[str, dict[bytes, Any]
                 os.makedirs(newtmppath)
                 _hash_archive(archives, extradata, by, newtmppath, nested_plugin, fpath, h, s, extrafactories)
     for xf in extrafactories:
-        xd = xf.extra_data(tmppath)
-        if xd is None:
-            continue
         if xf.name() not in extradata:
             extradata[xf.name()] = {}
         xfbyname = extradata[xf.name()]
         assert arhash not in xfbyname
-        xfbyname[arhash] = xd
+
+        try:
+            xd = xf.extra_data(tmppath)
+            xfbyname[arhash] = xd
+        except Exception as e:
+            xfbyname[arhash] = e
 
 
 def _read_git_tentative_names(params: tuple[str]) -> dict[bytes, list[str]]:
