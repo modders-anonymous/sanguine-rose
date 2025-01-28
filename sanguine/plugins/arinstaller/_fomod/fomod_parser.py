@@ -244,6 +244,10 @@ class _SomeDependency:
     dependencies: "_Dependencies | None"
 
     def __init__(self, dep: "_FlagDependency|_FileDependency|_GameDependency|_Dependencies") -> None:
+        self.flag_dependency = None
+        self.file_dependency = None
+        self.game_dependency = None
+        self.dependencies = None
         if isinstance(dep, _FlagDependency):
             self.flag_dependency = dep
         elif isinstance(dep, _FileDependency):
@@ -264,7 +268,8 @@ class _SomeDependency:
 
 
 class _Dependencies:
-    SANGUINE_JSON: list[tuple] = [('oroperator', 'or', False), ('dependencies', 'deps', _SomeDependency)]
+    SANGUINE_JSON: list[tuple] = [('oroperator', 'or', False),
+                                  ('dependencies', 'deps', _SomeDependency, StableJsonFlags.Unsorted)]
     oroperator: bool
     dependencies: list[_SomeDependency]
 
@@ -520,7 +525,7 @@ def _parse_order_attr(e, av: str) -> _FomodOrder:
 
 class _Group:
     SANGUINE_JSON: list[tuple] = [('name', 'name'), ('select', 'sel', _GroupSelect.NotInitialized),
-                                  ('order', 'ord', _FomodOrder.Ascending),
+                                  ('order', 'ord', _FomodOrder.Explicit),
                                   ('plugins', 'plugins', _Plugin, StableJsonFlags.Unsorted)]
     name: str | None
     select: _GroupSelect
@@ -582,7 +587,7 @@ def _parse_group(e: ElementTree.Element) -> _Group:
 
 
 class _InstallStep:
-    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('order', 'ord'),
+    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('order', 'ord', _FomodOrder.Explicit),
                                   ('groups', 'groups', _Group, StableJsonFlags.Unsorted),
                                   ('visible', 'visible')]
     name: str | None
@@ -638,14 +643,14 @@ def _parse_install_step(e: ElementTree.Element) -> _InstallStep:
 class _FomodConfig:
     SANGUINE_JSON: list[tuple] = [('module_name', 'modulename'), ('eye_candy_attr', 'eyecandy', (str, str)),
                                   ('module_dependencies', 'deps', _FileDependency, StableJsonFlags.Unsorted),
-                                  ('required', 'required'), ('install_steps_order', 'order'),
+                                  ('required', 'required'), ('install_steps_order', 'order', _FomodOrder.Ascending),
                                   ('install_steps', 'isteps', _InstallStep, StableJsonFlags.Unsorted),
                                   ('conditional_file_installs', 'conditional', _Pattern, StableJsonFlags.Unsorted)]
     module_name: str | None
     eye_candy_attr: dict[str, str]
     module_dependencies: list[_FileDependency]
     required: _FilesAndFolders
-    install_steps_order: bool
+    install_steps_order: _FomodOrder
     install_steps: list[_InstallStep]
     conditional_file_installs: list[_Pattern]
 
@@ -654,7 +659,7 @@ class _FomodConfig:
         self.eye_candy_attr = {}
         self.module_dependencies = []
         self.required = _FilesAndFolders()
-        self.install_steps_order = False
+        self.install_steps_order = _FomodOrder.Ascending
         self.install_steps = []
         self.conditional_file_installs = []
 
@@ -702,11 +707,7 @@ def parse_fomod_moduleconfig(root: ElementTree.Element) -> _FomodConfig:
             case 'installSteps':
                 for an, av in child.attrib.items():
                     if an == 'order':
-                        match av:
-                            case 'Explicit':
-                                out.order = True
-                            case _:
-                                _raise_unknown_attr(child, av)
+                        out.order = _parse_order_attr(child, av)
                     else:
                         _raise_unknown_attr(child, an)
                 for ch2 in child:

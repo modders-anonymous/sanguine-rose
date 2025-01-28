@@ -144,7 +144,17 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
                     return to_stable_json(v, _get_type(v, sj))
                 ftyp = _get_type(v, sj)
                 if v != ftyp.default:
-                    out[jfield] = to_stable_json(v, ftyp)
+                    vjson = to_stable_json(v, ftyp)
+                    if vjson is None:
+                        pass
+                    elif isinstance(vjson, list) and len(vjson) == 0:
+                        pass
+                    elif isinstance(vjson, dict) and len(vjson) == 0:
+                        pass
+                    elif isinstance(vjson, str) and len(vjson) == 0:
+                        pass
+                    else:
+                        out[jfield] = vjson
         return out
     elif isinstance(data, list):
         return _stable_json_list(data, typ)

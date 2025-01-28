@@ -2,7 +2,7 @@ from sanguine.common import *
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
-from sanguine.helpers.stable_json import from_stable_json, StableJsonFlags
+from sanguine.helpers.stable_json import from_stable_json, StableJsonFlags, to_stable_json
 from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig
 
 
@@ -117,5 +117,8 @@ if __name__ == '__main__':
                 xml += tln
             tree = ElementTree.fromstring(xml)
             modulecfg = parse_fomod_moduleconfig(tree)
-            asjson = as_json(modulecfg)
-            info(asjson)
+
+            # asjson = as_json(modulecfg)
+            # info(asjson)
+            stable = to_stable_json(modulecfg)
+            info(stable)
