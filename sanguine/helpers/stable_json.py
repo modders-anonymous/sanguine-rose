@@ -9,23 +9,29 @@ class StableJsonFlags(Flag):
 class _StableJsonType:
     typ: Any
     flags: StableJsonFlags
+    default: Any
 
-    def __init__(self, typ: Any, flags: StableJsonFlags):
+    def __init__(self, typ: Any, flags: StableJsonFlags, default: Any) -> None:
         self.typ = typ
         self.flags = flags
+        self.default = default
 
 
-def _get_type(sj: tuple) -> _StableJsonType:
+_PRIMITIVE_TYPES = (str, int, float, bytes, bool, IntFlag, IntEnum)
+
+
+def _get_type(target4typeonly: Any, sj: tuple) -> _StableJsonType:
     if len(sj) == 2:
-        return _StableJsonType(None, StableJsonFlags.NoFlags)
+        return _StableJsonType(None, StableJsonFlags.NoFlags, None)
     elif len(sj) == 3:
-        return _StableJsonType(sj[2], StableJsonFlags.NoFlags)
+        if isinstance(target4typeonly, _PRIMITIVE_TYPES):
+            return _StableJsonType(None, StableJsonFlags.NoFlags, sj[2])
+        else:
+            assert isinstance(target4typeonly, (dict, list))
+            return _StableJsonType(sj[2], StableJsonFlags.NoFlags, None)
     else:
         assert len(sj) == 4
-        return _StableJsonType(sj[2], sj[3])
-
-
-_PRIMITIVE_TYPES = (str, int, float, bytes)
+        return _StableJsonType(sj[2], sj[3], None)
 
 
 def _create_from_typ(typ: Any) -> Any:
@@ -66,7 +72,9 @@ def _validate_sjdecl(obj: Any) -> None:
         else:
             if target is not None and not isinstance(target, _PRIMITIVE_TYPES):
                 assert False
-            assert len(sj) == 2
+            assert len(sj) == 2 or len(sj) == 3
+            if len(sj) == 3:
+                assert type(sj[2]) == type(target)
 
 
 def _to_sort_key(jsonobj: Any, sjlist: list[tuple] | None) -> Any:
@@ -133,8 +141,10 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
             else:
                 if jfield is None:
                     assert len(data.SANGUINE_JSON) == 1
-                    return to_stable_json(v, _get_type(sj))
-                out[jfield] = to_stable_json(v, _get_type(sj))
+                    return to_stable_json(v, _get_type(v, sj))
+                ftyp = _get_type(v, sj)
+                if v != ftyp.default:
+                    out[jfield] = to_stable_json(v, ftyp)
         return out
     elif isinstance(data, list):
         return _stable_json_list(data, typ)
@@ -151,6 +161,10 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
         return {k: v for k, v in data2}
     elif isinstance(data, bytes):
         return to_json_hash(data)
+    elif isinstance(data, IntEnum):
+        return int(data)
+    elif isinstance(data, IntFlag):
+        return int(data)
     elif isinstance(data, _PRIMITIVE_TYPES):
         return data
     assert False
@@ -170,6 +184,10 @@ def _from_stable_json_primitive(data: Any, target4typeonly: Any) -> Any:
     if isinstance(target4typeonly, bytes):
         abort_if_not(isinstance(data, str))
         return from_json_hash(data)
+    elif isinstance(target4typeonly, IntEnum):
+        return int(data)
+    elif isinstance(target4typeonly, IntFlag):
+        return int(data)
     abort_if_not(isinstance(data, _PRIMITIVE_TYPES) and not isinstance(data, bytes))
     return data
 
@@ -187,8 +205,8 @@ def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> Non
             field = sj[0]
             assert field in tgdi
             jfield = sj[1]
-            sjtyp = _get_type(sj)
             tgt = tgdi[field]
+            sjtyp = _get_type(tgt, sj)
             if hasattr(tgt, 'SANGUINE_JSON'):
                 assert sjtyp.flags == StableJsonFlags.NoFlags
                 if jfield is None:

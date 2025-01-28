@@ -2,47 +2,6 @@ from sanguine.common import *
 from sanguine.helpers.file_retriever import GithubFileRetriever
 from sanguine.helpers.stable_json import StableJsonFlags
 
-'''
-def _sort_list(l: list[str]) -> list[str]:
-    if __debug__:
-        for e in l:
-            assert isinstance(e, str)
-    return sorted(l)
-
-
-def _sort_dict(d: dict[str, Any]) -> dict[str, Any]:
-    out: dict[str, Any] = {}
-    if __debug__:
-        for k in d:
-            assert isinstance(k, str)
-    srt = sorted([(k, v) for k, v in d.items()], key=lambda item: item[0])
-    for k, v in srt:
-        if isinstance(v, dict):
-            v = _sort_dict(v)
-        elif isinstance(v, list):
-            v = _sort_list(v)
-        out[k] = v
-    return out
-
-
-class GenericJsonParams:
-    data: dict[str, Any]
-
-    def __init__(self, data: dict[str, Any]) -> None:
-        self.data = data
-
-    def from_sanguine_stable_json(self, data: dict[str, Any]) -> None:
-        assert len(self.data) == 0
-        self.data = data
-
-    def to_sanguine_stable_json(self) -> dict[str, Any]:
-        return _sort_dict(self.data)
-
-    @classmethod
-    def for_stable_json_load(cls) -> "GenericJsonParams":
-        return cls({})
-'''
-
 
 class ProjectExtraArchiveFile:
     SANGUINE_JSON: list[tuple] = [('target_file_name', 't'), ('file_hash', 'h')]
