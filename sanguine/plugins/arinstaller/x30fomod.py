@@ -131,18 +131,14 @@ if __name__ == '__main__':
         '''
         tfname = os.path.split(os.path.abspath(__file__))[
                      0] + '\\..\\..\\..\\..\\sanguine-skyrim-root\\known-arinstaller-fomod-data.json'
+
+        xdata = _FomodArInstallerPluginInstallData.for_stable_json_load()
+
         with open(tfname, 'rt') as tf:
             known_json = json.load(tf)
-        for h, v in known_json.items():
-            mc = v['moduleconfig']
-            txml = ''
-            for tln in mc:
-                txml += tln
-            ttree = ElementTree.fromstring(txml)
-            tmodulecfg = parse_fomod_moduleconfig(ttree)
+            from_stable_json(xdata, known_json)
 
-            # asjson = as_json(modulecfg)
-            # info(asjson)
-            stable = to_stable_json(tmodulecfg)
-            stablestr = json.dumps(stable, indent=1)
-            info(stablestr)
+        new_json = to_stable_json(xdata)
+        with open(tfname, 'wt') as tf:
+            # noinspection PyTypeChecker
+            json.dump(new_json, tf, indent=1)

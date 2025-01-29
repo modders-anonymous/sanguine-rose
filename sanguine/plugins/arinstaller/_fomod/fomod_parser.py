@@ -102,6 +102,9 @@ class _FilesAndFolders:
     def for_stable_json_load(cls) -> "_FilesAndFolders":
         return cls()
 
+    def is_for_load(self) -> bool:
+        return self.files == [] and self.folders == []
+
 
 def _parse_files_and_folders(n: ElementTree.Element) -> _FilesAndFolders:
     out = _FilesAndFolders()
@@ -133,6 +136,9 @@ class _FlagDependency:
         out.name = ''
         out.value = ''
         return out
+
+    def is_for_load(self) -> bool:
+        return self.name == '' and self.value == ''
 
 
 def _parse_flag_dependency(n: ElementTree.Element) -> _FlagDependency:
@@ -184,6 +190,9 @@ class _FileDependency:
         out.file = ''
         return out
 
+    def is_for_load(self) -> bool:
+        return self.file == '' and self.state == _FileDependencyState.NotInitialized
+
 
 def _parse_file_dependency(n: ElementTree.Element) -> _FileDependency:
     out = _FileDependency()
@@ -220,6 +229,9 @@ class _GameDependency:
         out = cls()
         out.version = ''
         return out
+
+    def is_for_load(self) -> bool:
+        return self.version == ''
 
 
 def _parse_game_dependency(n: ElementTree.Element) -> _GameDependency:
@@ -266,6 +278,16 @@ class _SomeDependency:
         out.dependencies = _Dependencies.for_stable_json_load()
         return out
 
+    def sanguine_stable_json_make_canonical(self) -> None:
+        if self.flag_dependency is not None and self.flag_dependency.is_for_load():
+            self.flag_dependency = None
+        if self.file_dependency is not None and self.file_dependency.is_for_load():
+            self.file_dependency = None
+        if self.game_dependency is not None and self.game_dependency.is_for_load():
+            self.game_dependency = None
+        if self.dependencies is not None and self.dependencies.is_for_load():
+            self.dependencies = None
+
 
 class _Dependencies:
     SANGUINE_JSON: list[tuple] = [('oroperator', 'or', False),
@@ -280,6 +302,9 @@ class _Dependencies:
     @classmethod
     def for_stable_json_load(cls) -> "_Dependencies":
         return cls()
+
+    def is_for_load(self) -> bool:
+        return self.dependencies == [] and self.oroperator is False
 
 
 def _parse_some_dependency(n: ElementTree.Element) -> _SomeDependency:
@@ -361,6 +386,10 @@ class _Pattern:
         out.dependencies = _Dependencies()
         out.files = _FilesAndFolders()
         return out
+
+    def sanguine_stable_json_make_canonical(self) -> None:
+        if self.files is not None and self.files.is_for_load():
+            self.files = None
 
 
 def _parse_pattern(n: ElementTree.Element) -> _Pattern:
@@ -452,9 +481,13 @@ class _Plugin:
         out.name = ''
         out.description = ''
         out.image = ''
-        out.files = _FilesAndFolders()
+        out.files = _FilesAndFolders.for_stable_json_load()
         out.type_descriptor = _TypeDescriptor()
         return out
+
+    def sanguine_stable_json_make_canonical(self) -> None:
+        if self.files is not None and self.files.is_for_load():
+            self.files = None
 
 
 def _parse_plugin(n: ElementTree.Element) -> _Plugin:

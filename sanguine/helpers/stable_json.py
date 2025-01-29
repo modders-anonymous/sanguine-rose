@@ -154,14 +154,9 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
                 ftyp = _get_type(v, sj)
                 if v != ftyp.default:
                     vjson = to_stable_json(v, ftyp)
-                    # if vjson is None:
-                    #    pass
-                    # elif isinstance(vjson, list) and len(vjson) == 0:
-                    #    pass
-                    # elif isinstance(vjson, dict) and len(vjson) == 0:
-                    #    pass
-                    # else:
                     out[jfield] = vjson
+        if hasattr(data, 'sanguine_stable_json_make_canonical'):
+            data.sanguine_stable_json_make_canonical()
         return out
     elif isinstance(data, list):
         return _stable_json_list(data, typ)
@@ -271,6 +266,8 @@ def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> Non
                 else:
                     tgdi[field] = _from_stable_json_primitive(data[jfield], tgt)
                     assert type(tgdi[field]) == type(tgt)
+        if hasattr(target, 'sanguine_stable_json_make_canonical'):
+            target.sanguine_stable_json_make_canonical()
     elif isinstance(target, list):
         assert len(target) == 0
         raise_if_not(isinstance(data, list))
