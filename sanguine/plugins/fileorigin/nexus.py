@@ -135,7 +135,7 @@ class GitNexusData:
         lineno += 1
         if not re.search(r'^\s*file_origins\s*:\s*//', ln):
             alert('GitNexusData.read_from_file(): Unexpected line #{}: {}'.format(lineno, ln))
-            abort_if_not(False)
+            raise_if_not(False)
 
         dfo = gitdatafile.GitDataReadList(_GitNexusFileOriginsReadHandler.COMMON_FIELDS,
                                           [_GitNexusFileOriginsReadHandler(nexus_file_origins)])
@@ -279,9 +279,9 @@ class NexusFileOriginPlugin(FileOriginPluginBase):
             if isinstance(gameids, int):
                 gameids = [gameids]
             self.game_ids = gameids
-            abort_if_not(isinstance(self.game_ids, list))
+            raise_if_not(isinstance(self.game_ids, list))
             for gid in self.game_ids:
-                abort_if_not(isinstance(gid, int))
+                raise_if_not(isinstance(gid, int))
         else:
             self.game_ids = []
 

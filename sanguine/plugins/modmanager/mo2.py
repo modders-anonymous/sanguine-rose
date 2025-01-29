@@ -33,12 +33,12 @@ class Mo2ProjectConfig(ModManagerConfig):
         unused_config_warning('mo2', section,
                               ['mo2dir', 'ignores', 'masterprofile', 'generatedprofiles'])
 
-        abort_if_not('mo2dir' in section, "'mo2dir' must be present in config.mo2 for modmanager=mo2")
+        raise_if_not('mo2dir' in section, "'mo2dir' must be present in config.mo2 for modmanager=mo2")
         mo2dir = config_dir_path(section['mo2dir'], configdir, fullconfig)
-        abort_if_not(isinstance(mo2dir, str), 'config.mo2.mo2dir must be a string')
+        raise_if_not(isinstance(mo2dir, str), 'config.mo2.mo2dir must be a string')
 
         ignores = section.get('ignores', ['{DEFAULT-MO2-IGNORES}'])
-        abort_if_not(isinstance(ignores, list), lambda: "config.mo2.ignores must be a list, got " + repr(ignores))
+        raise_if_not(isinstance(ignores, list), lambda: "config.mo2.ignores must be a list, got " + repr(ignores))
         self.ignore_dirs = []
         for ignore in ignores:
             if ignore == '{DEFAULT-MO2-IGNORES}':
@@ -56,15 +56,15 @@ class Mo2ProjectConfig(ModManagerConfig):
         assert self.master_profile is None
         assert self.generated_profiles is None
         self.master_profile = section.get('masterprofile')
-        abort_if_not(self.master_profile is not None and isinstance(self.master_profile, str),
+        raise_if_not(self.master_profile is not None and isinstance(self.master_profile, str),
                      lambda: "'masterprofile' in config must be a string, got " + repr(self.master_profile))
-        abort_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + self.master_profile))
+        raise_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + self.master_profile))
 
         self.generated_profiles = section.get('generatedprofiles')
-        abort_if_not(self.generated_profiles is not None and isinstance(self.generated_profiles, dict),
+        raise_if_not(self.generated_profiles is not None and isinstance(self.generated_profiles, dict),
                      lambda: "'generatedprofiles' in config must be a list, got " + repr(self.generated_profiles))
         for gp in self.generated_profiles.keys():
-            abort_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + gp))
+            raise_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + gp))
 
         assert self.master_modlist is None
         self.master_modlist = ModList(

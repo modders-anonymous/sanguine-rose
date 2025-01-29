@@ -16,6 +16,9 @@ class _StableJsonType:
         self.flags = flags
         self.default = default
 
+    # def get_default(self,defaultdefault:Any) -> Any:
+    #    return self.default if self.default is not None else defaultdefault
+
 
 _PRIMITIVE_TYPES = (str, int, float, bytes, bool, IntFlag, IntEnum)
 
@@ -196,13 +199,12 @@ def write_stable_json_opened(f: typing.TextIO, data: dict[str, Any]) -> None:
 
 def _from_stable_json_primitive(data: Any, target4typeonly: Any) -> Any:
     if isinstance(target4typeonly, bytes):
-        abort_if_not(isinstance(data, str))
+        raise_if_not(isinstance(data, str))
         return from_json_hash(data)
-    elif isinstance(target4typeonly, IntEnum):
-        return int(data)
-    elif isinstance(target4typeonly, IntFlag):
-        return int(data)
-    abort_if_not(isinstance(data, _PRIMITIVE_TYPES) and not isinstance(data, bytes))
+    elif isinstance(target4typeonly, (IntEnum, IntFlag)):
+        typ = type(target4typeonly)
+        return typ(int(data))
+    raise_if_not(isinstance(data, _PRIMITIVE_TYPES) and not isinstance(data, bytes))
     return data
 
 
@@ -213,7 +215,7 @@ def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> Non
     if hasattr(target, 'SANGUINE_JSON'):
         if __debug__:
             _validate_sjdecl(target)
-        abort_if_not(isinstance(data, dict))
+        raise_if_not(isinstance(data, dict))
         tgdi = target.__dict__
         for sj in target.SANGUINE_JSON:  # len(sj) can be 2 or 3
             field = sj[0]
@@ -227,7 +229,10 @@ def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> Non
                     assert len(target.SANGUINE_JSON) == 1
                     from_stable_json(tgt, data, sjtyp)
                 else:
-                    from_stable_json(tgt, data[jfield], sjtyp)
+                    if jfield not in data:
+                        pass
+                    else:
+                        from_stable_json(tgt, data[jfield], sjtyp)
             elif isinstance(tgt, list):
                 assert len(tgt) == 0
                 if jfield is None:
@@ -251,23 +256,24 @@ def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> Non
                     from_stable_json(tgt, data[jfield], sjtyp)
             else:
                 if __debug__:
-                    assert isinstance(tgt, _PRIMITIVE_TYPES)
+                    if not isinstance(tgt, _PRIMITIVE_TYPES):
+                        assert False
                     assert sjtyp.flags == StableJsonFlags.NoFlags
                     if isinstance(tgt, (int, float)):
-                        assert tgt == 0
+                        pass  # can have any value, even unrelated to sjtyp.default
                     elif isinstance(tgt, (str, bytes)):
                         assert len(tgt) == 0
                     else:
                         assert False
                 assert jfield is not None
                 if jfield not in data:
-                    tgdi[field] = None
+                    tgdi[field] = sjtyp.default
                 else:
                     tgdi[field] = _from_stable_json_primitive(data[jfield], tgt)
                     assert type(tgdi[field]) == type(tgt)
     elif isinstance(target, list):
         assert len(target) == 0
-        abort_if_not(isinstance(data, list))
+        raise_if_not(isinstance(data, list))
         for d in data:
             e = _create_from_typ(typ.typ)
             if isinstance(e, _PRIMITIVE_TYPES):
@@ -278,7 +284,7 @@ def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> Non
                 from_stable_json(e, d)
     elif isinstance(target, dict):
         assert len(target) == 0
-        abort_if_not(isinstance(data, dict))
+        raise_if_not(isinstance(data, dict))
         for k, v in data.items():
             typ0, typ1 = typ.typ
             e0 = _create_from_typ(typ0)

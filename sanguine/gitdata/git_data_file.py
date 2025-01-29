@@ -731,7 +731,7 @@ def read_git_file_list(dlist: GitDataReadList, rfile: typing.TextIO, lineno: int
             # warn(ln)
             if not re.search(r'^\s*][\s,]*$', ln):
                 alert('read_git_file_list(): Unexpected line #{}: {}'.format(lineno, ln))
-                abort_if_not(False)
+                raise_if_not(False)
             return lineno
 
 
@@ -752,4 +752,4 @@ def skip_git_file_footer(rfile: typing.TextIO, lineno: int) -> None:
                 closebracketfound = True
             else:
                 critical('Unrecognized line #' + str(lineno) + ':' + ln)
-                abort_if_not(False)  # unknown pattern
+                raise_if_not(False)  # unknown pattern

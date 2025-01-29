@@ -104,7 +104,7 @@ def file_origins_for_file(fpath: str) -> list[FileOrigin] | None:
     assert os.path.isfile(fpath)
     metafpath = fpath + '.meta'
     if os.path.isfile(metafpath):
-        with open_3rdparty_txt_file(metafpath) as rf:
+        with open_3rdparty_txt_file_autodetect(metafpath) as rf:
             metafileparsers = [plugin.meta_file_parser(metafpath) for plugin in _file_origin_plugins.values()]
             for ln in rf:
                 for mfp in metafileparsers:

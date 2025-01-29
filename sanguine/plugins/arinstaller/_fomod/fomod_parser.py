@@ -260,10 +260,10 @@ class _SomeDependency:
 
     @classmethod
     def for_stable_json_load(cls) -> "_SomeDependency":
-        out = cls(_FileDependency())
-        out.flag_dependency = _FlagDependency()
-        out.game_dependency = _GameDependency()
-        out.dependencies = _Dependencies()
+        out = cls(_FileDependency.for_stable_json_load())
+        out.flag_dependency = _FlagDependency.for_stable_json_load()
+        out.game_dependency = _GameDependency.for_stable_json_load()
+        out.dependencies = _Dependencies.for_stable_json_load()
         return out
 
 

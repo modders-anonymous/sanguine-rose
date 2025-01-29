@@ -56,7 +56,7 @@ try:
         info('py not found, will try to download and install python')
         dlurl = pattern_from_url('https://python.org/downloads/',
                                  r'(https://www\.python\.org/ftp/python/3\.[0-9.]*/python-3\.[0-9.]*-amd64.exe)')
-        abort_if_not(len(dlurl) == 1)
+        raise_if_not(len(dlurl) == 1)
         info('Downloading {}...'.format(dlurl[0]))
         pyinstallexe = download_temp(dlurl[0], BoxUINetworkErrorHandler(2))
         run_installer([pyinstallexe, '/quiet', 'InstallAllUsers=1', 'PrependPath=1'], 'python.org',
@@ -64,7 +64,7 @@ try:
         info('Python installer finished.')
 
         pyok = find_command_and_add_to_path(['py', '--version'], shell=True)
-        abort_if_not(pyok)
+        raise_if_not(pyok)
         info('Python is available now.')
 
     gitok = find_command_and_add_to_path(['git', '--version'])
@@ -74,10 +74,10 @@ try:
         info('git not found, will try to download and install it')
         tags = pattern_from_url('https://gitforwindows.org/',
                                 r'https://github.com/git-for-windows/git/releases/tag/([a-zA-Z0-9.]*)"')
-        abort_if_not(len(tags) == 1)
+        raise_if_not(len(tags) == 1)
         tag = tags[0]
         m = re.match(r'v([0-9.]*)\.windows\.[0-9]*', tag)
-        abort_if_not(bool(m))
+        raise_if_not(bool(m))
         ver = m.group(1)
         url = 'https://github.com/git-for-windows/git/releases/download/{}/Git-{}-64-bit.exe'.format(tag, ver)
         info('Downloading {}...'.format(url))
@@ -86,7 +86,7 @@ try:
                       'Installing git... Installer runs in silent mode and may take up to 5 minutes.')
         info('Git installer finished.')
         gitok = find_command_and_add_to_path(['git', '--version'], shell=True)
-        abort_if_not(gitok)
+        raise_if_not(gitok)
         info('Git is available now.')
 
     skiprepo = False

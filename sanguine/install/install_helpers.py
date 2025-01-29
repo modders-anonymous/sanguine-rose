@@ -82,7 +82,7 @@ def _install_vs_build_tools() -> None:
 
 def install_sanguine_prerequisites() -> None:
     gitok = find_command_and_add_to_path(['git', '--version'])
-    abort_if_not(gitok)
+    raise_if_not(gitok)
 
     info('Installing certifi...')
     _install_pip_module('certifi')  # needed to run simple_download within _install_vs_build_tools()

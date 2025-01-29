@@ -76,4 +76,4 @@ def download_temp(url: str, errhandler: NetworkErrorHandler | None) -> str:
         except OSError:
             continue
 
-        abort_if_not(os.path.isfile(tfname))
+        raise_if_not(os.path.isfile(tfname))

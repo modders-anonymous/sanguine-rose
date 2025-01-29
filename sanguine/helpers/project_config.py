@@ -27,9 +27,9 @@ def config_dir_path(path: str, configdir: str, config: ConfigData):
         spl = found.split('.')
         cur = config
         for name in spl:
-            abort_if_not(name in cur, lambda: 'unable to resolve {} in {}'.format(found, configdir))
+            raise_if_not(name in cur, lambda: 'unable to resolve {} in {}'.format(found, configdir))
             cur = cur[name]
-        abort_if_not(isinstance(cur, str), lambda: '{} in {} must be a string'.format(found, configdir))
+        raise_if_not(isinstance(cur, str), lambda: '{} in {} must be a string'.format(found, configdir))
         path = pattern.sub(cur, path)
         replaced = True
 
@@ -44,7 +44,7 @@ def normalize_source_vfs_dir_path(path: str, rootvfsdir: str) -> str:  # relativ
         out = normalize_dir_path(path)
     else:
         out = normalize_dir_path(rootvfsdir + path)
-    abort_if_not(out.startswith(rootvfsdir), lambda: 'expected path within vfs, got ' + repr(path))
+    raise_if_not(out.startswith(rootvfsdir), lambda: 'expected path within vfs, got ' + repr(path))
     return out
 
 
@@ -181,19 +181,19 @@ class GithubModpackConfig:
 
     def __init__(self, jsonconfigfname: str, jsonconfig: ConfigData) -> None:
         is_root = jsonconfig.get('isroot', 0)
-        abort_if_not(is_root == 1 or is_root == 0)
+        raise_if_not(is_root == 1 or is_root == 0)
         self.is_root = is_root != 0
         if self.is_root:
             unused_config_warning(jsonconfigfname, jsonconfig, ['isroot', 'origins', 'gameuniverse', 'ignorepatterns'])
             self.origin_configs = jsonconfig.get('origins', {})
-            abort_if_not('gameuniverse' in jsonconfig)
+            raise_if_not('gameuniverse' in jsonconfig)
             self.game_universe = jsonconfig['gameuniverse']
             self.dependencies = []
             self.own_mod_names = []
             self.ignored_file_patterns = jsonconfig.get('ignorepatterns', [])
             if isinstance(self.ignored_file_patterns, str):
                 self.ignored_file_patterns = [self.ignored_file_patterns]
-            abort_if_not(isinstance(self.ignored_file_patterns, list))
+            raise_if_not(isinstance(self.ignored_file_patterns, list))
             self.ignored_file_patterns = self.ignored_file_patterns
         else:
             unused_config_warning('ModpackConfig', jsonconfig, ['isroot', 'dependencies', 'ownmods'])
@@ -215,7 +215,7 @@ def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
         critical(
             'Fatal error: folder {} exists, but does not contain {}/{}'.format(gh.folder(githubrootdir),
                                                                                gh.author, gh.project))
-        abort_if_not(False)
+        raise_if_not(False)
 
     if ok == 0:
         info('Cloning GitHub project: {}'.format(ghproject))
@@ -224,18 +224,18 @@ def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
 
     assert ok == 1
     jsonconfigfname = gh.mpfolder(githubrootdir) + 'sanguine.json5'
-    with open_3rdparty_txt_file(jsonconfigfname) as rf:
+    with open_3rdparty_txt_file_autodetect(jsonconfigfname) as rf:
         jsonconfig = json5.load(rf)
         mpcfg = GithubModpackConfig(jsonconfigfname, jsonconfig)
         allmodpackconfigs[ghproject] = mpcfg
 
         if mpcfg.is_root:
-            abort_if_not(rootmodpack is None)
+            raise_if_not(rootmodpack is None)
             rootmodpack = ghproject
 
         for d in mpcfg.dependencies:
             rmp = install_github_project_with_dependencies(d.mpto_str(), githubrootdir, allmodpackconfigs)
-            abort_if_not(rmp is None or rootmodpack is None)
+            raise_if_not(rmp is None or rootmodpack is None)
             if rmp is not None:
                 rootmodpack = rmp
 
@@ -257,24 +257,24 @@ class LocalProjectConfig:
     # TODO: check that sanguine-rose itself, cache_dir, and tmp_dir don't overlap with any of the dirs
     def __init__(self, jsonconfigfname: str) -> None:
         self.config_dir = normalize_dir_path(os.path.split(jsonconfigfname)[0])
-        with (open_3rdparty_txt_file(jsonconfigfname) as f):
+        with (open_3rdparty_txt_file_autodetect(jsonconfigfname) as f):
             jsonconfig = json5.loads(f.read())
             unused_config_warning(jsonconfigfname, jsonconfig,
                                   ['modmanager', 'downloads', 'cache', 'tmp', 'githubroot', 'modpack',
                                    'githubusername'] + _all_config_names())
 
-            abort_if_not('modmanager' in jsonconfig, "'modmanager' must be present in config")
+            raise_if_not('modmanager' in jsonconfig, "'modmanager' must be present in config")
             modmanager = jsonconfig['modmanager']
             self.mod_manager_config = _find_config(modmanager)
-            abort_if_not(self.mod_manager_config is not None,
+            raise_if_not(self.mod_manager_config is not None,
                          lambda: "config.modmanager must be one of [{}]".format(_all_configs_string()))
 
-            abort_if_not(self.mod_manager_config.mod_manager_name in jsonconfig,
+            raise_if_not(self.mod_manager_config.mod_manager_name in jsonconfig,
                          lambda: "'{}' must be present in config for modmanager={}".format(
                              self.mod_manager_config.mod_manager_name,
                              self.mod_manager_config.mod_manager_name))
             mmc_config = jsonconfig[self.mod_manager_config.mod_manager_name]
-            abort_if_not(isinstance(mmc_config, dict),
+            raise_if_not(isinstance(mmc_config, dict),
                          lambda: "config.{} must be a dictionary, got {}".format(
                              self.mod_manager_config.mod_manager_name,
                              repr(mmc_config)))
@@ -285,7 +285,7 @@ class LocalProjectConfig:
                 dls = jsonconfig['downloads']
             if isinstance(dls, str):
                 dls = [dls]
-            abort_if_not(isinstance(dls, list),
+            raise_if_not(isinstance(dls, list),
                          lambda: "'downloads' in config must be a string or a list, got " + repr(dls))
             self.download_dirs = [config_dir_path(dl, self.config_dir, jsonconfig) for dl in dls]
 
@@ -301,20 +301,20 @@ class LocalProjectConfig:
             self.github_root_dir = config_dir_path(jsonconfig.get('githubroot', '.\\'), self.config_dir,
                                                    jsonconfig)
 
-            abort_if_not('modpack' in jsonconfig)
+            raise_if_not('modpack' in jsonconfig)
             ghmodpack = jsonconfig['modpack']
-            abort_if_not(isinstance(ghmodpack, str) and GithubModpack.is_ok(ghmodpack))
+            raise_if_not(isinstance(ghmodpack, str) and GithubModpack.is_ok(ghmodpack))
 
             self.all_modpack_configs = {}
             self.this_modpack = ghmodpack
             self.root_modpack = install_github_project_with_dependencies(ghmodpack, self.github_root_dir,
                                                                          self.all_modpack_configs)
-            abort_if_not(self.root_modpack is not None)
-            abort_if_not(self.root_modpack != self.this_modpack)
+            raise_if_not(self.root_modpack is not None)
+            raise_if_not(self.root_modpack != self.this_modpack)
             assert self.root_modpack in self.all_modpack_configs
             config_file_origin_plugins(self.all_modpack_configs[self.root_modpack].origin_configs)
 
-            abort_if_not('githubusername' in jsonconfig)
+            raise_if_not('githubusername' in jsonconfig)
             self.github_username = jsonconfig['githubusername']
 
     def root_modpack_config(self) -> GithubModpackConfig:

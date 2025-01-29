@@ -5,7 +5,7 @@ from sanguine.helpers.file_retriever import ArchiveFileRetriever
 
 
 class _SimpleArInstallerInstallData:
-    SANGUINE_JSON: list[tuple[str, str]] = [('install_from_root','root')]
+    SANGUINE_JSON: list[tuple[str, str]] = [('install_from_root', 'root')]
     install_from_root: str
 
     def __init__(self, ifr: str) -> None:

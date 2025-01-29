@@ -48,7 +48,7 @@ def github_project_exists(githubroot: str, ghfolder: GithubFolder) -> int:
         config = targetdir + '\\.git\\config'
         pattern = re.compile(r'\s*url\s*=\s*https://github.com/([^/]*)/(.*)\.git')
         if os.path.isfile(config):
-            with open_3rdparty_txt_file(config) as f:
+            with open_3rdparty_txt_file_with_encoding(config, 'utf-8') as f:
                 for ln in f:
                     m = pattern.match(ln.strip())
                     if m:
@@ -69,7 +69,7 @@ def github_project_exists(githubroot: str, ghfolder: GithubFolder) -> int:
 def clone_github_project(githubdir: str, ghfolder: GithubFolder,
                          errhandler: NetworkErrorHandler | None, adjustpermissions: bool = False) -> None:
     targetdir = os.path.split(ghfolder.folder(githubdir))[0]
-    abort_if_not(not os.path.exists(targetdir + '\\' + ghfolder.project))
+    raise_if_not(not os.path.exists(targetdir + '\\' + ghfolder.project))
 
     createddir = targetdir + '\\' + ghfolder.project  # we need it to adjust permissions properly
     if not os.path.isdir(targetdir):

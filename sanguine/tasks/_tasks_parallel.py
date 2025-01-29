@@ -467,7 +467,7 @@ class Parallel:
 
                 critical('Parallel: probable typo in task name or circular dependency: cannot resolve tasks:\n'
                          + taskstr + '\n')
-                abort_if_not(False)
+                raise_if_not(False)
 
     def _run_all_own_tasks(self, mltimer: _MainLoopTimer) -> bool:
         ran = False
@@ -813,7 +813,7 @@ class Parallel:
     def add_task(self, task: Task) -> None:  # to be called from owntask.f()
         assert task.name not in self._all_task_nodes
         added = self._internal_add_task_if(task)
-        abort_if_not(added,
+        raise_if_not(added,
                      lambda: 'Parallel: cannot add task {}, are you sure all dependencies are known?'.format(task.name))
 
     def replace_task_placeholder(self, task: Task) -> None:

@@ -26,7 +26,7 @@ def decrement_parallel_count() -> None:
 
 def _abort_if_parallel_running() -> None:
     global _parallel_count
-    abort_if_not(_parallel_count == 0)
+    raise_if_not(_parallel_count == 0)
 
 
 def is_lambda(func: Callable) -> bool:

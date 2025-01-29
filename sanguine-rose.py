@@ -36,7 +36,7 @@ if __name__ == '__main__':
     check_sanguine_prerequisites()
 
     cfgfname = argv[0]
-    abort_if_not(os.path.isfile(cfgfname))
+    raise_if_not(os.path.isfile(cfgfname))
     cfgfname = normalize_file_path(cfgfname)
     cfg = LocalProjectConfig(cfgfname)
     add_file_logging(cfg.tmp_dir + 'sanguine.log.html')

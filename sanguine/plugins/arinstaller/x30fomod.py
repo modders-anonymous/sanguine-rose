@@ -6,6 +6,7 @@ from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 from sanguine.helpers.stable_json import from_stable_json, to_stable_json
+# noinspection PyProtectedMember
 from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig, FomodModuleConfig
 
 
@@ -32,7 +33,7 @@ class _FomodArInstallerPluginExtraData:
 
     @classmethod
     def for_stable_json_load(cls) -> "_FomodArInstallerPluginExtraData":
-        return cls(FomodModuleConfig())
+        return cls(FomodModuleConfig.for_stable_json_load())
 
 
 class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
@@ -67,9 +68,9 @@ class _FomodArInstallerPluginInstallData:
         self.no_extra_data = noextradata
         self.exceptions = exceptions
 
-    # @classmethod
-    # def for_stable_json_load(cls) -> "_FomodArInstallerPluginInstallData":
-    #    return cls({})
+    @classmethod
+    def for_stable_json_load(cls) -> "_FomodArInstallerPluginInstallData":
+        return cls({}, [], {})
 
 
 class FomodArInstallerPlugin(ArInstallerPluginBase):
@@ -91,7 +92,7 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
         return None
 
     def got_loaded_data(self, data: dict[str, Any]) -> None:
-        target = _FomodArInstallerPluginInstallData({}, [], {})
+        target = _FomodArInstallerPluginInstallData.for_stable_json_load()
         from_stable_json(target, data)
         self.extra_data = target.extra_data
         self.no_extra_data = target.no_extra_data

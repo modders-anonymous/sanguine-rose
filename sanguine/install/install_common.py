@@ -35,11 +35,11 @@ class SanguinicError(Exception):
     pass
 
 
-def abort_if_not(cond: bool, msg: Callable[[], str] | str | None = None):
+def raise_if_not(cond: bool, msg: Callable[[], str] | str | None = None):
     # 'always assert', even if __debug__ is False.
     # msg is a string or lambda which returns error message
     if not cond:
-        msg1 = 'abort_if_not() failed'
+        msg1 = 'raise_if_not() failed'
         if msg is not None:
             if callable(msg):
                 msg1 += ': ' + msg()
@@ -54,12 +54,8 @@ def abort_if_not(cond: bool, msg: Callable[[], str] | str | None = None):
 
 # helpers
 
-def open_3rdparty_txt_file(fname: str) -> typing.TextIO:
-    return open(fname, 'rt', encoding='cp1252', errors='replace')
-
-
-def open_3rdparty_txt_file_w(fname) -> typing.TextIO:
-    return open(fname, 'wt', encoding='cp1252')
+def open_3rdparty_txt_file_with_encoding(fname: str, encoding: str) -> typing.TextIO:
+    return open(fname, 'rt', encoding=encoding, errors='replace')
 
 
 #  all our dir and file names are always in lowercase, and always end with '\\'

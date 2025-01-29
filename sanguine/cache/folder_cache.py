@@ -154,7 +154,7 @@ def _load_files_task_func(param: tuple[str, str, FolderListToCache]) -> tuple[di
         assert p == f.file_path
         # incl = self._folder_list.is_file_path_included(p)
         incl2 = srch.is_file_path_included(p)
-        # abort_if_not(incl == incl2)
+        # raise_if_not(incl == incl2)
         if incl2:
             files_by_path[p] = f
         else:
@@ -544,7 +544,7 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
                                          name)
             else:
                 critical('FolderCache: {} is neither dir or file, aborting'.format(fpath))
-                abort_if_not(False)
+                raise_if_not(False)
         assert dirpath not in sdout.scan_stats
         sdout.scan_stats[dirpath] = nf
 

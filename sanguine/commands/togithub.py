@@ -336,7 +336,7 @@ class _ModInProgress:
                         ordered.append(i)
                         roundok = True
                         break  # for i
-                abort_if_not(roundok)  # circular dependency, TODO: handle it
+                raise_if_not(roundok)  # circular dependency, TODO: handle it
 
             assert len(ordered) == len(self.install_from)
             assert len(ordered) == len(set(ordered))

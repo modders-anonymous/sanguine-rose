@@ -8,7 +8,7 @@ class ModList:
         assert is_normalized_dir_path(dirpath)
         fname = dirpath + 'modlist.txt'
         self.modlist = None
-        with open_3rdparty_txt_file(fname) as rf:
+        with open_3rdparty_txt_file_autodetect(fname) as rf:
             self.modlist = [line.rstrip() for line in rf]
         self.modlist = list(filter(lambda s: s.endswith('_separator') or not s.startswith('-'), self.modlist))
         self.modlist.reverse()  # 'natural' order

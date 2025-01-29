@@ -277,15 +277,9 @@ def unused_config_warning(where: str, cfg: ConfigData, known: list[str]) -> None
         alert('Unused config keys in {}: {}'.format(where, errstr))
 
 
-### JSON-related
+### file-related
 
-def open_git_data_file_for_writing(fpath: str) -> typing.TextIO:
-    return open(fpath, 'wt', encoding='utf-8', newline='\n')
-
-
-def open_git_data_file_for_reading(fpath: str) -> typing.TextIO:
-    return open(fpath, 'rt', encoding='utf-8')
-
+# open_3rdparty_txt_file_with_encoding() is defined in sanguine.install.install_common.py
 
 def open_3rdparty_txt_file_autodetect(fname: str) -> typing.TextIO:
     n = min(32, os.path.getsize(fname))
@@ -298,6 +292,20 @@ def open_3rdparty_txt_file_autodetect(fname: str) -> typing.TextIO:
         enc = chardet.detect(raw)['encoding']
     return open(fname, 'rt', encoding=enc, errors='replace')
 
+
+def open_3rdparty_txt_file_w(fname) -> typing.TextIO:
+    return open(fname, 'wt', encoding='cp1252')
+
+
+def open_git_data_file_for_writing(fpath: str) -> typing.TextIO:
+    return open(fpath, 'wt', encoding='utf-8', newline='\n')
+
+
+def open_git_data_file_for_reading(fpath: str) -> typing.TextIO:
+    return open(fpath, 'rt', encoding='utf-8')
+
+
+# JSON-related
 
 def to_json_hash(h: bytes) -> str:
     b64 = base64.b64encode(h).decode('ascii')

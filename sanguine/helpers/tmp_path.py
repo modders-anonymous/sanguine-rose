@@ -37,7 +37,7 @@ class TmpPath:  # as we're playing with rmtree() here, we need to be super-caref
                     except Exception as e2:
                         warn('Error removing {}: {}'.format(reservefolder, e2))
 
-                abort_if_not(ok)
+                raise_if_not(ok)
                 info('Will use {} as tmpdir'.format(self.tmpdir))
 
         os.makedirs(self.tmpdir)

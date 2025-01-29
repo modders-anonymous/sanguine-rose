@@ -50,7 +50,7 @@ def pickled_cache(cachedir: str, cachedata: ConfigData, prefix: str, origfiles: 
 
     for f in files:
         st = os.lstat(f[0])
-        abort_if_not(f[1] == st.st_size and f[
+        raise_if_not(f[1] == st.st_size and f[
             2] == st.st_mtime)  # if any of the files we depend on, has changed while calc() was calculated - something is really weird is going on here
 
     with open(cachedir + prefix + '.pickle', 'wb') as wf:
