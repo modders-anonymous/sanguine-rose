@@ -203,7 +203,7 @@ def _from_stable_json_primitive(data: Any, target4typeonly: Any) -> Any:
     return data
 
 
-def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> None:
+def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None, ignore_unknown=False) -> None:
     assert target is not None
     if hasattr(target, 'from_sanguine_stable_json'):
         return target.from_sanguine_stable_json(data)
@@ -211,6 +211,13 @@ def from_stable_json(target: Any, data: Any, typ: _StableJsonType = None) -> Non
         if __debug__:
             _validate_sjdecl(target)
         raise_if_not(isinstance(data, dict))
+        if __debug__:
+            if len(target.SANGUINE_JSON) == 1 and target.SANGUINE_JSON[0][1] is None:
+                pass
+            elif not ignore_unknown:
+                known_keys = set([sj[1] for sj in target.SANGUINE_JSON])
+                for key in data:
+                    assert key in known_keys
         tgdi = target.__dict__
         for sj in target.SANGUINE_JSON:  # len(sj) can be 2 or 3
             field = sj[0]
