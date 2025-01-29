@@ -135,6 +135,8 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
     if hasattr(data, 'SANGUINE_JSON'):
         if __debug__:
             _validate_sjdecl(data)
+        if hasattr(data, 'sanguine_stable_json_make_canonical'):
+            data.sanguine_stable_json_make_canonical()
         out: dict[str, Any] = {}
         di = data.__dict__
         for sj in data.SANGUINE_JSON:  # len(sj) can be 2 or 3
@@ -155,8 +157,6 @@ def to_stable_json(data: Any, typ: _StableJsonType | None = None) -> Any:
                 if v != ftyp.default:
                     vjson = to_stable_json(v, ftyp)
                     out[jfield] = vjson
-        if hasattr(data, 'sanguine_stable_json_make_canonical'):
-            data.sanguine_stable_json_make_canonical()
         return out
     elif isinstance(data, list):
         return _stable_json_list(data, typ)
