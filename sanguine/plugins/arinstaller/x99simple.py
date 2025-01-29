@@ -12,7 +12,7 @@ class _SimpleArInstallerInstallData:
         self.install_from_root = ifr
 
     @classmethod
-    def for_stable_json_load(cls):
+    def for_sanguine_stable_json_load(cls):
         return cls('')
 
 

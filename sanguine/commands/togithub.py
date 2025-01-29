@@ -7,12 +7,12 @@ from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.gitdata.project_json import (ProjectJson, ProjectMod, ProjectInstaller,
                                            ProjectExtraArchive, ProjectExtraArchiveFile)
+from sanguine.gitdata.stable_json import to_stable_json, write_stable_json
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.project_config import LocalProjectConfig
-from sanguine.helpers.stable_json import to_stable_json, write_stable_json
 from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 
 

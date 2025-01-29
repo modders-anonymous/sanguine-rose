@@ -38,8 +38,8 @@ def _get_type(target4typeonly: Any, sj: tuple) -> _StableJsonType:
 
 
 def _create_from_typ(typ: Any) -> Any:
-    if hasattr(typ, 'for_stable_json_load'):
-        return typ.for_stable_json_load()
+    if hasattr(typ, 'for_sanguine_stable_json_load'):
+        return typ.for_sanguine_stable_json_load()
     else:
         return typ()
 

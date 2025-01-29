@@ -14,7 +14,7 @@ class _BainArInstallerInstallData:
         self.bain_folders = bf
 
     @classmethod
-    def for_stable_json_load(cls):
+    def for_sanguine_stable_json_load(cls):
         return cls([])
 
 

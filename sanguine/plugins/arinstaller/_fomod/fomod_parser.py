@@ -1,7 +1,7 @@
 import xml.etree.ElementTree as ElementTree
 
 from sanguine.common import *
-from sanguine.helpers.stable_json import StableJsonFlags
+from sanguine.gitdata.stable_json import StableJsonFlags
 
 
 def _raise_unknown_tag(parent: ElementTree.Element | None, e: ElementTree.Element) -> None:
@@ -58,7 +58,7 @@ class _SrcDst:
         self.flags = _SrcDstFlags.NoFlags
 
     @classmethod
-    def for_stable_json_load(cls) -> "_SrcDst":
+    def for_sanguine_stable_json_load(cls) -> "_SrcDst":
         out = cls()
         out.src = ''
         out.dst = ''
@@ -99,7 +99,7 @@ class _FilesAndFolders:
         self.folders = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "_FilesAndFolders":
+    def for_sanguine_stable_json_load(cls) -> "_FilesAndFolders":
         return cls()
 
     def is_for_load(self) -> bool:
@@ -131,7 +131,7 @@ class _FlagDependency:
         self.value = None
 
     @classmethod
-    def for_stable_json_load(cls) -> "_FlagDependency":
+    def for_sanguine_stable_json_load(cls) -> "_FlagDependency":
         out = cls()
         out.name = ''
         out.value = ''
@@ -185,7 +185,7 @@ class _FileDependency:
         self.state = _FileDependencyState.NotInitialized
 
     @classmethod
-    def for_stable_json_load(cls) -> "_FileDependency":
+    def for_sanguine_stable_json_load(cls) -> "_FileDependency":
         out = cls()
         out.file = ''
         return out
@@ -225,7 +225,7 @@ class _GameDependency:
         self.version = None
 
     @classmethod
-    def for_stable_json_load(cls) -> "_GameDependency":
+    def for_sanguine_stable_json_load(cls) -> "_GameDependency":
         out = cls()
         out.version = ''
         return out
@@ -271,11 +271,11 @@ class _SomeDependency:
             self.dependencies = dep
 
     @classmethod
-    def for_stable_json_load(cls) -> "_SomeDependency":
-        out = cls(_FileDependency.for_stable_json_load())
-        out.flag_dependency = _FlagDependency.for_stable_json_load()
-        out.game_dependency = _GameDependency.for_stable_json_load()
-        out.dependencies = _Dependencies.for_stable_json_load()
+    def for_sanguine_stable_json_load(cls) -> "_SomeDependency":
+        out = cls(_FileDependency.for_sanguine_stable_json_load())
+        out.flag_dependency = _FlagDependency.for_sanguine_stable_json_load()
+        out.game_dependency = _GameDependency.for_sanguine_stable_json_load()
+        out.dependencies = _Dependencies.for_sanguine_stable_json_load()
         return out
 
     def sanguine_stable_json_make_canonical(self) -> None:
@@ -300,7 +300,7 @@ class _Dependencies:
         self.dependencies = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "_Dependencies":
+    def for_sanguine_stable_json_load(cls) -> "_Dependencies":
         return cls()
 
     def is_for_load(self) -> bool:
@@ -381,7 +381,7 @@ class _Pattern:
         self.files = None
 
     @classmethod
-    def for_stable_json_load(cls) -> "_Pattern":
+    def for_sanguine_stable_json_load(cls) -> "_Pattern":
         out = cls()
         out.dependencies = _Dependencies()
         out.files = _FilesAndFolders()
@@ -432,7 +432,7 @@ class _TypeDescriptor:
         self.patterns = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "_TypeDescriptor":
+    def for_sanguine_stable_json_load(cls) -> "_TypeDescriptor":
         return cls()
 
 
@@ -476,12 +476,12 @@ class _Plugin:
         self.condition_flags = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "_Plugin":
+    def for_sanguine_stable_json_load(cls) -> "_Plugin":
         out = cls()
         out.name = ''
         out.description = ''
         out.image = ''
-        out.files = _FilesAndFolders.for_stable_json_load()
+        out.files = _FilesAndFolders.for_sanguine_stable_json_load()
         out.type_descriptor = _TypeDescriptor()
         return out
 
@@ -571,7 +571,7 @@ class _Group:
         self.plugins = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "_Group":
+    def for_sanguine_stable_json_load(cls) -> "_Group":
         out = cls()
         out.name = ''
         return out
@@ -634,7 +634,7 @@ class _InstallStep:
         self.visible = _Dependencies()
 
     @classmethod
-    def for_stable_json_load(cls) -> "_InstallStep":
+    def for_sanguine_stable_json_load(cls) -> "_InstallStep":
         out = cls()
         out.name = ''
         return out
@@ -696,7 +696,7 @@ class FomodModuleConfig:
         self.conditional_file_installs = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "FomodModuleConfig":
+    def for_sanguine_stable_json_load(cls) -> "FomodModuleConfig":
         out = cls()
         out.module_name = ''
         return out

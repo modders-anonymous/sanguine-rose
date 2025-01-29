@@ -72,7 +72,7 @@ class GithubFileRetriever(FileRetriever):
         self.from_path = frompath
 
     @classmethod
-    def for_stable_json_load(cls) -> "GithubFileRetriever":
+    def for_sanguine_stable_json_load(cls) -> "GithubFileRetriever":
         return cls((b'', 0), '', '', '')
 
     def _full_path(self) -> str:

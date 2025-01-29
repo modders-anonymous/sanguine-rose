@@ -1,6 +1,6 @@
 from sanguine.common import *
+from sanguine.gitdata.stable_json import StableJsonFlags
 from sanguine.helpers.file_retriever import GithubFileRetriever
-from sanguine.helpers.stable_json import StableJsonFlags
 
 
 class ProjectExtraArchiveFile:
@@ -13,7 +13,7 @@ class ProjectExtraArchiveFile:
         self.file_hash = h
 
     @classmethod
-    def for_stable_json_load(cls) -> "ProjectExtraArchiveFile":
+    def for_sanguine_stable_json_load(cls) -> "ProjectExtraArchiveFile":
         return cls('', b'')
 
 
@@ -35,7 +35,7 @@ class ProjectExtraArchive:
         self.extra_files = []
 
     @classmethod
-    def for_stable_json_load(cls) -> "ProjectExtraArchive":
+    def for_sanguine_stable_json_load(cls) -> "ProjectExtraArchive":
         out = cls(0)
         out.archive_idx = 0
         out.archive_hash = b''
@@ -58,7 +58,7 @@ class ProjectInstaller:
         self.skip = skip
 
     @classmethod
-    def for_stable_json_load(cls) -> "ProjectInstaller":
+    def for_sanguine_stable_json_load(cls) -> "ProjectInstaller":
         return cls(b'', '', {}, [])
 
 
@@ -88,7 +88,7 @@ class ProjectMod:
         self.unknown_files_by_tools = None
 
     @classmethod
-    def for_stable_json_load(cls) -> "ProjectMod":
+    def for_sanguine_stable_json_load(cls) -> "ProjectMod":
         out = cls()
         out.mod_name = ''
         out.zero_files = []

@@ -2,10 +2,10 @@
 import xml.etree.ElementTree as ElementTree
 
 from sanguine.common import *
+from sanguine.gitdata.stable_json import from_stable_json, to_stable_json
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
-from sanguine.helpers.stable_json import from_stable_json, to_stable_json
 # noinspection PyProtectedMember
 from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig, FomodModuleConfig
 
@@ -32,8 +32,8 @@ class _FomodArInstallerPluginExtraData:
         self.module_config = mconfig
 
     @classmethod
-    def for_stable_json_load(cls) -> "_FomodArInstallerPluginExtraData":
-        return cls(FomodModuleConfig.for_stable_json_load())
+    def for_sanguine_stable_json_load(cls) -> "_FomodArInstallerPluginExtraData":
+        return cls(FomodModuleConfig.for_sanguine_stable_json_load())
 
 
 class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
@@ -69,7 +69,7 @@ class _FomodArInstallerPluginInstallData:
         self.exceptions = exceptions
 
     @classmethod
-    def for_stable_json_load(cls) -> "_FomodArInstallerPluginInstallData":
+    def for_sanguine_stable_json_load(cls) -> "_FomodArInstallerPluginInstallData":
         return cls({}, [], {})
 
 
@@ -92,7 +92,7 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
         return None
 
     def got_loaded_data(self, data: dict[str, Any]) -> None:
-        target = _FomodArInstallerPluginInstallData.for_stable_json_load()
+        target = _FomodArInstallerPluginInstallData.for_sanguine_stable_json_load()
         from_stable_json(target, data)
         self.extra_data = target.extra_data
         self.no_extra_data = target.no_extra_data
@@ -132,7 +132,7 @@ if __name__ == '__main__':
         tfname = os.path.split(os.path.abspath(__file__))[
                      0] + '\\..\\..\\..\\..\\sanguine-skyrim-root\\known-arinstaller-fomod-data.json'
 
-        xdata = _FomodArInstallerPluginInstallData.for_stable_json_load()
+        xdata = _FomodArInstallerPluginInstallData.for_sanguine_stable_json_load()
 
         with open(tfname, 'rt') as tf:
             known_json = json.load(tf)
