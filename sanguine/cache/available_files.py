@@ -10,6 +10,7 @@ from sanguine.helpers.file_retriever import (FileRetriever, ZeroFileRetriever, G
                                              ArchiveFileRetriever, ArchiveFileRetrieverHelper)
 from sanguine.helpers.tmp_path import TmpPath
 from sanguine.install.install_github import GithubFolder
+from sanguine.install.install_ui import InstallUI
 
 
 def _file_origins_task_func(param: tuple[list[bytes, str]]) -> tuple[
@@ -284,11 +285,12 @@ class AvailableFiles:
 if __name__ == '__main__':
     import sys
 
+    ui = InstallUI()
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
         ttmppath = normalize_dir_path('../../../sanguine.tmp\\')
         add_file_logging(ttmppath + 'sanguine.log.html')
 
-        check_sanguine_prerequisites()
+        check_sanguine_prerequisites(ui)
         perf_warn('Test performance warning')
 
         with TmpPath(ttmppath) as ttmpdir:

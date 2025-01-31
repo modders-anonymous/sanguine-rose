@@ -92,28 +92,30 @@ if __name__ == '__main__':
     import sys
     import time
     from sanguine.install.install_github import clone_github_project, GithubFolder
-    from sanguine.install.install_ui import BoxUINetworkErrorHandler
+    from sanguine.install.install_ui import InstallUI
 
+    ui = InstallUI()
     if len(sys.argv) > 1 and sys.argv[1] == 'test':
         ttmppath = normalize_dir_path('../../../../sanguine.tmp\\')
         if not os.path.isdir(ttmppath):
             os.makedirs(ttmppath)
         if not os.path.isdir('../../../../KTAGirl/KTA'):
-            clone_github_project('../../../../', GithubFolder('KTAGirl/KTA'), BoxUINetworkErrorHandler(2))
+            clone_github_project('../../../../', GithubFolder('KTAGirl/KTA'), ui.network_error_handler(2))
         add_file_logging(ttmppath + 'sanguine.log.html')
         enable_ex_logging()
-        check_sanguine_prerequisites()
+        check_sanguine_prerequisites(ui)
 
         cfgfname = normalize_file_path('../../../../local-sanguine-project.json5')
-        tcfg = LocalProjectConfig(cfgfname)
+        tcfg = LocalProjectConfig(ui, cfgfname)
 
-        wcache = WholeCache(tcfg)
-        with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=False) as tparallel:
-            t0 = time.perf_counter()
-            wcache.start_tasks(tparallel)
-            dt = time.perf_counter() - t0
-            info('Whole Cache: starting tasks took {:.2f}s'.format(dt))
-            tparallel.run([])
-        wcache.done()
+        with TmpPath(ttmppath) as ttmp:
+            wcache = WholeCache(tcfg, ttmp)
+            with tasks.Parallel(None, taskstatsofinterest=wcache.stats_of_interest(), dbg_serialize=False) as tparallel:
+                t0 = time.perf_counter()
+                wcache.start_tasks(tparallel)
+                dt = time.perf_counter() - t0
+                info('Whole Cache: starting tasks took {:.2f}s'.format(dt))
+                tparallel.run([])
+            wcache.done()
 
         info('whole_cache.py test finished ok')

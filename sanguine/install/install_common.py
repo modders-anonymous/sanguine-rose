@@ -1,5 +1,4 @@
 # part of common.py which can be used in install scripts too
-
 # noinspection PyUnresolvedReferences
 import os
 import traceback
@@ -109,3 +108,33 @@ def is_normalized_file_name(fname: str) -> bool:
 def normalize_file_name(fname: str) -> str:
     assert '\\' not in fname and '/' not in fname
     return fname.lower()
+
+
+# UI
+
+class LinearUIImportance(IntEnum):
+    Default = 0
+    Important = 1
+    VeryImportant = 2
+
+
+class LinearUI:
+    @abstractmethod
+    def set_silent_mode(self) -> None:
+        pass
+
+    @abstractmethod
+    def message_box(self, prompt: str, spec: list[str], level: LinearUIImportance = LinearUIImportance.Default) -> str:
+        pass
+
+    @abstractmethod
+    def input_box(self, prompt: str, default: str, level: LinearUIImportance = LinearUIImportance.Default) -> str:
+        pass
+
+    @abstractmethod
+    def confirm_box(self, prompt: str, level: LinearUIImportance = LinearUIImportance.Default) -> None:
+        pass
+
+    @abstractmethod
+    def network_error_handler(self, nretries: int) -> NetworkErrorHandler:
+        pass

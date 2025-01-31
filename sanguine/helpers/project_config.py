@@ -6,7 +6,6 @@ from sanguine.common import *
 from sanguine.gitdata.file_origin import config_file_origin_plugins
 from sanguine.helpers.plugin_handler import load_plugins
 from sanguine.install.install_github import GithubFolder, clone_github_project, github_project_exists
-from sanguine.install.install_ui import BoxUINetworkErrorHandler
 
 
 def _normalize_config_dir_path(path: str, configdir: str) -> str:  # relative to config dir
@@ -203,7 +202,7 @@ class GithubModpackConfig:
             self.own_mod_names = [normalize_file_name(om) for om in jsonconfig.get('ownmods', [])]
 
 
-def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
+def install_github_project_with_dependencies(ui: LinearUI, ghproject: str, githubrootdir: str,
                                              allmodpackconfigs: ConfigData) -> str | None:
     rootmodpack: str | None = None
     if ghproject in allmodpackconfigs:
@@ -219,7 +218,7 @@ def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
 
     if ok == 0:
         info('Cloning GitHub project: {}'.format(ghproject))
-        clone_github_project(githubrootdir, gh, BoxUINetworkErrorHandler(2))
+        clone_github_project(githubrootdir, gh, ui.network_error_handler(2))
         info('GitHub project {} cloned successfully'.format(ghproject))
 
     assert ok == 1
@@ -234,7 +233,7 @@ def install_github_project_with_dependencies(ghproject: str, githubrootdir: str,
             rootmodpack = ghproject
 
         for d in mpcfg.dependencies:
-            rmp = install_github_project_with_dependencies(d.mpto_str(), githubrootdir, allmodpackconfigs)
+            rmp = install_github_project_with_dependencies(ui, d.mpto_str(), githubrootdir, allmodpackconfigs)
             raise_if_not(rmp is None or rootmodpack is None)
             if rmp is not None:
                 rootmodpack = rmp
@@ -255,7 +254,7 @@ class LocalProjectConfig:
     github_username: str | None
 
     # TODO: check that sanguine-rose itself, cache_dir, and tmp_dir don't overlap with any of the dirs
-    def __init__(self, jsonconfigfname: str) -> None:
+    def __init__(self, ui: LinearUI, jsonconfigfname: str) -> None:
         self.config_dir = normalize_dir_path(os.path.split(jsonconfigfname)[0])
         with (open_3rdparty_txt_file_autodetect(jsonconfigfname) as f):
             jsonconfig = json5.loads(f.read())
@@ -307,7 +306,7 @@ class LocalProjectConfig:
 
             self.all_modpack_configs = {}
             self.this_modpack = ghmodpack
-            self.root_modpack = install_github_project_with_dependencies(ghmodpack, self.github_root_dir,
+            self.root_modpack = install_github_project_with_dependencies(ui, ghmodpack, self.github_root_dir,
                                                                          self.all_modpack_configs)
             raise_if_not(self.root_modpack is not None)
             raise_if_not(self.root_modpack != self.this_modpack)

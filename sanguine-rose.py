@@ -10,7 +10,7 @@ sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 from sanguine.common import *
 from sanguine.install.install_checks import check_sanguine_prerequisites
-from sanguine.install.install_ui import input_box
+from sanguine.install.install_ui import InstallUI
 from sanguine.helpers.project_config import LocalProjectConfig, install_github_project_with_dependencies, \
     GithubModpackConfig
 import sanguine.tasks as tasks
@@ -33,12 +33,13 @@ if __name__ == '__main__':
         _usage()
         sys.exit(1)
 
-    check_sanguine_prerequisites()
+    ui = InstallUI()
+    check_sanguine_prerequisites(ui)
 
     cfgfname = argv[0]
     raise_if_not(os.path.isfile(cfgfname))
     cfgfname = normalize_file_path(cfgfname)
-    cfg = LocalProjectConfig(cfgfname)
+    cfg = LocalProjectConfig(ui, cfgfname)
     add_file_logging(cfg.tmp_dir + 'sanguine.log.html')
     enable_ex_logging()
 
@@ -51,7 +52,7 @@ if __name__ == '__main__':
         wcache.done()
 
     while True:
-        cmd = input_box('Enter Command:', '')
+        cmd = ui.input_box('Enter Command:', '')
         try:
             info(cmd)
             command: list[str] = cmd.split(' ')
@@ -68,7 +69,7 @@ if __name__ == '__main__':
                     else:
                         allmodpackconfigs: dict[
                             str, GithubModpackConfig] = {}  # have to use temporary one to avoid changing our main cfg
-                        rootmodpack = install_github_project_with_dependencies(command[1], cfg.github_root_dir,
+                        rootmodpack = install_github_project_with_dependencies(ui, command[1], cfg.github_root_dir,
                                                                                allmodpackconfigs)
                         info('{} installed, root={}'.format(command[1], rootmodpack))
 

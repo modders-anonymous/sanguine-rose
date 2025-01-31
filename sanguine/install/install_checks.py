@@ -8,7 +8,6 @@ import sys
 #                    1. may use only those Python modules installed by default, and
 #                    2. may use only those sanguine modules which are specifically designated as install-friendly
 from sanguine.install.install_common import *
-from sanguine.install.install_ui import message_box
 
 REQUIRED_PIP_MODULES = ['json5', 'bethesda-structs', 'pywin32', 'certifi', 'pyinstaller', 'chardet']
 PIP2PYTHON_MODULE_NAME_REMAPPING = {'bethesda-structs': 'bethesda_structs', 'pywin32': ['win32api', 'win32file'],
@@ -83,7 +82,7 @@ def find_command_and_add_to_path(cmd: list[str], shell: bool = False) -> bool:
     return False
 
 
-def report_hostile_programs() -> None:
+def report_hostile_programs(ui: LinearUI) -> None:
     try:
         tasklist = subprocess.check_output(['tasklist'])
         tasklist = tasklist.decode('ascii')
@@ -99,8 +98,8 @@ def report_hostile_programs() -> None:
             critical('It is STRONGLY suggested to quit, uninstall Norton antivirus, reboot, and re-launch {}.'.format(
                 sys.argv[0]))
             alert('After removing Norton antivirus, you may want to enable Windows Defender.')
-            choice = message_box('Are you ok with this suggestion?',
-                                 ['Yes', 'no'], level=logging.CRITICAL)
+            choice = ui.message_box('Are you ok with this suggestion?',
+                                    ['Yes', 'no'], level=logging.CRITICAL)
             if choice != 'no':
                 alert(
                     'Exiting. Please uninstall Norton antivirus, reboot, optionally enable Windows Defender, and re-launch {}.'.format(
@@ -108,7 +107,7 @@ def report_hostile_programs() -> None:
                 sys.exit(1)
 
 
-def check_sanguine_prerequisites(frominstall: bool = False) -> None:
+def check_sanguine_prerequisites(ui: LinearUI, frominstall: bool = False) -> None:
     if not sys.version_info >= (3, 10):
         critical('Sorry, sanguine-rose needs at least Python 3.10')
         sys.exit(1)
@@ -136,6 +135,6 @@ def check_sanguine_prerequisites(frominstall: bool = False) -> None:
         # noinspection PyProtectedMember, PyUnresolvedReferences
         os._exit(1)
 
-    report_hostile_programs()
+    report_hostile_programs(ui)
 
     info('All sanguine prerequisites are ok.')

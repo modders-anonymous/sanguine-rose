@@ -4,7 +4,6 @@ import sys
 
 from sanguine.install.install_checks import (REQUIRED_PIP_MODULES, find_command_and_add_to_path)
 from sanguine.install.install_common import *
-from sanguine.install.install_ui import message_box, confirm_box, BoxUINetworkErrorHandler
 
 
 # for _install_helpers we cannot use any files with non-guaranteed dependencies, so we:
@@ -19,14 +18,14 @@ def _install_pip_module(module: str) -> None:
 
 ### install
 
-def run_installer(cmd: list[str], sitefrom: str, msg: str) -> None:
+def run_installer(ui: LinearUI, cmd: list[str], sitefrom: str, msg: str) -> None:
     alert("We're about to run the following installer: {}".format(cmd[0]))
     info("It was downloaded from {}".format(sitefrom))
     info("Feel free to run it through your favorite virus checker,")
     info("     but when, after entering 'Y' below, Windows will ask you stupid questions,")
     alert("     please make sure to tell Windows that you're ok with it")
 
-    choice = message_box('Do you want to proceed?', ['Yes', 'no'])
+    choice = ui.message_box('Do you want to proceed?', ['Yes', 'no'])
     if choice == 'no':
         critical('Aborting installation. sanguine-rose is likely to be unusable')
         # noinspection PyProtectedMember, PyUnresolvedReferences
@@ -44,7 +43,7 @@ def _tools_dir() -> str:
 
 ### specific installers
 
-def _install_vs_build_tools() -> None:
+def _install_vs_build_tools(ui: LinearUI) -> None:
     import sanguine.install.simple_download as simple_download
     # importing only here, not at the beginning, to ensure that we already have certifi installed
 
@@ -70,17 +69,17 @@ def _install_vs_build_tools() -> None:
     assert len(urls) == 1
     url = urls[0]
     info('Downloading {}...'.format(url))
-    exe = simple_download.download_temp(url, BoxUINetworkErrorHandler(2))
+    exe = simple_download.download_temp(url, ui.network_error_handler(2))
     info('Download complete.')
-    run_installer([exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
+    run_installer(ui, [exe], url, 'Make sure to check "Desktop Development with C++" checkbox.')
     info('Visual C++ build tools install started.')
     alert('Please proceed with VC++ install and restart {} afterwards.'.format(sys.argv[0]))
-    confirm_box('Press any key to exit {} now.'.format(sys.argv[0]))
+    ui.confirm_box('Press any key to exit {} now.'.format(sys.argv[0]))
     # noinspection PyProtectedMember, PyUnresolvedReferences
     os._exit(0)
 
 
-def install_sanguine_prerequisites() -> None:
+def install_sanguine_prerequisites(ui: LinearUI) -> None:
     gitok = find_command_and_add_to_path(['git', '--version'])
     raise_if_not(gitok)
 
@@ -88,7 +87,7 @@ def install_sanguine_prerequisites() -> None:
     _install_pip_module('certifi')  # needed to run simple_download within _install_vs_build_tools()
     info('certifi installed.')
 
-    _install_vs_build_tools()  # should run before installing pip modules
+    _install_vs_build_tools(ui)  # should run before installing pip modules
 
     for m in REQUIRED_PIP_MODULES:
         _install_pip_module(m)
