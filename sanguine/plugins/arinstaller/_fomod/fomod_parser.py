@@ -1,7 +1,6 @@
 import xml.etree.ElementTree as ElementTree
 
-from sanguine.common import *
-from sanguine.gitdata.stable_json import StableJsonFlags
+from sanguine.plugins.arinstaller._fomod.fomod_common import *
 
 
 def _raise_unknown_tag(parent: ElementTree.Element | None, e: ElementTree.Element) -> None:
@@ -37,38 +36,10 @@ def _text(e: ElementTree.Element) -> str:
     return e.text.strip() if e.text is not None else ''
 
 
-class _SrcDstFlags(IntFlag):
-    NoFlags = 0
-    AlwaysInstall = 0x1
-    InstallIfUsable = 0x2
-
-
-class _SrcDst:
-    SANGUINE_JSON: list[tuple] = [('src', 'src', ''), ('dst', 'dst', ''),
-                                  ('priority', 'pri', -1), ('flags', 'flags', _SrcDstFlags.NoFlags)]
-    src: str | None
-    dst: str | None
-    priority: int
-    flags: _SrcDstFlags
-
-    def __init__(self) -> None:
-        self.src = None
-        self.dst = None
-        self.priority = -1
-        self.flags = _SrcDstFlags.NoFlags
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_SrcDst":
-        out = cls()
-        out.src = ''
-        out.dst = ''
-        return out
-
-
-def _parse_src_dst(n: ElementTree.Element) -> _SrcDst:
+def _parse_src_dst(n: ElementTree.Element) -> FomodSrcDst:
     _check_no_text(n)
     _check_no_children(n)
-    out = _SrcDst()
+    out = FomodSrcDst()
     for an, av in n.attrib.items():
         match an:
             case 'source':
@@ -78,9 +49,9 @@ def _parse_src_dst(n: ElementTree.Element) -> _SrcDst:
             case 'priority':
                 out.priority = int(av)
             case 'alwaysInstall':
-                out.flags |= _SrcDstFlags.AlwaysInstall
+                out.flags |= FomodSrcDstFlags.AlwaysInstall
             case 'installIfUsable':
-                out.flags |= _SrcDstFlags.InstallIfUsable
+                out.flags |= FomodSrcDstFlags.InstallIfUsable
             case _:
                 _raise_unknown_attr(n, an)
     if out.src is None or out.dst is None:
@@ -88,26 +59,8 @@ def _parse_src_dst(n: ElementTree.Element) -> _SrcDst:
     return out
 
 
-class _FilesAndFolders:
-    SANGUINE_JSON: list[tuple] = [('files', 'files', _SrcDst, StableJsonFlags.Unsorted),
-                                  ('folders', 'folders', _SrcDst, StableJsonFlags.Unsorted)]
-    files: list[_SrcDst]
-    folders: list[_SrcDst]
-
-    def __init__(self) -> None:
-        self.files = []
-        self.folders = []
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_FilesAndFolders":
-        return cls()
-
-    def is_for_load(self) -> bool:
-        return self.files == [] and self.folders == []
-
-
-def _parse_files_and_folders(n: ElementTree.Element) -> _FilesAndFolders:
-    out = _FilesAndFolders()
+def _parse_files_and_folders(n: ElementTree.Element) -> FomodFilesAndFolders:
+    out = FomodFilesAndFolders()
     _check_no_text(n)
     _check_no_attrs(n)
     for child in n:
@@ -121,28 +74,8 @@ def _parse_files_and_folders(n: ElementTree.Element) -> _FilesAndFolders:
     return out
 
 
-class _FlagDependency:
-    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('value', 'value')]
-    name: str | None
-    value: str | None
-
-    def __init__(self) -> None:
-        self.name = None
-        self.value = None
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_FlagDependency":
-        out = cls()
-        out.name = ''
-        out.value = ''
-        return out
-
-    def is_for_load(self) -> bool:
-        return self.name == '' and self.value == ''
-
-
-def _parse_flag_dependency(n: ElementTree.Element) -> _FlagDependency:
-    out = _FlagDependency()
+def _parse_flag_dependency(n: ElementTree.Element) -> FomodFlagDependency:
+    out = FomodFlagDependency()
     _check_no_text(n)
     _check_no_children(n)
     for an, av in n.attrib.items():
@@ -156,8 +89,8 @@ def _parse_flag_dependency(n: ElementTree.Element) -> _FlagDependency:
     return out
 
 
-def _parse_flag(n: ElementTree.Element) -> _FlagDependency:
-    out = _FlagDependency()
+def _parse_flag(n: ElementTree.Element) -> FomodFlagDependency:
+    out = FomodFlagDependency()
     _check_no_children(n)
     for an, av in n.attrib.items():
         if an == 'name':
@@ -168,34 +101,8 @@ def _parse_flag(n: ElementTree.Element) -> _FlagDependency:
     return out
 
 
-class _FileDependencyState(IntEnum):
-    NotInitialized = 0
-    Active = 1
-    Inactive = 2
-    Missing = 3
-
-
-class _FileDependency:
-    SANGUINE_JSON: list[tuple] = [('file', 'file'), ('state', 'state', _FileDependencyState.NotInitialized)]
-    file: str | None
-    state: _FileDependencyState
-
-    def __init__(self) -> None:
-        self.file = None
-        self.state = _FileDependencyState.NotInitialized
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_FileDependency":
-        out = cls()
-        out.file = ''
-        return out
-
-    def is_for_load(self) -> bool:
-        return self.file == '' and self.state == _FileDependencyState.NotInitialized
-
-
-def _parse_file_dependency(n: ElementTree.Element) -> _FileDependency:
-    out = _FileDependency()
+def _parse_file_dependency(n: ElementTree.Element) -> FomodFileDependency:
+    out = FomodFileDependency()
     _check_no_text(n)
     _check_no_children(n)
     for an, av in n.attrib.items():
@@ -205,11 +112,11 @@ def _parse_file_dependency(n: ElementTree.Element) -> _FileDependency:
             case 'state':
                 match av:
                     case 'Active':
-                        out.state = _FileDependencyState.Active
+                        out.state = FomodFileDependencyState.Active
                     case 'Inactive':
-                        out.state = _FileDependencyState.Inactive
+                        out.state = FomodFileDependencyState.Inactive
                     case 'Missing':
-                        out.state = _FileDependencyState.Missing
+                        out.state = FomodFileDependencyState.Missing
                     case _:
                         _raise_unknown_attr(n, av)
             case _:
@@ -217,25 +124,8 @@ def _parse_file_dependency(n: ElementTree.Element) -> _FileDependency:
     return out
 
 
-class _GameDependency:
-    SANGUINE_JSON: list[tuple] = [('version', 'version')]
-    version: str | None
-
-    def __init__(self) -> None:
-        self.version = None
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_GameDependency":
-        out = cls()
-        out.version = ''
-        return out
-
-    def is_for_load(self) -> bool:
-        return self.version == ''
-
-
-def _parse_game_dependency(n: ElementTree.Element) -> _GameDependency:
-    out = _GameDependency()
+def _parse_game_dependency(n: ElementTree.Element) -> FomodGameDependency:
+    out = FomodGameDependency()
     _check_no_text(n)
     _check_no_children(n)
     for an, av in n.attrib.items():
@@ -246,83 +136,22 @@ def _parse_game_dependency(n: ElementTree.Element) -> _GameDependency:
     return out
 
 
-class _SomeDependency:
-    SANGUINE_JSON: list[tuple] = [('file_dependency', 'filedep'), ('flag_dependency', 'flagdep'),
-                                  ('game_dependency', 'gamedep'), ('dependencies', 'deps')
-                                  ]
-    file_dependency: _FileDependency | None
-    flag_dependency: _FlagDependency | None
-    game_dependency: _GameDependency | None
-    dependencies: "_Dependencies | None"
-
-    def __init__(self, dep: "_FlagDependency|_FileDependency|_GameDependency|_Dependencies") -> None:
-        self.flag_dependency = None
-        self.file_dependency = None
-        self.game_dependency = None
-        self.dependencies = None
-        if isinstance(dep, _FlagDependency):
-            self.flag_dependency = dep
-        elif isinstance(dep, _FileDependency):
-            self.file_dependency = dep
-        elif isinstance(dep, _GameDependency):
-            self.game_dependency = dep
-        else:
-            assert isinstance(dep, _Dependencies)
-            self.dependencies = dep
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_SomeDependency":
-        out = cls(_FileDependency.for_sanguine_stable_json_load())
-        out.flag_dependency = _FlagDependency.for_sanguine_stable_json_load()
-        out.game_dependency = _GameDependency.for_sanguine_stable_json_load()
-        out.dependencies = _Dependencies.for_sanguine_stable_json_load()
-        return out
-
-    def sanguine_stable_json_make_canonical(self) -> None:
-        if self.flag_dependency is not None and self.flag_dependency.is_for_load():
-            self.flag_dependency = None
-        if self.file_dependency is not None and self.file_dependency.is_for_load():
-            self.file_dependency = None
-        if self.game_dependency is not None and self.game_dependency.is_for_load():
-            self.game_dependency = None
-        if self.dependencies is not None and self.dependencies.is_for_load():
-            self.dependencies = None
-
-
-class _Dependencies:
-    SANGUINE_JSON: list[tuple] = [('oroperator', 'or', False),
-                                  ('dependencies', 'deps', _SomeDependency, StableJsonFlags.Unsorted)]
-    oroperator: bool
-    dependencies: list[_SomeDependency]
-
-    def __init__(self) -> None:
-        self.oroperator = False
-        self.dependencies = []
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_Dependencies":
-        return cls()
-
-    def is_for_load(self) -> bool:
-        return self.dependencies == [] and self.oroperator is False
-
-
-def _parse_some_dependency(n: ElementTree.Element) -> _SomeDependency:
+def _parse_some_dependency(n: ElementTree.Element) -> FomodSomeDependency:
     match n.tag:
         case 'fileDependency':
-            return _SomeDependency(_parse_file_dependency(n))
+            return FomodSomeDependency(_parse_file_dependency(n))
         case 'flagDependency':
-            return _SomeDependency(_parse_flag_dependency(n))
+            return FomodSomeDependency(_parse_flag_dependency(n))
         case 'gameDependency':
-            return _SomeDependency(_parse_game_dependency(n))
+            return FomodSomeDependency(_parse_game_dependency(n))
         case 'dependencies':
-            return _SomeDependency(_parse_dependencies(n))
+            return FomodSomeDependency(_parse_dependencies(n))
         case _:
             _raise_unknown_tag(n, n)
 
 
-def _parse_dependencies(n: ElementTree.Element) -> _Dependencies:
-    out = _Dependencies()
+def _parse_dependencies(n: ElementTree.Element) -> FomodDependencies:
+    out = FomodDependencies()
     out.oroperator = False
     for an, av in n.attrib.items():
         if an == 'operator':
@@ -338,62 +167,29 @@ def _parse_dependencies(n: ElementTree.Element) -> _Dependencies:
     return out
 
 
-class _FomodType(IntEnum):
-    NotInitialized = 0
-    NotUsable = 1
-    CouldBeUsable = 2
-    Optional = 3
-    Recommended = 4
-    Required = 5
-
-
-def _parse_fomod_type(n: ElementTree.Element) -> _FomodType:
+def _parse_fomod_type(n: ElementTree.Element) -> FomodType:
     _check_no_text(n)
     _check_no_children(n)
     for an, av in n.attrib.items():
         if an == 'name':
             match av:
                 case 'Recommended':
-                    return _FomodType.Recommended
+                    return FomodType.Recommended
                 case 'Optional':
-                    return _FomodType.Optional
+                    return FomodType.Optional
                 case 'Required':
-                    return _FomodType.Required
+                    return FomodType.Required
                 case 'NotUsable':
-                    return _FomodType.NotUsable
+                    return FomodType.NotUsable
                 case 'CouldBeUsable':
-                    return _FomodType.CouldBeUsable
+                    return FomodType.CouldBeUsable
                 case _:
                     _raise_unknown_attr(n, av)
     _raise_incomplete_tag(n)
 
 
-class _Pattern:
-    SANGUINE_JSON: list[tuple] = [('dependencies', 'deps'), ('type', 'type', _FomodType.NotInitialized),
-                                  ('files', 'files')]
-    dependencies: _Dependencies | None
-    type: _FomodType
-    files: _FilesAndFolders | None
-
-    def __init__(self) -> None:
-        self.dependencies = None
-        self.type = _FomodType.NotInitialized
-        self.files = None
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_Pattern":
-        out = cls()
-        out.dependencies = _Dependencies()
-        out.files = _FilesAndFolders()
-        return out
-
-    def sanguine_stable_json_make_canonical(self) -> None:
-        if self.files is not None and self.files.is_for_load():
-            self.files = None
-
-
-def _parse_pattern(n: ElementTree.Element) -> _Pattern:
-    out = _Pattern()
+def _parse_pattern(n: ElementTree.Element) -> FomodPattern:
+    out = FomodPattern()
     _check_no_text(n)
     _check_no_attrs(n)
     for child in n:
@@ -409,7 +205,7 @@ def _parse_pattern(n: ElementTree.Element) -> _Pattern:
     return out
 
 
-def _parse_patterns(n: ElementTree.Element) -> list[_Pattern]:
+def _parse_patterns(n: ElementTree.Element) -> list[FomodPattern]:
     out = []
     _check_no_text(n)
     _check_no_attrs(n)
@@ -421,23 +217,8 @@ def _parse_patterns(n: ElementTree.Element) -> list[_Pattern]:
     return out
 
 
-class _TypeDescriptor:
-    SANGUINE_JSON: list[tuple] = [('type', 'type'),
-                                  ('patterns', 'patterns', _Pattern, StableJsonFlags.Unsorted)]
-    type: _FomodType
-    patterns: list[_Pattern]
-
-    def __init__(self) -> None:
-        self.type = _FomodType.NotInitialized
-        self.patterns = []
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_TypeDescriptor":
-        return cls()
-
-
-def _parse_type_descriptor(n: ElementTree.Element) -> _TypeDescriptor:
-    out = _TypeDescriptor()
+def _parse_type_descriptor(n: ElementTree.Element) -> FomodTypeDescriptor:
+    out = FomodTypeDescriptor()
     _check_no_text(n)
     _check_no_attrs(n)
     for child in n:
@@ -456,42 +237,8 @@ def _parse_type_descriptor(n: ElementTree.Element) -> _TypeDescriptor:
     return out
 
 
-class _Plugin:
-    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('description', 'descr'), ('image', 'img'),
-                                  ('files', 'files'), ('type_descriptor', 'tdescr'),
-                                  ('condition_flags', 'conditionflags', _FlagDependency)]
-    name: str | None
-    description: str | None
-    image: str | None
-    files: _FilesAndFolders | None
-    type_descriptor: _TypeDescriptor | None
-    condition_flags: list[_FlagDependency]
-
-    def __init__(self) -> None:
-        self.name = None
-        self.description = None
-        self.image = None
-        self.files = None
-        self.type_descriptor = None
-        self.condition_flags = []
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_Plugin":
-        out = cls()
-        out.name = ''
-        out.description = ''
-        out.image = ''
-        out.files = _FilesAndFolders.for_sanguine_stable_json_load()
-        out.type_descriptor = _TypeDescriptor()
-        return out
-
-    def sanguine_stable_json_make_canonical(self) -> None:
-        if self.files is not None and self.files.is_for_load():
-            self.files = None
-
-
-def _parse_plugin(n: ElementTree.Element) -> _Plugin:
-    out = _Plugin()
+def _parse_plugin(n: ElementTree.Element) -> FomodPlugin:
+    out = FomodPlugin()
     for an, av in n.attrib.items():
         match an:
             case 'name':
@@ -529,56 +276,20 @@ def _parse_plugin(n: ElementTree.Element) -> _Plugin:
     return out
 
 
-class _GroupSelect(IntEnum):
-    NotInitialized = 0
-    SelectAny = 1
-    SelectAll = 2
-    SelectExactlyOne = 3
-    SelectAtMostOne = 4
-    SelectAtLeastOne = 5
-
-
-class _FomodOrder(IntEnum):
-    Ascending = 0
-    Explicit = 1
-    Descending = 2
-
-
-def _parse_order_attr(e, av: str) -> _FomodOrder:
+def _parse_order_attr(e, av: str) -> FomodOrder:
     match av:
         case 'Explicit':
-            return _FomodOrder.Explicit
+            return FomodOrder.Explicit
         case 'Descending':
-            return _FomodOrder.Descending
+            return FomodOrder.Descending
         case 'Ascending':
-            return _FomodOrder.Descending
+            return FomodOrder.Descending
         case _:
             _raise_unknown_attr(e, av)
 
 
-class _Group:
-    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('select', 'sel', _GroupSelect.SelectAny),
-                                  ('order', 'ord', _FomodOrder.Ascending),
-                                  ('plugins', 'plugins', _Plugin, StableJsonFlags.Unsorted)]
-    name: str | None
-    select: _GroupSelect
-    plugins: list[_Plugin]
-
-    def __init__(self) -> None:
-        self.name = None
-        self.select = _GroupSelect.NotInitialized
-        self.order = _FomodOrder.Ascending
-        self.plugins = []
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_Group":
-        out = cls()
-        out.name = ''
-        return out
-
-
-def _parse_group(e: ElementTree.Element) -> _Group:
-    out = _Group()
+def _parse_group(e: ElementTree.Element) -> FomodGroup:
+    out = FomodGroup()
     for an, av in e.attrib.items():
         match an:
             case 'name':
@@ -586,15 +297,15 @@ def _parse_group(e: ElementTree.Element) -> _Group:
             case 'type':
                 match av:
                     case 'SelectAny':
-                        out.select = _GroupSelect.SelectAny
+                        out.select = FomodGroupSelect.SelectAny
                     case 'SelectAll':
-                        out.select = _GroupSelect.SelectAll
+                        out.select = FomodGroupSelect.SelectAll
                     case 'SelectExactlyOne':
-                        out.select = _GroupSelect.SelectExactlyOne
+                        out.select = FomodGroupSelect.SelectExactlyOne
                     case 'SelectAtMostOne':
-                        out.select = _GroupSelect.SelectAtMostOne
+                        out.select = FomodGroupSelect.SelectAtMostOne
                     case 'SelectAtLeastOne':
-                        out.select = _GroupSelect.SelectAtLeastOne
+                        out.select = FomodGroupSelect.SelectAtLeastOne
                     case _:
                         _raise_unknown_attr(e, av)
             case _:
@@ -618,30 +329,8 @@ def _parse_group(e: ElementTree.Element) -> _Group:
     return out
 
 
-class _InstallStep:
-    SANGUINE_JSON: list[tuple] = [('name', 'name'), ('order', 'ord', _FomodOrder.Explicit),
-                                  ('groups', 'groups', _Group, StableJsonFlags.Unsorted),
-                                  ('visible', 'visible')]
-    name: str | None
-    order: _FomodOrder
-    groups: list[_Group]
-    visible: _Dependencies | None
-
-    def __init__(self) -> None:
-        self.name = None
-        self.order = _FomodOrder.Ascending
-        self.groups = []
-        self.visible = _Dependencies()
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "_InstallStep":
-        out = cls()
-        out.name = ''
-        return out
-
-
-def _parse_install_step(e: ElementTree.Element) -> _InstallStep:
-    out = _InstallStep()
+def _parse_install_step(e: ElementTree.Element) -> FomodInstallStep:
+    out = FomodInstallStep()
     for an, av in e.attrib.items():
         if an == 'name':
             out.name = av
@@ -670,36 +359,6 @@ def _parse_install_step(e: ElementTree.Element) -> _InstallStep:
             case _:
                 _raise_unknown_tag(e, child)
     return out
-
-
-class FomodModuleConfig:
-    SANGUINE_JSON: list[tuple] = [('module_name', 'modulename'), ('eye_candy_attr', 'eyecandy', (str, str)),
-                                  ('module_dependencies', 'deps', _FileDependency, StableJsonFlags.Unsorted),
-                                  ('required', 'required'), ('install_steps_order', 'order', _FomodOrder.Ascending),
-                                  ('install_steps', 'isteps', _InstallStep, StableJsonFlags.Unsorted),
-                                  ('conditional_file_installs', 'conditional', _Pattern, StableJsonFlags.Unsorted)]
-    module_name: str | None
-    eye_candy_attr: dict[str, str]
-    module_dependencies: list[_FileDependency]
-    required: _FilesAndFolders
-    install_steps_order: _FomodOrder
-    install_steps: list[_InstallStep]
-    conditional_file_installs: list[_Pattern]
-
-    def __init__(self) -> None:
-        self.module_name = None
-        self.eye_candy_attr = {}
-        self.module_dependencies = []
-        self.required = _FilesAndFolders()
-        self.install_steps_order = _FomodOrder.Ascending
-        self.install_steps = []
-        self.conditional_file_installs = []
-
-    @classmethod
-    def for_sanguine_stable_json_load(cls) -> "FomodModuleConfig":
-        out = cls()
-        out.module_name = ''
-        return out
 
 
 def parse_fomod_moduleconfig(root: ElementTree.Element) -> FomodModuleConfig:
