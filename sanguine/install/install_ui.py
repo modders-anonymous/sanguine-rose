@@ -64,7 +64,8 @@ class InstallUI(LinearUI):
     def network_error_handler(self, nretries: int) -> NetworkErrorHandler:
         return _BoxUINetworkErrorHandler(self, nretries)
 
-    def wizard_page(self, wizardpage: LinearUIGroup) -> None:
+    def wizard_page(self, wizardpage: LinearUIGroup,
+                    validator: Callable[[LinearUIGroup], str | None] | None = None) -> None:
         stack = []
         while True:
             if len(stack) == 0:
@@ -83,7 +84,14 @@ class InstallUI(LinearUI):
             got = 'x' if self._silent_mode else input().lower().strip()
             if got == 'x':
                 if len(stack) == 0:
-                    break
+                    if validator is not None:
+                        errmsg = validator(wizardpage)
+                    else:
+                        errmsg = None
+                    if errmsg is None:
+                        break
+                    else:
+                        alert('Error validating wizard page: {}'.format(errmsg))
                 else:
                     stack.pop()
             elif got == 'p':

@@ -122,11 +122,13 @@ class LinearUITextInput:
     name: str
     value: str
     disabled: bool
+    extra_data: Any
 
     def __init__(self, name: str, initvalue: str) -> None:
         self.name = name
         self.value = initvalue
         self.disabled = False
+        self.extra_data = None
 
 
 class LinearUICheckbox:
@@ -134,12 +136,14 @@ class LinearUICheckbox:
     value: bool
     is_radio: bool
     disabled: bool
+    extra_data: Any
 
     def __init__(self, name: str, initvalue: bool, isradio: bool = False) -> None:
         self.name = name
         self.value = initvalue
         self.is_radio = isradio
         self.disabled = False
+        self.extra_data = None
 
 
 type LinearUIControl = LinearUITextInput | LinearUICheckbox | "LinearUIGroup"
@@ -149,11 +153,13 @@ class LinearUIGroup:
     name: str
     controls: list[LinearUIControl]
     checkboxes_are_radio: bool | None
+    extra_data: Any
 
     def __init__(self, name: str, controls: list[LinearUIControl]) -> None:
         self.name = name
         self.controls = controls
         self.checkboxes_are_radio = None
+        self.extra_data = None
         for ctrl in controls:
             if isinstance(ctrl, LinearUICheckbox):
                 if self.checkboxes_are_radio is None:
@@ -209,5 +215,6 @@ class LinearUI:
         pass
 
     @abstractmethod
-    def wizard_page(self, wizardpage: LinearUIGroup) -> None:
+    def wizard_page(self, wizardpage: LinearUIGroup,
+                    validator: Callable[[LinearUIGroup], str | None] | None = None) -> None:
         pass
