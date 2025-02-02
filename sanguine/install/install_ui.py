@@ -1,6 +1,6 @@
 import logging
 
-from sanguine.install.install_common import NetworkErrorHandler, LinearUI, LinearUIImportance
+from sanguine.install.install_common import *
 from sanguine.install.install_logging import log_with_level
 
 
@@ -63,6 +63,79 @@ class InstallUI(LinearUI):
 
     def network_error_handler(self, nretries: int) -> NetworkErrorHandler:
         return _BoxUINetworkErrorHandler(self, nretries)
+
+    def wizard_page(self, wizardpage: LinearUIGroup) -> None:
+        stack = []
+        while True:
+            if len(stack) == 0:
+                curgrp = wizardpage
+                curgrptype = 'wizard page'
+            else:
+                curgrp = wizardpage.find_control_by_path(stack)
+                curgrptype = 'current group page'
+                info('Current group: {}'.format(repr(stack)))
+            assert curgrp is not None
+            for i, ctrl in enumerate(curgrp.controls):
+                InstallUI._print_control(i, ctrl)
+            info('[p] to print the whole {}'.format(curgrptype))
+            info('[x] to exit {} with current settings'.format(curgrptype))
+
+            got = 'x' if self._silent_mode else input().lower().strip()
+            if got == 'x':
+                if len(stack) == 0:
+                    break
+                else:
+                    stack.pop()
+            elif got == 'p':
+                for i, ctrl in enumerate(curgrp.controls):
+                    InstallUI._print_control(i, ctrl, True)
+            elif got.isdigit():
+                idx = int(got)
+                if 0 <= idx <= len(curgrp.controls):
+                    ctrl = curgrp.controls[idx]
+                    if isinstance(ctrl, LinearUIGroup):
+                        stack.append(ctrl.name)
+                        continue
+                    elif isinstance(ctrl, LinearUICheckbox):
+                        if not ctrl.disabled:
+                            if ctrl.is_radio:
+                                assert curgrp.checkboxes_are_radio
+                                for c2 in curgrp.controls:
+                                    if isinstance(c2, LinearUICheckbox):
+                                        c2.value = False
+                                ctrl.value = True
+                            else:
+                                assert not curgrp.checkboxes_are_radio
+                                ctrl.value = not ctrl.value
+                    elif isinstance(ctrl, LinearUITextInput):
+                        assert not self._silent_mode
+                        if not ctrl.disabled:
+                            got2 = input().strip()
+                            ctrl.value = got2
+            else:
+                pass
+
+    @staticmethod
+    def _print_control(i: int | str, ctrl: LinearUIControl, recursive: bool = False) -> None:
+        assert isinstance(i, (int, str))
+        prefix = '[{}]'.format(i) if isinstance(i, int) else i
+        if isinstance(ctrl, LinearUITextInput):
+            info('{}{}:{}'.format(prefix, ctrl.name, ctrl.value))
+        elif isinstance(ctrl, LinearUICheckbox):
+            info('{}{}:[{}]'.format(prefix, ctrl.name, 'X' if ctrl.value else ' '))
+        elif isinstance(ctrl, LinearUIGroup):
+            if recursive:
+                info('{}{{{}}}:'.format(prefix, ctrl.name))
+                if isinstance(i, int):
+                    for ctrl in ctrl.controls:
+                        InstallUI._print_control('  ', ctrl)
+                else:
+                    for ctrl in ctrl.controls:
+                        InstallUI._print_control(prefix + '  ', ctrl)
+            else:
+                info('{}{{{}}} (group of {} elements)'.format(prefix, ctrl.name, len(ctrl.controls)))
+        else:
+            assert False
 
     @staticmethod
     def _translate_level(level: LinearUIImportance = LinearUIImportance.Default) -> int:

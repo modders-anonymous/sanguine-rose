@@ -118,6 +118,75 @@ class LinearUIImportance(IntEnum):
     VeryImportant = 2
 
 
+class LinearUITextInput:
+    name: str
+    value: str
+    disabled: bool
+
+    def __init__(self, name: str, initvalue: str) -> None:
+        self.name = name
+        self.value = initvalue
+        self.disabled = False
+
+
+class LinearUICheckbox:
+    name: str
+    value: bool
+    is_radio: bool
+    disabled: bool
+
+    def __init__(self, name: str, initvalue: bool, isradio: bool = False) -> None:
+        self.name = name
+        self.value = initvalue
+        self.is_radio = isradio
+        self.disabled = False
+
+
+type LinearUIControl = LinearUITextInput | LinearUICheckbox | "LinearUIGroup"
+
+
+class LinearUIGroup:
+    name: str
+    controls: list[LinearUIControl]
+    checkboxes_are_radio: bool | None
+
+    def __init__(self, name: str, controls: list[LinearUIControl]) -> None:
+        self.name = name
+        self.controls = controls
+        self.checkboxes_are_radio = None
+        for ctrl in controls:
+            if isinstance(ctrl, LinearUICheckbox):
+                if self.checkboxes_are_radio is None:
+                    self.checkboxes_are_radio = ctrl.is_radio
+                    if __debug__:
+                        break
+                else:
+                    assert self.checkboxes_are_radio == ctrl.is_radio
+
+    def add_control(self, ctrl: LinearUIControl) -> None:
+        self.controls.append(ctrl)
+        if isinstance(ctrl, LinearUICheckbox):
+            if self.checkboxes_are_radio is None:
+                self.checkboxes_are_radio = ctrl.is_radio
+            else:
+                assert self.checkboxes_are_radio == ctrl.is_radio
+
+    def find_control(self, name: str) -> LinearUIControl | None:
+        for ctrl in self.controls:
+            if ctrl.name == name:
+                return ctrl
+        return None
+
+    def find_control_by_path(self, path: list[str]) -> LinearUIControl | None:
+        for ctrl in self.controls:
+            if ctrl.name == path[0]:
+                if isinstance(ctrl, LinearUIGroup):
+                    return ctrl.find_control_by_path(path[1:])
+                else:
+                    return None
+        return None
+
+
 class LinearUI:
     @abstractmethod
     def set_silent_mode(self) -> None:
@@ -137,4 +206,8 @@ class LinearUI:
 
     @abstractmethod
     def network_error_handler(self, nretries: int) -> NetworkErrorHandler:
+        pass
+
+    @abstractmethod
+    def wizard_page(self, wizardpage: LinearUIGroup) -> None:
         pass

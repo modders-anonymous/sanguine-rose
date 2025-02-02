@@ -7,7 +7,9 @@ from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 # noinspection PyProtectedMember
-from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig, FomodModuleConfig
+from sanguine.plugins.arinstaller._fomod.fomod_common import FomodModuleConfig
+# noinspection PyProtectedMember
+from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig
 
 
 class FomodArInstaller(ArInstaller):

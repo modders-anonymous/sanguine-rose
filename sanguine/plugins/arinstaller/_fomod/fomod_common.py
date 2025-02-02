@@ -40,6 +40,16 @@ class FomodFilesAndFolders:
         self.files = []
         self.folders = []
 
+    def merge(self, b: "FomodFilesAndFolders") -> None:
+        self.files += b.files
+        self.folders += b.folders
+
+    def copy(self) -> "FomodFilesAndFolders":
+        out = FomodFilesAndFolders()
+        out.files = self.files.copy()
+        out.folders = self.folders.copy()
+        return out
+
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodFilesAndFolders":
         return cls()
