@@ -2,40 +2,52 @@ from sanguine.helpers.archives import Archive
 from sanguine.helpers.arinstallers import ArInstaller
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
-from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine
+from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodEngineWizardPlugin
 
 
 class _FomodInstallerSelection:
-    step: str
-    group: str
-    plugin: str
+    step_name: str
+    group_name: str
+    plugin_name: str
 
     def __init__(self, step: str, group: str, plugin: str) -> None:
-        self.step = step
-        self.group = group
-        self.plugin = plugin
+        self.step_name = step
+        self.group_name = group
+        self.plugin_name = plugin
 
-class _FomodReplayStep(_FomodInstallerSelection):
-    value: bool
 
-    def __init__(self, step: str, group: str, plugin: str,value:bool) -> None:
-        super().__init__(step,group,plugin)
-        self.value = value
+type _FomodReplaySteps = list[_FomodInstallerSelection]
+type _FomodGuessPlugins = list[tuple[_FomodInstallerSelection, FomodFilesAndFolders]]
+type _FomodGuessFlags = dict[str, FomodFlagDependency]
 
-type _FomodReplaySteps = list[_FomodReplayStep]
-type _FomodGuessFileVariants = list[tuple[_FomodInstallerSelection, FomodFilesAndFolders]]
+
+class _FomodGuessFork:
+    start_step: _FomodReplaySteps
+    selected_plugins: _FomodGuessPlugins  # selected for sure in current fork
+    true_or_false_plugins: _FomodGuessPlugins
+    flags: _FomodGuessFlags
+
+    def __init__(self, start: _FomodReplaySteps, sel: _FomodGuessPlugins | None = None,
+                 tof: _FomodGuessPlugins | None = None, flags: _FomodGuessFlags | None = None) -> None:
+        self.start_step = start
+        self.selected_plugins = sel if sel is not None else []
+        self.true_or_false_plugins = tof if tof is not None else []
+        self.flags = flags if flags is not None else {}
+
+    def copy(self) -> "_FomodGuessFork":
+        return _FomodGuessFork(self.start_step.copy(), self.selected_plugins.copy(), self.true_or_false_plugins.copy(),
+                               self.flags.copy())
+
 
 class _FomodGuessFakeUI(LinearUI):
-    start_step: _FomodReplaySteps
+    current_fork: _FomodGuessFork
     current_step: _FomodReplaySteps
-    files_variants: _FomodGuessFileVariants
-    forks: list[tuple[_FomodReplaySteps, _FomodGuessFileVariants]]
+    requested_forks: list[_FomodGuessFork]
 
-    def __init__(self, startingfork: list[_FomodReplayStep]) -> None:
-        self.start_step = startingfork
+    def __init__(self, startingfork: _FomodGuessFork) -> None:
+        self.current_fork = startingfork
         self.current_step = []
-        self.files_variants = []
-        self.forks = []
+        self.requested_forks = []
 
     def set_silent_mode(self) -> None:
         assert False
@@ -58,49 +70,47 @@ class _FomodGuessFakeUI(LinearUI):
 
     def wizard_page(self, wizardpage: LinearUIGroup,
                     validator: Callable[[LinearUIGroup], str | None] | None = None) -> None:
-        if len(self.current_step) < len(self.start_step):
-            for ctrl in wizardpage.controls:
-                assert isinstance(ctrl, LinearUIGroup)
-                tag, istep = ctrl.extra_data
-                assert tag == 0
-                for c2 in ctrl.controls:
-                    assert isinstance(c2, LinearUIGroup)
-                    tag, grp = c2.extra_data
-                    assert tag == 1
-                    assert isinstance(grp, FomodGroup)
-                    sel = grp.select
-                    nsel = 0
-                    for c3 in c2.controls:
-                        tag, plugin = c3.extra_data
-                        assert tag == 2
-                        assert isinstance(plugin, FomodPlugin)
-                        assert isinstance(c3, LinearUICheckbox)
-                        if c3.value:
-                            nsel += 1
+        for ctrl in wizardpage.controls:
+            it = FomodEngineWizardPlugin(ctrl)
+            for c2 in ctrl.controls:
+                it.add_c2(c2)
+                for c3 in c2.controls:
+                    it.add_c3(c3)
+                    if len(self.current_step) < len(self.current_fork.start_step):
+                        nxt = self.current_fork.start_step[len(self.current_step)]
+                        assert it.istep.name == nxt.step_name
+                        assert it.grp.name == nxt.group_name
+                        assert it.plugin.name == nxt.plugin_name
 
-                    assert nsel >= 0
-                    match sel:
-                        case FomodGroupSelect.SelectAll:
-                            assert nsel == len(c2.controls)
-                        case FomodGroupSelect.SelectAny:
-                            pass
-                        case FomodGroupSelect.SelectExactlyOne:
-                            assert nsel == 1
-                        case FomodGroupSelect.SelectAtMostOne:
-                            if nsel > 1:
-                                return 'Too many selections in group {}'.format(c2.name)
-                        case FomodGroupSelect.SelectAtLeastOne:
-                            if nsel < 1:
-                                return 'Too few selections in group {}'.format(c2.name)
-            return None
+                        self.current_step.append(nxt)
+                        continue
+                    assert len(self.current_step) >= len(self.current_fork.start_step)
+
+                    cur = _FomodInstallerSelection(it.istep.name, it.grp.name, it.plugin.name)
+                    if len(it.plugin.condition_flags) > 0:
+                        if it.plugin_ctrl.disabled:  # no choice, no fork
+                            if it.plugin_ctrl.value:
+                                self.current_fork.flags |= it.plugin.condition_flags
+                                self.current_fork.selected_plugins.append((cur, it.plugin.files))
+                        else:  # both are possible, will handle True in this run, will request fork with False
+                            forked = self.current_fork.copy()
+                            forked.start_step.append(cur)
+                            self.requested_forks.append(forked)
+                            self.current_fork.flags |= it.plugin.condition_flags
+                            self.current_fork.selected_plugins.append((cur, it.plugin.files))
+                    else:
+                        self.current_step.append(cur)
+                        self.current_fork.true_or_false_plugins.append((cur, it.plugin.files))
 
 
 def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive, modname: str,
                 modfiles: dict[str, list[ArchiveFileRetriever]]) -> ArInstaller | None:
-    known_forks = [[]]
-    while len(known_forks) > 0:
-        startingfork = known_forks[0]
-        known_forks = known_forks[1:]
+    processed_forks: list[_FomodGuessFork]
+    remaining_forks: list[_FomodGuessFork] = [_FomodGuessFork([])]
+    while len(remaining_forks) > 0:
+        startingfork = remaining_forks[0]
+        remaining_forks = remaining_forks[1:]
         fakeui = _FomodGuessFakeUI(startingfork)
         engine = FomodEngine(modulecfg)
         engine.run(fakeui)
+        remaining_forks += fakeui.requested_forks

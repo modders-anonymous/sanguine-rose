@@ -1,23 +1,61 @@
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
 
 
+class FomodEngineWizardPlugin:
+    istep_ctrl: LinearUIGroup
+    istep: FomodInstallStep
+    grp_ctrl: LinearUIGroup | None
+    grp: FomodGroup | None
+    plugin_ctrl: LinearUICheckbox | None
+    plugin: FomodPlugin | None
+
+    def __init__(self, ctrl: LinearUIGroup) -> None:
+        assert isinstance(ctrl, LinearUIGroup)
+        self.istep_ctrl = ctrl
+        tag, self.istep = ctrl.extra_data
+        assert tag == 0
+        assert isinstance(self.istep, FomodInstallStep)
+        self.grp_ctrl = None
+        self.grp = None
+        self.plugin_ctrl = None
+        self.plugin = None
+
+    def add_c2(self, c2: LinearUIGroup) -> None:
+        assert self.grp_ctrl is None
+        assert self.grp is None
+        assert self.plugin_ctrl is None
+        assert self.plugin is None
+
+        assert isinstance(c2, LinearUIGroup)
+        self.grp_ctrl = c2
+        tag, self.grp = c2.extra_data
+        assert tag == 1
+        assert isinstance(self.grp, FomodGroup)
+        self.grp = c2.extra_data
+
+    def add_c3(self, c3: LinearUICheckbox) -> None:
+        assert self.grp_ctrl is not None
+        assert self.grp is not None
+        assert self.plugin_ctrl is None
+        assert self.plugin is None
+
+        assert isinstance(c3, LinearUICheckbox)
+        self.plugin_ctrl = c3
+        tag, self.plugin = c3.extra_data
+        assert tag == 2
+        assert isinstance(self.plugin, FomodPlugin)
+        self.plugin = c3.extra_data
+
+
 def _fomod_wizard_page_validator(wizardpage: LinearUIGroup) -> str | None:
     for ctrl in wizardpage.controls:
-        assert isinstance(ctrl, LinearUIGroup)
-        tag, istep = ctrl.extra_data
-        assert tag == 0
+        it = FomodEngineWizardPlugin(ctrl)
         for c2 in ctrl.controls:
-            assert isinstance(c2, LinearUIGroup)
-            tag, grp = c2.extra_data
-            assert tag == 1
-            assert isinstance(grp, FomodGroup)
-            sel = grp.select
+            it.add_c2(c2)
+            sel = it.grp.select
             nsel = 0
             for c3 in c2.controls:
-                tag, plugin = c3.extra_data
-                assert tag == 2
-                assert isinstance(plugin, FomodPlugin)
-                assert isinstance(c3, LinearUICheckbox)
+                it.add_c3(c3)
                 if c3.value:
                     nsel += 1
 
