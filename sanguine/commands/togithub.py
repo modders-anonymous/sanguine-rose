@@ -251,7 +251,7 @@ class _ModInProgress:
         assert self.unknown_files_could_be_produced_by_tools is None
         self.required_archives = {}
 
-        for intra, rlist in self.archive_files.items():
+        for rlist in self.archive_files.values():
             assert len(rlist) > 0
             if len(rlist) == 1:
                 r0: ArchiveFileRetriever = rlist[0]
