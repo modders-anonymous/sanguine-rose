@@ -56,37 +56,37 @@ class _FomodGuessFakeUI(LinearUI):
 
     def wizard_page(self, wizardpage: LinearUIGroup,
                     validator: Callable[[LinearUIGroup], str | None] | None = None) -> None:
+        it = FomodEngineWizardPlugin(wizardpage)
         for ctrl in wizardpage.controls:
-            it = FomodEngineWizardPlugin(ctrl)
+            it.set_grp(ctrl)
             for c2 in ctrl.controls:
-                it.add_c2(c2)
-                for c3 in c2.controls:
-                    it.add_c3(c3)
-                    if len(self.current_step) < len(self.current_fork.start_step):
-                        nxt = self.current_fork.start_step[len(self.current_step)]
-                        assert it.istep.name == nxt.step_name
-                        assert it.grp.name == nxt.group_name
-                        assert it.plugin.name == nxt.plugin_name
+                it.set_chkbox(c2)
+                if len(self.current_step) < len(self.current_fork.start_step):
+                    nxt = self.current_fork.start_step[len(self.current_step)]
+                    assert it.istep.name == nxt.step_name
+                    assert it.grp.name == nxt.group_name
+                    if it.plugin.name != nxt.plugin_name:
+                        assert False
 
-                        self.current_step.append(nxt)
-                        continue
-                    assert len(self.current_step) >= len(self.current_fork.start_step)
+                    self.current_step.append(nxt)
+                    continue
+                assert len(self.current_step) >= len(self.current_fork.start_step)
 
-                    cur = FomodInstallerSelection(it.istep.name, it.grp.name, it.plugin.name)
-                    if len(it.plugin.condition_flags) > 0:
-                        if it.plugin_ctrl.disabled:  # no choice, no fork
-                            if it.plugin_ctrl.value:
-                                self.current_fork.flags |= it.plugin.condition_flags
-                                self.current_fork.selected_plugins.append((cur, it.plugin.files))
-                        else:  # both are possible, will handle True in this run, will request fork with False
-                            forked = self.current_fork.copy()
-                            forked.start_step.append(cur)
-                            self.requested_forks.append(forked)
+                cur = FomodInstallerSelection(it.istep.name, it.grp.name, it.plugin.name)
+                if len(it.plugin.condition_flags) > 0:
+                    if it.plugin_ctrl.disabled:  # no choice, no fork
+                        if it.plugin_ctrl.value:
                             self.current_fork.flags |= it.plugin.condition_flags
                             self.current_fork.selected_plugins.append((cur, it.plugin.files))
-                    else:
-                        self.current_step.append(cur)
-                        self.current_fork.true_or_false_plugins.append((cur, it.plugin.files))
+                    else:  # both are possible, will handle True in this run, will request fork with False
+                        forked = self.current_fork.copy()
+                        forked.start_step.append(cur)
+                        self.requested_forks.append(forked)
+                        self.current_fork.flags |= {dep.name:dep.value for dep in it.plugin.condition_flags}
+                        self.current_fork.selected_plugins.append((cur, it.plugin.files))
+                else:
+                    self.current_step.append(cur)
+                    self.current_fork.true_or_false_plugins.append((cur, it.plugin.files))
 
 
 def _find_required_tofs(archive: Archive, modfiles: dict[str, list[ArchiveFileRetriever]],
@@ -98,17 +98,31 @@ def _find_required_tofs(archive: Archive, modfiles: dict[str, list[ArchiveFileRe
 
     tofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]] = {}
     for instsel, ff in fork.true_or_false_plugins:
-        for f in ff.files:
-            assert f.src in fias
-            if f.dst not in tofs:
-                tofs[f.dst] = []
-            tofs[f.dst].append((instsel, fias[f.src]))
+        if ff is not None:
+            for f in ff.files:
+                fsrc = FomodFilesAndFolders.normalize_file_path(f.src)
+                fdst = FomodFilesAndFolders.normalize_file_path(f.dst)
+                if fsrc not in fias:
+                    assert False
+                if fdst not in tofs:
+                    tofs[fdst] = []
+                tofs[fdst].append((instsel, fias[fsrc]))
+            for f in ff.folders:
+                fsrc = FomodFilesAndFolders.normalize_folder_path(f.src)
+                fdst = FomodFilesAndFolders.normalize_folder_path(f.dst)
+                for af in archive.files:
+                    if af.intra_path.startswith(fsrc):
+                        file = af.intra_path[len(fsrc):]
+                        filedst = fdst + file
+                        if filedst not in tofs:
+                            tofs[filedst] = []
+                        tofs[filedst].append((instsel, fias[af.intra_path]))
 
     required_tofs: set[FomodInstallerSelection] = set()
-    for modfile, rlist in modfiles:
+    for modfile, rlist in modfiles.items():
         r0: ArchiveFileRetriever = rlist[0]
         fh = r0.file_hash
-        if modfile in tofs and len(tofs[modfile]) == 1 and tofs[modfile][0][1].file_hash == fh:
+        if modfile in tofs and len(tofs[modfile]) == 1 and tofs[modfile][0][1].file_hash == truncate_file_hash(fh):
             required_tofs.add(tofs[modfile][0][0])
 
     return list(required_tofs)
@@ -145,7 +159,8 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
             for group in istep.groups:
                 for plugin in group.plugins:
                     sel = FomodInstallerSelection(istep.name, group.name, plugin.name)
-                    assert sel in known
+                    if sel not in known:
+                        assert False
                     if sel in required_tofs:
                         selections.append((sel, known[sel]))
                     elif sel in selected_plugins:
@@ -154,7 +169,7 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
         candidate: FomodArInstaller = FomodArInstaller(archive, selections)
         n = 0
         for fpath, fia in candidate.all_desired_files():
-            if fpath in modfiles and modfiles[fpath][0].file_hash == fia.file_hash:
+            if fpath in modfiles and truncate_file_hash(modfiles[fpath][0].file_hash) == fia.file_hash:
                 n += 1
         if n > best_coverage:
             best_coverage = n

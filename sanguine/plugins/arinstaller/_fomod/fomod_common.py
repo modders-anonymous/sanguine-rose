@@ -16,6 +16,13 @@ class FomodInstallerSelection:
         self.group_name = group
         self.plugin_name = plugin
 
+    def __hash__(self) -> int:
+        return hash((self.step_name, self.group_name, self.plugin_name))
+
+    def __eq__(self, other) -> bool:
+        return (self.step_name, self.group_name, self.plugin_name) == (
+        other.step_name, other.group_name, other.plugin_name)
+
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodInstallerSelection":
         return cls('', '', '')
@@ -78,15 +85,15 @@ class FomodFilesAndFolders:
             arfiles[f.intra_path] = f
 
         for f in self.files:
-            src = FomodFilesAndFolders._normalize_file_path(f.src)
+            src = FomodFilesAndFolders.normalize_file_path(f.src)
             assert src in arfiles
-            dst = FomodFilesAndFolders._normalize_file_path(f.dst)
+            dst = FomodFilesAndFolders.normalize_file_path(f.dst)
             assert dst not in out
             out[dst] = arfiles[src]
 
         for f in self.folders:
-            src = FomodFilesAndFolders._normalize_folder_path(f.src)
-            dst = FomodFilesAndFolders._normalize_folder_path(f.dst)
+            src = FomodFilesAndFolders.normalize_folder_path(f.src)
+            dst = FomodFilesAndFolders.normalize_folder_path(f.dst)
             for af in archive.files:  # TODO: can/should we try speeding it up?
                 if af.intra_path.startswith(src):
                     remainder = af.intra_path[len(src):]
@@ -97,14 +104,15 @@ class FomodFilesAndFolders:
         return [(dst, fia) for dst, fia in out.items()]
 
     @staticmethod
-    def _normalize_file_path(src: str) -> str:
+    def normalize_file_path(src: str) -> str:
         src = src.lower().replace('/', '\\')
-        return src if src.endswith('\\') else src + '\\'
+        assert not src.endswith('\\')
+        return src
 
     @staticmethod
-    def _normalize_folder_path(src: str) -> str:
+    def normalize_folder_path(src: str) -> str:
         src = src.lower().replace('/', '\\')
-        return src if src.endswith('\\') else src + '\\'
+        return src if src.endswith('\\') or len(src) == 0 else src + '\\'
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodFilesAndFolders":

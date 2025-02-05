@@ -20,42 +20,42 @@ class FomodEngineWizardPlugin:
         self.plugin_ctrl = None
         self.plugin = None
 
-    def add_c2(self, c2: LinearUIGroup) -> None:
-        assert self.grp_ctrl is None
-        assert self.grp is None
-        assert self.plugin_ctrl is None
-        assert self.plugin is None
+    def set_grp(self, c2: LinearUIGroup) -> None:
+        # assert self.grp_ctrl is None
+        # assert self.grp is None
+        # assert self.plugin_ctrl is None
+        # assert self.plugin is None
 
         assert isinstance(c2, LinearUIGroup)
         self.grp_ctrl = c2
         tag, self.grp = c2.extra_data
         assert tag == 1
         assert isinstance(self.grp, FomodGroup)
-        self.grp = c2.extra_data
+        self.plugin_ctrl = None
+        self.plugin = None
 
-    def add_c3(self, c3: LinearUICheckbox) -> None:
+    def set_chkbox(self, c3: LinearUICheckbox) -> None:
         assert self.grp_ctrl is not None
         assert self.grp is not None
-        assert self.plugin_ctrl is None
-        assert self.plugin is None
+        # assert self.plugin_ctrl is None
+        # assert self.plugin is None
 
         assert isinstance(c3, LinearUICheckbox)
         self.plugin_ctrl = c3
         tag, self.plugin = c3.extra_data
         assert tag == 2
         assert isinstance(self.plugin, FomodPlugin)
-        self.plugin = c3.extra_data
 
 
 def _fomod_wizard_page_validator(wizardpage: LinearUIGroup) -> str | None:
     for ctrl in wizardpage.controls:
         it = FomodEngineWizardPlugin(ctrl)
         for c2 in ctrl.controls:
-            it.add_c2(c2)
+            it.set_grp(c2)
             sel = it.grp.select
             nsel = 0
             for c3 in c2.controls:
-                it.add_c3(c3)
+                it.set_chkbox(c3)
                 if c3.value:
                     nsel += 1
 
@@ -93,8 +93,7 @@ class FomodEngine:
                 wizpage.add_control(wizpagegrp)
                 for plugin in grp.plugins:
                     match grp.select:
-                        case (FomodGroupSelect.SelectAny, FomodGroupSelect.SelectAtMostOne,
-                              FomodGroupSelect.SelectAtLeastOne):
+                        case FomodGroupSelect.SelectAny | FomodGroupSelect.SelectAtMostOne | FomodGroupSelect.SelectAtLeastOne:
                             wizpageplugin = LinearUICheckbox(plugin.name, False, False)
                         case FomodGroupSelect.SelectExactlyOne:
                             wizpageplugin = LinearUICheckbox(plugin.name, False, True)
