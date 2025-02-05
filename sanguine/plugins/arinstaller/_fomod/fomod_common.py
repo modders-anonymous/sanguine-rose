@@ -1,6 +1,7 @@
 from sanguine.common import *
 from sanguine.gitdata.stable_json import StableJsonFlags
 from sanguine.helpers.archives import Archive, FileInArchive
+from sanguine.helpers.arinstallers import ArInstaller
 
 
 class FomodInstallerSelection:
@@ -19,6 +20,8 @@ class FomodInstallerSelection:
     def for_sanguine_stable_json_load(cls) -> "FomodInstallerSelection":
         return cls('', '', '')
 
+
+### FomodModuleConfig and its dependencies
 
 class FomodSrcDstFlags(IntFlag):
     NoFlags = 0
@@ -403,3 +406,25 @@ class FomodModuleConfig:
         out = cls()
         out.module_name = ''
         return out
+
+
+### done with FomodModuleConfig
+
+class FomodArInstaller(ArInstaller):
+    selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
+
+    def __init__(self, archive: Archive, selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]):
+        super().__init__(archive)
+        self.selections = selections
+
+    def name(self) -> str:
+        return 'FOMOD'
+
+    def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
+        out: list[tuple[str, FileInArchive]] = []
+        for sel, ff in self.selections:  # TODO: handle overwrites incl. priorities
+            out += ff.all_files(self.archive)
+        return out
+
+    def install_params(self) -> Any:
+        return [sel[0] for sel in self.selections]

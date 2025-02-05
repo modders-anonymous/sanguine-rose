@@ -3,36 +3,15 @@ import xml.etree.ElementTree as ElementTree
 
 from sanguine.common import *
 from sanguine.gitdata.stable_json import from_stable_json, to_stable_json
-from sanguine.helpers.archives import Archive, FileInArchive
+from sanguine.helpers.archives import Archive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 # noinspection PyProtectedMember
-from sanguine.plugins.arinstaller._fomod.fomod_common import (FomodModuleConfig, FomodInstallerSelection,
-                                                              FomodFilesAndFolders)
+from sanguine.plugins.arinstaller._fomod.fomod_common import FomodModuleConfig
 # noinspection PyProtectedMember
 from sanguine.plugins.arinstaller._fomod.fomod_guess import fomod_guess
 # noinspection PyProtectedMember
 from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig
-
-
-class FomodArInstaller(ArInstaller):
-    selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
-
-    def __init__(self, archive: Archive, selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]):
-        super().__init__(archive)
-        self.selections = selections
-
-    def name(self) -> str:
-        return 'FOMOD'
-
-    def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
-        out: list[tuple[str, FileInArchive]] = []
-        for sel, ff in self.selections:  # TODO: handle overwrites incl. priorities
-            out += ff.all_files(self.archive)
-        return out
-
-    def install_params(self) -> Any:
-        return [sel[0] for sel in self.selections]
 
 
 class _FomodArInstallerPluginExtraData:
