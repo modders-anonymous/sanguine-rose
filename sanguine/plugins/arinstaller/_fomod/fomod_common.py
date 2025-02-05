@@ -1,5 +1,23 @@
 from sanguine.common import *
 from sanguine.gitdata.stable_json import StableJsonFlags
+from sanguine.helpers.archives import Archive, FileInArchive
+
+
+class FomodInstallerSelection:
+    SANGUINE_JSON: list[tuple] = [('step_name', 'step'), ('group_name', 'grp'),
+                                  ('plugin_name', 'plugin')]
+    step_name: str
+    group_name: str
+    plugin_name: str
+
+    def __init__(self, step: str, group: str, plugin: str) -> None:
+        self.step_name = step
+        self.group_name = group
+        self.plugin_name = plugin
+
+    @classmethod
+    def for_sanguine_stable_json_load(cls) -> "FomodInstallerSelection":
+        return cls('', '', '')
 
 
 class FomodSrcDstFlags(IntFlag):
@@ -49,6 +67,41 @@ class FomodFilesAndFolders:
         out.files = self.files.copy()
         out.folders = self.folders.copy()
         return out
+
+    def all_files(self, archive: Archive) -> Iterable[tuple[str, FileInArchive]]:
+        out: dict[str, FileInArchive] = {}
+        arfiles: dict[str, FileInArchive] = {}
+        for f in archive.files:
+            arfiles[f.intra_path] = f
+
+        for f in self.files:
+            src = FomodFilesAndFolders._normalize_file_path(f.src)
+            assert src in arfiles
+            dst = FomodFilesAndFolders._normalize_file_path(f.dst)
+            assert dst not in out
+            out[dst] = arfiles[src]
+
+        for f in self.folders:
+            src = FomodFilesAndFolders._normalize_folder_path(f.src)
+            dst = FomodFilesAndFolders._normalize_folder_path(f.dst)
+            for af in archive.files:  # TODO: can/should we try speeding it up?
+                if af.intra_path.startswith(src):
+                    remainder = af.intra_path[len(src):]
+                    fdst = dst + remainder
+                    assert fdst not in out
+                    out[fdst] = af
+
+        return [(dst, fia) for dst, fia in out.items()]
+
+    @staticmethod
+    def _normalize_file_path(src: str) -> str:
+        src = src.lower().replace('/', '\\')
+        return src if src.endswith('\\') else src + '\\'
+
+    @staticmethod
+    def _normalize_folder_path(src: str) -> str:
+        src = src.lower().replace('/', '\\')
+        return src if src.endswith('\\') else src + '\\'
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodFilesAndFolders":

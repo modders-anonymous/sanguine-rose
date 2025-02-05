@@ -38,20 +38,6 @@ class SimpleArInstaller(ArInstaller):
         return _SimpleArInstallerInstallData(self.install_from_root)
 
 
-'''
-def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,
-                                    arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> None:
-    assert arfh in arfiles_by_hash
-    arfs = arfiles_by_hash[arfh]
-    ok = False
-    for arf in arfs:
-        if arf.intra_path == arintra:
-            ok = True
-            break
-    assert ok
-'''
-
-
 class SimpleArInstallerPlugin(ArInstallerPluginBase):
     def name(self) -> str:
         return 'SIMPLE'

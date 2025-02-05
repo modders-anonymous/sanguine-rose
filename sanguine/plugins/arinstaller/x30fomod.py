@@ -7,23 +7,32 @@ from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 # noinspection PyProtectedMember
-from sanguine.plugins.arinstaller._fomod.fomod_common import FomodModuleConfig
+from sanguine.plugins.arinstaller._fomod.fomod_common import (FomodModuleConfig, FomodInstallerSelection,
+                                                              FomodFilesAndFolders)
+# noinspection PyProtectedMember
+from sanguine.plugins.arinstaller._fomod.fomod_guess import fomod_guess
 # noinspection PyProtectedMember
 from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_moduleconfig
 
 
 class FomodArInstaller(ArInstaller):
-    def __init__(self, archive: Archive):
+    selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
+
+    def __init__(self, archive: Archive, selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]):
         super().__init__(archive)
+        self.selections = selections
 
     def name(self) -> str:
         return 'FOMOD'
 
     def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
-        assert False
+        out: list[tuple[str, FileInArchive]] = []
+        for sel, ff in self.selections:  # TODO: handle overwrites incl. priorities
+            out += ff.all_files(self.archive)
+        return out
 
     def install_params(self) -> Any:
-        assert False
+        return [sel[0] for sel in self.selections]
 
 
 class _FomodArInstallerPluginExtraData:
@@ -91,7 +100,10 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
 
     def guess_arinstaller_from_vfs(self, archive: Archive, modname: str,
                                    modfiles: dict[str, list[ArchiveFileRetriever]]) -> ArInstaller | None:
-        return None
+        if archive.archive_hash not in self.extra_data:
+            return None
+        instdata: _FomodArInstallerPluginExtraData = self.extra_data[archive.archive_hash]
+        return fomod_guess(instdata.module_config, archive, modfiles)
 
     def got_loaded_data(self, data: dict[str, Any]) -> None:
         target = _FomodArInstallerPluginInstallData.for_sanguine_stable_json_load()
