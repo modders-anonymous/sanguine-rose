@@ -21,7 +21,7 @@ class FomodInstallerSelection:
 
     def __eq__(self, other) -> bool:
         return (self.step_name, self.group_name, self.plugin_name) == (
-        other.step_name, other.group_name, other.plugin_name)
+            other.step_name, other.group_name, other.plugin_name)
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodInstallerSelection":

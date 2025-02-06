@@ -76,13 +76,15 @@ class _FomodGuessFakeUI(LinearUI):
                 if len(it.plugin.condition_flags) > 0:
                     if it.plugin_ctrl.disabled:  # no choice, no fork
                         if it.plugin_ctrl.value:
-                            self.current_fork.flags |= it.plugin.condition_flags
+                            self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
                             self.current_fork.selected_plugins.append((cur, it.plugin.files))
                     else:  # both are possible, will handle True in this run, will request fork with False
                         forked = self.current_fork.copy()
+                        forked.start_step = self.current_step.copy()
                         forked.start_step.append(cur)
                         self.requested_forks.append(forked)
-                        self.current_fork.flags |= {dep.name:dep.value for dep in it.plugin.condition_flags}
+                        self.current_step.append(cur)
+                        self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
                         self.current_fork.selected_plugins.append((cur, it.plugin.files))
                 else:
                     self.current_step.append(cur)
