@@ -2,7 +2,7 @@ from sanguine.helpers.file_retriever import ArchiveFileRetriever
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
 from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodEngineWizardPlugin
 
-type _FomodReplaySteps = list[FomodInstallerSelection]
+type _FomodReplaySteps = list[tuple[FomodInstallerSelection,bool|None]]
 type _FomodGuessPlugins = list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
 type _FomodGuessFlags = dict[str, FomodFlagDependency]
 
@@ -57,38 +57,107 @@ class _FomodGuessFakeUI(LinearUI):
     def wizard_page(self, wizardpage: LinearUIGroup,
                     validator: Callable[[LinearUIGroup], str | None] | None = None) -> None:
         it = FomodEngineWizardPlugin(wizardpage)
-        for ctrl in wizardpage.controls:
-            it.set_grp(ctrl)
-            for c2 in ctrl.controls:
+        for cgrp in wizardpage.controls:
+            it.set_grp(cgrp)
+            for c2idx,c2 in enumerate(cgrp.controls):
                 it.set_chkbox(c2)
                 if len(self.current_step) < len(self.current_fork.start_step):
                     nxt = self.current_fork.start_step[len(self.current_step)]
-                    assert it.istep.name == nxt.step_name
-                    assert it.grp.name == nxt.group_name
-                    if it.plugin.name != nxt.plugin_name:
+                    assert it.istep.name == nxt[0].step_name
+                    if it.grp.name != nxt[0].group_name:
+                        assert False
+                    if it.plugin.name != nxt[0].plugin_name:
                         assert False
 
                     self.current_step.append(nxt)
                     continue
                 assert len(self.current_step) >= len(self.current_fork.start_step)
+                oldcurlen = len(self.current_step)
 
                 cur = FomodInstallerSelection(it.istep.name, it.grp.name, it.plugin.name)
-                if len(it.plugin.condition_flags) > 0:
-                    if it.plugin_ctrl.disabled:  # no choice, no fork
-                        if it.plugin_ctrl.value:
-                            self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
-                            self.current_fork.selected_plugins.append((cur, it.plugin.files))
-                    else:  # both are possible, will handle True in this run, will request fork with False
-                        forked = self.current_fork.copy()
-                        forked.start_step = self.current_step.copy()
-                        forked.start_step.append(cur)
-                        self.requested_forks.append(forked)
-                        self.current_step.append(cur)
+                match it.grp.select:
+                    case FomodGroupSelect.SelectAny:
+                        possible = (None,)
+                    case FomodGroupSelect.SelectAll:
+                        possible = (True,)
+                    case FomodGroupSelect.SelectExactlyOne:
+                        possible = (True,False)
+                        for i in range(c2idx):
+                            prevstep = self.current_step[-1-i]
+                            assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
+                            assert prevstep[1] is False or prevstep[1] is True
+                            if prevstep[1] is True:
+                                possible = (False,)
+                                break
+                        if len(possible) == 2 and c2idx == len(cgrp.controls) - 1:
+                            possible = (True,)
+                    case FomodGroupSelect.SelectAtLeastOne:
+                        possible = (True,False)
+                        found = False
+                        for i in range(c2idx):
+                            prevstep = self.current_step[-1-i]
+                            assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
+                            assert prevstep[1] is False or prevstep[1] is True
+
+                            if prevstep[1] is True:
+                                found = True
+                                break
+                        if not found and c2idx == len(cgrp.controls) - 1:
+                            possible = (True,)
+                    case FomodGroupSelect.SelectAtMostOne:
+                        possible = (True,False)
+                        found = False
+                        for i in range(c2idx):
+                            prevstep = self.current_step[-1-i]
+                            assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
+                            assert prevstep[1] is False or prevstep[1] is True
+
+                            if prevstep[1] is True:
+                                found = True
+                                break
+                        if found:
+                            possible = (False,)
+                    case _:
+                        assert False
+
+                assert isinstance(possible, tuple)
+                assert len(possible) == 1 or len(possible) == 2
+                predetermined = len(possible) == 1 and possible[0] is not None
+                if it.plugin_ctrl.disabled:
+                    assert predetermined
+                    assert possible[0] == it.plugin_ctrl.value
+
+                willfork = False
+                if predetermined:  # no choice, no fork
+                    assert len(possible) == 1
+                    assert possible[0] is False or possible[0] is True
+                    if possible[0]:
                         self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
-                        self.current_fork.selected_plugins.append((cur, it.plugin.files))
+                        if it.plugin.files is not None:
+                            self.current_fork.selected_plugins.append((cur, it.plugin.files))
+                    self.current_step.append((cur,possible[0]))
+                elif len(it.plugin.condition_flags) > 0:
+                    willfork = True
+                elif possible[0] is None:
+                    self.current_step.append((cur,None))
+                    if it.plugin.files is not None:
+                        self.current_fork.true_or_false_plugins.append((cur, it.plugin.files))
                 else:
-                    self.current_step.append(cur)
-                    self.current_fork.true_or_false_plugins.append((cur, it.plugin.files))
+                    willfork = True
+
+                if willfork: # both are possible, will handle True in this run, will request fork with False
+                    assert possible[0] is None or (possible[0] is True and possible[1] is False)
+                    # (None,) is treated the same as (True,False) here
+                    forked = self.current_fork.copy()
+                    forked.start_step = self.current_step.copy()
+                    forked.start_step.append((cur,False))
+                    self.requested_forks.append(forked)
+                    self.current_step.append((cur,True))
+                    self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
+                    if it.plugin.files is not None:
+                        self.current_fork.selected_plugins.append((cur, it.plugin.files))
+
+                assert len(self.current_step) == oldcurlen + 1
 
 
 def _find_required_tofs(archive: Archive, modfiles: dict[str, list[ArchiveFileRetriever]],
@@ -134,6 +203,9 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
                 modfiles: dict[str, list[ArchiveFileRetriever]]) -> ArInstaller | None:
     processed_forks: list[_FomodGuessFork] = []
     remaining_forks: list[_FomodGuessFork] = [_FomodGuessFork([])]
+    info('Running simulations for FOMOD installer {}...'.format(modulecfg.module_name))
+    if 'caliente' in modulecfg.module_name.lower(): # temporary hack; TODO: remove!
+        return None
     while len(remaining_forks) > 0:
         startingfork = remaining_forks[0]
         remaining_forks = remaining_forks[1:]
@@ -142,6 +214,7 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
         engine.run(fakeui)
         processed_forks.append(fakeui.current_fork)
         remaining_forks += fakeui.requested_forks
+    info('{}: {} fork(s) found'.format(modulecfg.module_name, len(processed_forks)))
 
     best_arinstaller: ArInstaller | None = None
     best_coverage: int = 0
@@ -149,7 +222,8 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
         selected_plugins: set[FomodInstallerSelection] = set([plg for plg, _ in pf.selected_plugins])
         known: dict[FomodInstallerSelection, FomodFilesAndFolders] = {}
         for sel, selected in pf.selected_plugins:
-            assert sel not in known
+            if sel in known:
+                assert as_json(known[sel]) == as_json(selected)
             known[sel] = selected
         for sel, tof in pf.true_or_false_plugins:
             assert sel not in known
@@ -161,12 +235,18 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
             for group in istep.groups:
                 for plugin in group.plugins:
                     sel = FomodInstallerSelection(istep.name, group.name, plugin.name)
-                    if sel not in known:
-                        assert False
                     if sel in required_tofs:
+                        if sel not in known:
+                            assert False
+                        assert known[sel] is not None
                         selections.append((sel, known[sel]))
                     elif sel in selected_plugins:
+                        if sel not in known:
+                            assert False
+                        assert known[sel] is not None
                         selections.append((sel, known[sel]))
+                    else:
+                        pass
 
         candidate: FomodArInstaller = FomodArInstaller(archive, selections)
         n = 0
