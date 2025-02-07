@@ -130,6 +130,13 @@ class FomodFilesAndFolders:
         return self.files == [] and self.folders == []
 
 
+class FomodDependencyEngineRuntimeData:
+    flags: dict[str, str]
+
+    def __init__(self, flags: dict[str, str]) -> None:
+        self.flags = flags
+
+
 class FomodFlagDependency:
     SANGUINE_JSON: list[tuple] = [('name', 'name'), ('value', 'value')]
     name: str | None
@@ -138,6 +145,9 @@ class FomodFlagDependency:
     def __init__(self) -> None:
         self.name = None
         self.value = None
+
+    def is_satisfied(self, runtimedata: FomodDependencyEngineRuntimeData) -> bool:
+        return self.name in runtimedata.flags and runtimedata.flags[self.name] == self.value
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodFlagDependency":
@@ -166,6 +176,9 @@ class FomodFileDependency:
         self.file = None
         self.state = FomodFileDependencyState.NotInitialized
 
+    def is_satisfied(self, runtimedata: FomodDependencyEngineRuntimeData) -> bool:
+        return True  # TODO!
+
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodFileDependency":
         out = cls()
@@ -182,6 +195,9 @@ class FomodGameDependency:
 
     def __init__(self) -> None:
         self.version = None
+
+    def is_satisfied(self, runtimedata: FomodDependencyEngineRuntimeData) -> bool:
+        return True  # TODO!
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodGameDependency":
@@ -217,6 +233,28 @@ class FomodSomeDependency:
             assert isinstance(dep, FomodDependencies)
             self.dependencies = dep
 
+    def is_satisfied(self, runtimedata: FomodDependencyEngineRuntimeData) -> bool:
+        if self.flag_dependency is not None:
+            assert self.game_dependency is None
+            assert self.file_dependency is None
+            assert self.dependencies is None
+            return self.flag_dependency.is_satisfied(runtimedata)
+        elif self.game_dependency is not None:
+            assert self.flag_dependency is None
+            assert self.file_dependency is None
+            assert self.dependencies is None
+            return self.game_dependency.is_satisfied(runtimedata)
+        elif self.file_dependency is not None:
+            assert self.flag_dependency is None
+            assert self.game_dependency is None
+            assert self.dependencies is None
+            return self.file_dependency.is_satisfied(runtimedata)
+        elif self.dependencies is not None:
+            assert self.flag_dependency is None
+            assert self.file_dependency is None
+            assert self.game_dependency is None
+            return self.dependencies.is_satisfied(runtimedata)
+
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodSomeDependency":
         out = cls(FomodFileDependency.for_sanguine_stable_json_load())
@@ -245,6 +283,20 @@ class FomodDependencies:
     def __init__(self) -> None:
         self.oroperator = False
         self.dependencies = []
+
+    def is_satisfied(self, runtimedata: FomodDependencyEngineRuntimeData) -> bool:
+        if len(self.dependencies) == 0:
+            return True
+        if self.oroperator:
+            for dep in self.dependencies:
+                if dep.is_satisfied(runtimedata):
+                    return True
+            return False
+        else:
+            for dep in self.dependencies:
+                if not dep.is_satisfied(runtimedata):
+                    return False
+            return True
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "FomodDependencies":

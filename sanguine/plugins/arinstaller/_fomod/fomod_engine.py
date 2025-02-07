@@ -83,8 +83,12 @@ class FomodEngine:
         self.module_config = modulecfg
 
     def run(self, ui: LinearUI) -> FomodFilesAndFolders:
+        flags: dict[str, str] = {}
+        runtimedeps: FomodDependencyEngineRuntimeData = FomodDependencyEngineRuntimeData(flags)
         files = self.module_config.required.copy()  # copying just in case
         for istep in self.module_config.install_steps:
+            if not istep.visible.is_satisfied(runtimedeps):
+                continue  # TODO: what about potential mandatory settings within non-visible pages?
             wizpage = LinearUIGroup(istep.name, [])
             wizpage.extra_data = (0, istep)
             for grp in istep.groups:
@@ -105,4 +109,27 @@ class FomodEngine:
                     wizpageplugin.extra_data = (2, plugin)
                     wizpagegrp.add_control(wizpageplugin)
             ui.wizard_page(wizpage, _fomod_wizard_page_validator)
+
+            pgextra = FomodEngineWizardPlugin(wizpage)
+            for grp in wizpage.controls:
+                pgextra.set_grp(grp)
+                n = 0
+                for chkbox in grp.controls:
+                    pgextra.set_chkbox(chkbox)
+                    if chkbox.value:
+                        n += 1
+                        flags |= {dep.name: dep.value for dep in pgextra.plugin.condition_flags}
+                match pgextra.grp.select:
+                    case FomodGroupSelect.SelectExactlyOne:
+                        assert n == 1
+                    case FomodGroupSelect.SelectAny:
+                        pass
+                    case FomodGroupSelect.SelectAtMostOne:
+                        assert n <= 1
+                    case FomodGroupSelect.SelectAtLeastOne:
+                        assert n >= 1
+                    case FomodGroupSelect.SelectAll:
+                        assert n == len(grp.controls)
+                    case _:
+                        assert False
         return files

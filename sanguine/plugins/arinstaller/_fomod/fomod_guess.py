@@ -4,25 +4,29 @@ from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodE
 
 type _FomodReplaySteps = list[tuple[FomodInstallerSelection, bool | None]]
 type _FomodGuessPlugins = list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
-type _FomodGuessFlags = dict[str, FomodFlagDependency]
+
+
+# type _FomodGuessFlags = dict[str, FomodFlagDependency]
 
 
 class _FomodGuessFork:
     start_step: _FomodReplaySteps
     selected_plugins: _FomodGuessPlugins  # selected for sure in current fork
     true_or_false_plugins: _FomodGuessPlugins
-    flags: _FomodGuessFlags
+
+    # flags: _FomodGuessFlags
 
     def __init__(self, start: _FomodReplaySteps, sel: _FomodGuessPlugins | None = None,
-                 tof: _FomodGuessPlugins | None = None, flags: _FomodGuessFlags | None = None) -> None:
+                 tof: _FomodGuessPlugins | None = None) -> None:
+        # , flags: _FomodGuessFlags | None = None) -> None:
         self.start_step = start
         self.selected_plugins = sel if sel is not None else []
         self.true_or_false_plugins = tof if tof is not None else []
-        self.flags = flags if flags is not None else {}
+        # self.flags = flags if flags is not None else {}
 
     def copy(self) -> "_FomodGuessFork":
-        return _FomodGuessFork(self.start_step.copy(), self.selected_plugins.copy(), self.true_or_false_plugins.copy(),
-                               self.flags.copy())
+        return _FomodGuessFork(self.start_step.copy(), self.selected_plugins.copy(), self.true_or_false_plugins.copy())
+        # ,self.flags.copy())
 
 
 class _FomodGuessFakeUI(LinearUI):
@@ -70,6 +74,10 @@ class _FomodGuessFakeUI(LinearUI):
                         assert False
 
                     self.current_step.append(nxt)
+                    if it.plugin_ctrl.disabled:
+                        assert it.plugin_ctrl.value == nxt[1]
+                    else:
+                        it.plugin_ctrl.value = nxt[1]
                     continue
                 assert len(self.current_step) >= len(self.current_fork.start_step)
                 oldcurlen = len(self.current_step)
@@ -131,8 +139,9 @@ class _FomodGuessFakeUI(LinearUI):
                 if predetermined:  # no choice, no fork
                     assert len(possible) == 1
                     assert possible[0] is False or possible[0] is True
+                    it.plugin_ctrl.value = possible[0]
                     if possible[0]:
-                        self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
+                        # self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
                         if it.plugin.files is not None:
                             self.current_fork.selected_plugins.append((cur, it.plugin.files))
                     self.current_step.append((cur, possible[0]))
@@ -153,7 +162,9 @@ class _FomodGuessFakeUI(LinearUI):
                     forked.start_step.append((cur, False))
                     self.requested_forks.append(forked)
                     self.current_step.append((cur, True))
-                    self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
+                    # self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
+                    assert not it.plugin_ctrl.disabled
+                    it.plugin_ctrl.value = True
                     if it.plugin.files is not None:
                         self.current_fork.selected_plugins.append((cur, it.plugin.files))
 
