@@ -38,7 +38,7 @@ class FomodSrcDstFlags(IntFlag):
 
 class FomodSrcDst:
     SANGUINE_JSON: list[tuple] = [('src', 'src', ''), ('dst', 'dst', ''),
-                                  ('priority', 'pri', -1), ('flags', 'flags', FomodSrcDstFlags.NoFlags)]
+                                  ('priority', 'pri', 0), ('flags', 'flags', FomodSrcDstFlags.NoFlags)]
     src: str | None
     dst: str | None
     priority: int
