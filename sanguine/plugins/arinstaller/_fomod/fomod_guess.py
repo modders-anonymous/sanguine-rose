@@ -228,7 +228,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         engselections, engfiles = engine.run(fakeui)
         processed_forks.append((fakeui.current_fork.true_or_false_plugins, engselections, engfiles))
         remaining_forks += fakeui.requested_forks
-        if len(processed_forks) + len(remaining_forks) > 1000:
+        if len(processed_forks) + len(remaining_forks) > 5000:
             alert('Too many simulations for {}, skipping'.format(modulecfg.module_name))
             return None
     info('{}: {} fork(s) found'.format(modulecfg.module_name, len(processed_forks)))
@@ -269,10 +269,12 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
 
         candidate: FomodArInstaller = FomodArInstaller(archive, fomodroot, files, selections)
         n = 0
+        ndesired = 0
         for fpath, fia in candidate.all_desired_files():
+            ndesired += 1
             if fpath in modfiles and truncate_file_hash(modfiles[fpath][0].file_hash) == fia.file_hash:
                 n += 1
-        if n > best_coverage:
+        if n > best_coverage and n > (ndesired / 2):
             best_coverage = n
             best_arinstaller = candidate
 
