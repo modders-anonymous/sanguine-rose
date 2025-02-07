@@ -2,7 +2,7 @@ from sanguine.helpers.file_retriever import ArchiveFileRetriever
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
 from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodEngineWizardPlugin
 
-type _FomodReplaySteps = list[tuple[FomodInstallerSelection,bool|None]]
+type _FomodReplaySteps = list[tuple[FomodInstallerSelection, bool | None]]
 type _FomodGuessPlugins = list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
 type _FomodGuessFlags = dict[str, FomodFlagDependency]
 
@@ -59,7 +59,7 @@ class _FomodGuessFakeUI(LinearUI):
         it = FomodEngineWizardPlugin(wizardpage)
         for cgrp in wizardpage.controls:
             it.set_grp(cgrp)
-            for c2idx,c2 in enumerate(cgrp.controls):
+            for c2idx, c2 in enumerate(cgrp.controls):
                 it.set_chkbox(c2)
                 if len(self.current_step) < len(self.current_fork.start_step):
                     nxt = self.current_fork.start_step[len(self.current_step)]
@@ -81,9 +81,9 @@ class _FomodGuessFakeUI(LinearUI):
                     case FomodGroupSelect.SelectAll:
                         possible = (True,)
                     case FomodGroupSelect.SelectExactlyOne:
-                        possible = (True,False)
+                        possible = (True, False)
                         for i in range(c2idx):
-                            prevstep = self.current_step[-1-i]
+                            prevstep = self.current_step[-1 - i]
                             assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
                             assert prevstep[1] is False or prevstep[1] is True
                             if prevstep[1] is True:
@@ -92,10 +92,10 @@ class _FomodGuessFakeUI(LinearUI):
                         if len(possible) == 2 and c2idx == len(cgrp.controls) - 1:
                             possible = (True,)
                     case FomodGroupSelect.SelectAtLeastOne:
-                        possible = (True,False)
+                        possible = (True, False)
                         found = False
                         for i in range(c2idx):
-                            prevstep = self.current_step[-1-i]
+                            prevstep = self.current_step[-1 - i]
                             assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
                             assert prevstep[1] is False or prevstep[1] is True
 
@@ -105,10 +105,10 @@ class _FomodGuessFakeUI(LinearUI):
                         if not found and c2idx == len(cgrp.controls) - 1:
                             possible = (True,)
                     case FomodGroupSelect.SelectAtMostOne:
-                        possible = (True,False)
+                        possible = (True, False)
                         found = False
                         for i in range(c2idx):
-                            prevstep = self.current_step[-1-i]
+                            prevstep = self.current_step[-1 - i]
                             assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
                             assert prevstep[1] is False or prevstep[1] is True
 
@@ -135,24 +135,24 @@ class _FomodGuessFakeUI(LinearUI):
                         self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
                         if it.plugin.files is not None:
                             self.current_fork.selected_plugins.append((cur, it.plugin.files))
-                    self.current_step.append((cur,possible[0]))
+                    self.current_step.append((cur, possible[0]))
                 elif len(it.plugin.condition_flags) > 0:
                     willfork = True
                 elif possible[0] is None:
-                    self.current_step.append((cur,None))
+                    self.current_step.append((cur, None))
                     if it.plugin.files is not None:
                         self.current_fork.true_or_false_plugins.append((cur, it.plugin.files))
                 else:
                     willfork = True
 
-                if willfork: # both are possible, will handle True in this run, will request fork with False
+                if willfork:  # both are possible, will handle True in this run, will request fork with False
                     assert possible[0] is None or (possible[0] is True and possible[1] is False)
                     # (None,) is treated the same as (True,False) here
                     forked = self.current_fork.copy()
                     forked.start_step = self.current_step.copy()
-                    forked.start_step.append((cur,False))
+                    forked.start_step.append((cur, False))
                     self.requested_forks.append(forked)
-                    self.current_step.append((cur,True))
+                    self.current_step.append((cur, True))
                     self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
                     if it.plugin.files is not None:
                         self.current_fork.selected_plugins.append((cur, it.plugin.files))
@@ -204,8 +204,6 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
     processed_forks: list[_FomodGuessFork] = []
     remaining_forks: list[_FomodGuessFork] = [_FomodGuessFork([])]
     info('Running simulations for FOMOD installer {}...'.format(modulecfg.module_name))
-    if 'caliente' in modulecfg.module_name.lower(): # temporary hack; TODO: remove!
-        return None
     while len(remaining_forks) > 0:
         startingfork = remaining_forks[0]
         remaining_forks = remaining_forks[1:]
@@ -214,6 +212,9 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
         engine.run(fakeui)
         processed_forks.append(fakeui.current_fork)
         remaining_forks += fakeui.requested_forks
+        if len(remaining_forks) > 1000:
+            alert('Too many simulations for {}, skipping'.format(modulecfg.module_name))
+            return None
     info('{}: {} fork(s) found'.format(modulecfg.module_name, len(processed_forks)))
 
     best_arinstaller: ArInstaller | None = None

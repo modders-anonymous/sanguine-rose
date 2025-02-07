@@ -78,8 +78,8 @@ class FomodFilesAndFolders:
         out.folders = self.folders.copy()
         return out
 
-    def all_files(self, archive: Archive) -> Iterable[tuple[str, FileInArchive]]:
-        out: dict[str, FileInArchive] = {}
+    def all_files(self, archive: Archive) -> Iterable[tuple[str, int, FileInArchive]]:
+        out: dict[str, tuple[int, FileInArchive]] = {}
         arfiles: dict[str, FileInArchive] = {}
         for f in archive.files:
             arfiles[f.intra_path] = f
@@ -89,7 +89,7 @@ class FomodFilesAndFolders:
             assert src in arfiles
             dst = FomodFilesAndFolders.normalize_file_path(f.dst)
             assert dst not in out
-            out[dst] = arfiles[src]
+            out[dst] = f.priority, arfiles[src]
 
         for f in self.folders:
             src = FomodFilesAndFolders.normalize_folder_path(f.src)
@@ -98,10 +98,15 @@ class FomodFilesAndFolders:
                 if af.intra_path.startswith(src):
                     remainder = af.intra_path[len(src):]
                     fdst = dst + remainder
-                    assert fdst not in out
-                    out[fdst] = af
+                    if fdst in out:
+                        oldpri, oldaf = out[fdst]
+                        if f.priority > oldpri:
+                            out[fdst] = f.priority, af
+                        elif f.priority == oldpri:
+                            assert af.file_hash == oldaf.file_hash
+                    out[fdst] = f.priority, af
 
-        return [(dst, fia) for dst, fia in out.items()]
+        return [(dst, pfia[0], pfia[1]) for dst, pfia in out.items()]
 
     @staticmethod
     def normalize_file_path(src: str) -> str:
@@ -418,6 +423,14 @@ class FomodModuleConfig:
 
 ### done with FomodModuleConfig
 
+class FomodArInstallerData:
+    SANGUINE_JSON: list[tuple] = [('selections', 'sel', FomodInstallerSelection, StableJsonFlags.Unsorted)]
+    selections: list[FomodInstallerSelection]
+
+    def __init__(self, selections: list[FomodInstallerSelection]) -> None:
+        self.selections = selections
+
+
 class FomodArInstaller(ArInstaller):
     selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
 
@@ -429,10 +442,16 @@ class FomodArInstaller(ArInstaller):
         return 'FOMOD'
 
     def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
-        out: list[tuple[str, FileInArchive]] = []
-        for sel, ff in self.selections:  # TODO: handle overwrites incl. priorities
-            out += ff.all_files(self.archive)
-        return out
+        out: dict[str, tuple[int, FileInArchive]] = {}
+        for _, ff in self.selections:
+            for f, p, fia in ff.all_files(self.archive):
+                if f in out:
+                    pold, fiaold = out[f]
+                    if p > pold:
+                        out[f] = p, fia
+                else:
+                    out[f] = p, fia
+        return [(k, v[1]) for k, v in out.items()]
 
     def install_params(self) -> Any:
-        return [sel[0] for sel in self.selections]
+        return FomodArInstallerData([sel[0] for sel in self.selections])
