@@ -39,20 +39,20 @@ class GlobalToolPluginBase(ABC):
         pass
 
 
-_tool_plugins: list[GlobalToolPluginBase] = []
+_global_tool_plugins: list[GlobalToolPluginBase] = []
 
 
 def _found_global_tool_plugin(plugin: GlobalToolPluginBase):
-    global _tool_plugins
+    global _global_tool_plugins
     if __debug__:
         for universe in plugin.supported_games():
             assert universe.isupper()
-    _tool_plugins.append(plugin)
+    _global_tool_plugins.append(plugin)
 
 
 load_plugins('plugins/globaltool/', GlobalToolPluginBase, lambda plugin: _found_global_tool_plugin(plugin))
 
 
 def all_global_tool_plugins(gameuniverse: str) -> list[GlobalToolPluginBase]:
-    global _tool_plugins
-    return [t for t in _tool_plugins if gameuniverse.upper() in t.supported_games()]
+    global _global_tool_plugins
+    return [t for t in _global_tool_plugins if gameuniverse.upper() in t.supported_games()]

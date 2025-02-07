@@ -62,6 +62,20 @@ class ProjectInstaller:
         return cls(b'', '', {}, [])
 
 
+class ProjectModTool:
+    SANGUINE_JSON: list[tuple[str, str]] = [('name', 'name'), ('param', 'param')]
+    name: str
+    param: Any
+
+    def __init__(self, name: str, param: Any) -> None:
+        self.name = name
+        self.param = param
+
+    @classmethod
+    def for_sanguine_stable_json_load(cls) -> "ProjectModTool":
+        return cls('', '')
+
+
 class ProjectMod:
     SANGUINE_JSON: list[tuple[str, str]] = [('mod_name', 'name'),
                                             ('zero_files', 'zero', str),
@@ -69,7 +83,8 @@ class ProjectMod:
                                             ('installers', 'installers', ProjectInstaller, StableJsonFlags.Unsorted),
                                             ('remaining_archives', 'xarchives', ProjectExtraArchive),
                                             ('unknown_files_by_tools', 'unknownbytools', str),
-                                            ('unknown_files', 'unknown', str)]
+                                            ('unknown_files', 'unknown', str),
+                                            ('mod_tools', 'tools', ProjectModTool)]
     mod_name: str | None
     zero_files: list[str] | None
     github_files: dict[str, GithubFileRetriever] | None
@@ -77,6 +92,7 @@ class ProjectMod:
     remaining_archives: list[ProjectExtraArchive] | None
     unknown_files: list[str] | None
     unknown_files_by_tools: list[str] | None
+    mod_tools: list[ProjectModTool] | None
 
     def __init__(self) -> None:
         self.mod_name = None
@@ -86,6 +102,7 @@ class ProjectMod:
         self.remaining_archives = None
         self.unknown_files = None
         self.unknown_files_by_tools = None
+        self.mod_tools = None
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "ProjectMod":

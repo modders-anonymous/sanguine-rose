@@ -6,13 +6,14 @@ from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.gitdata.project_json import (ProjectJson, ProjectMod, ProjectInstaller,
-                                           ProjectExtraArchive, ProjectExtraArchiveFile)
+                                           ProjectExtraArchive, ProjectExtraArchiveFile, ProjectModTool)
 from sanguine.gitdata.stable_json import to_stable_json, write_stable_json
 from sanguine.helpers.archives import Archive, FileInArchive
-from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
+from sanguine.helpers.arinstallers import ArInstaller, ArInstallerDetails, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.globaltools import GlobalToolPluginBase, all_global_tool_plugins, CouldBeProducedByGlobalTool
+from sanguine.helpers.modtools import all_mod_tool_plugins, ModToolGuessParam, ModToolGuessDiff
 from sanguine.helpers.project_config import LocalProjectConfig
 
 
@@ -83,19 +84,6 @@ class _IgnoredTargetFiles:
         return False
 
 
-class _ArInstEx:
-    ignored: set[str]
-    skip: set[str]
-    files: dict[str, FileInArchive]
-    modified_since_install: set[str]
-
-    def __init__(self) -> None:
-        self.ignored = set()
-        self.skip = set()
-        self.files = {}
-        self.modified_since_install = set()
-
-
 class _ModInProgress:
     name: str
     # all *_files members use intramod as 1st parameter
@@ -107,9 +95,10 @@ class _ModInProgress:
     # files: dict[str, list[FileRetriever]]  # intramod -> list of retrievers
     known_archives: dict[bytes, tuple[Archive, int]]
     required_archives: dict[bytes, tuple[Archive, int]] | None
-    install_from: list[tuple[ArInstaller, _ArInstEx]] | None
+    install_from: list[tuple[ArInstaller, ArInstallerDetails]] | None
     remaining_after_install_from: dict[str, list[ArchiveFileRetriever]] | None
     unknown_files_could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByGlobalTool]] | None
+    mod_tools: list[tuple[str, Any]]
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -128,6 +117,8 @@ class _ModInProgress:
         # self.modified_from_install = None
         # self.skip_from_install = None
         self.unknown_files_could_be_produced_by_tools = None
+
+        self.mod_tools = []
 
     def add_file(self, available: AvailableFiles, intramod: str, retrievers: list[FileRetriever]) -> None:
         assert intramod not in self.unknown_files
@@ -176,7 +167,7 @@ class _ModInProgress:
     def collect_extension_stats(self, unknownstats: _ExtStats, archivestats: _ExtStats,
                                 modifiedsincestats: _ExtStats) -> None:
         for infr in self.install_from:
-            aic: _ArInstEx = infr[1]
+            aic: ArInstallerDetails = infr[1]
             for f in aic.files:
                 archivestats.add(f)
             for msi in aic.modified_since_install:
@@ -187,32 +178,13 @@ class _ModInProgress:
     def collect_mod_stats(self, unknownstats: _PerModStats, archivestats: _PerModStats,
                           modifiedsincestats: _PerModStats) -> None:
         for infr in self.install_from:
-            aic: _ArInstEx = infr[1]
+            aic: ArInstallerDetails = infr[1]
             archivestats.add(self.name, len(aic.files))
             modifiedsincestats.add(self.name, len(aic.modified_since_install))
         unknownstats.add(self.name, len(self.unknown_files))
 
-    '''
-    @staticmethod
-    def _assert_arfh_in_arfiles_by_hash(arfh: bytes, arintra: str,
-                                        arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> None:
-        assert arfh in arfiles_by_hash
-        arfs = arfiles_by_hash[arfh]
-        ok = False
-        for arf in arfs:
-            if arf.intra_path == arintra:
-                ok = True
-                break
-        assert ok
-    @staticmethod
-    def _best_unmatched_from_arfiles_by_hash(arfh: bytes, arintra: str,
-                                             arfiles_by_hash: dict[bytes, list[FileInArchive]]) -> str:
-        assert arfh in arfiles_by_hash
-        arfs = arfiles_by_hash[arfh]
-        return arfs[0].intra_path  # TODO! - best matching name?
-    '''
-
-    def _process_aic_clearing_remaining_after(self, cfg: LocalProjectConfig, srccache: FolderCache, aic: _ArInstEx):
+    def _process_aic_clearing_remaining_after(self, cfg: LocalProjectConfig, srccache: FolderCache,
+                                              aic: ArInstallerDetails):
         for f in aic.files:
             mf = ModFile(self.name, f)
             if __debug__:
@@ -224,8 +196,9 @@ class _ModInProgress:
             if f in self.remaining_after_install_from:  # might have already been deleted if identical file is present in multiple archives
                 del self.remaining_after_install_from[f]
 
-    def _inter_dependency(self, cfg: LocalProjectConfig, srccache: FolderCache, ar0: tuple[ArInstaller, _ArInstEx],
-                          ar1: tuple[ArInstaller, _ArInstEx]) -> tuple[bool, bool]:
+    def _inter_dependency(self, cfg: LocalProjectConfig, srccache: FolderCache,
+                          ar0: tuple[ArInstaller, ArInstallerDetails],
+                          ar1: tuple[ArInstaller, ArInstallerDetails]) -> tuple[bool, bool]:
         aoverb = 0
         bovera = 0
         files0: dict[str, FileInArchive] = ar0[1].files
@@ -267,7 +240,7 @@ class _ModInProgress:
                 if guess is not None:
                     # if isinstance(guess, SimpleArInstaller) and guess.install_from_root != '':
                     #    pass
-                    aic = _ArInstEx()
+                    aic = ArInstallerDetails()
                     self.install_from.append((guess, aic))
                     for f, fia in guess.all_desired_files():
                         mf = ModFile(self.name, f)
@@ -306,7 +279,7 @@ class _ModInProgress:
         assert self.remaining_after_install_from is None
         self.remaining_after_install_from = self.archive_files.copy()
         if len(self.install_from) == 1:
-            ar0: tuple[ArInstaller, _ArInstEx] = self.install_from[0]
+            ar0: tuple[ArInstaller, ArInstallerDetails] = self.install_from[0]
             _, aic = ar0
             self._process_aic_clearing_remaining_after(cfg, srccache, aic)
         elif len(self.install_from) > 1:
@@ -350,7 +323,7 @@ class _ModInProgress:
         if __debug__:
             fromarch: set[str] = set(self.remaining_after_install_from.keys())
             for arinst, arinstx0 in self.install_from:
-                arinstx: _ArInstEx = arinstx0
+                arinstx: ArInstallerDetails = arinstx0
 
                 for f in arinstx.files:
                     if f not in arinstx.modified_since_install:
@@ -369,13 +342,11 @@ class _ModInProgress:
     def is_fully_github(self) -> bool:
         return len(self.archive_files) == 0
 
-    def is_trivially_installed(self) -> bool:
-        return self._is_fully_installed() and self._num_skips() == 0
+    def is_fully_installed(self) -> bool:
+        return (len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == 0
+                and self._num_skips() == 0)
 
-    def _is_fully_installed(self) -> bool:
-        return len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == 0
-
-    def is_healable_to_trivial_install(self) -> bool:
+    def is_healable_to_full_install(self) -> bool:
         assert len(self.unknown_files_could_be_produced_by_tools) <= self._num_skips()
         if len(self.remaining_after_install_from) != 0 or len(
                 self.unknown_files_could_be_produced_by_tools) != self._num_skips():
@@ -575,8 +546,44 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('Resolved {} ambiguous files within mod archives, {} from other mod archives'.format(nresolvedinmods,
                                                                                               nresolvedoutofmods))
 
+    info('Trying to apply mod tools...')
+    modtools = all_mod_tool_plugins(cfg.root_modpack_config().game_universe)
+    for mod in mip.mods.values():
+        for t in modtools:
+            param = ModToolGuessParam()
+            param.install_from = mod.install_from
+            param.remaining_after_install_from = mod.remaining_after_install_from
+            guess = t.guess_applied(param)
+            if guess is not None:
+                guessdescr, guessdiff = guess
+                assert isinstance(guessdiff, ModToolGuessDiff)
+                for src, dst in guessdiff.moved:
+                    foundar = None
+                    for ar in mod.install_from:
+                        if src in ar[1].skip:
+                            foundar = ar
+                            break
+
+                    assert foundar is not None
+                    assert src in foundar[1].skip
+                    assert dst in mod.remaining_after_install_from
+                    retr = mod.remaining_after_install_from[dst]
+                    fh = truncate_file_hash(retr[0].file_hash)
+                    fh0 = None
+                    for f, fia in foundar[0].all_desired_files():
+                        if f == src:
+                            fh0 = fia.file_hash
+                            break
+                    assert fh0 is not None
+                    assert fh == fh0
+
+                    foundar[1].skip.remove(src)
+                    del mod.remaining_after_install_from[dst]
+                mod.mod_tools.append((t.name(), guessdescr))
+
+    info('Guesswork with global tools...')
     ntools = 0
-    for key, mod in mip.mods.items():
+    for mod in mip.mods.values():
         assert mod.unknown_files_could_be_produced_by_tools is None
         mod.unknown_files_could_be_produced_by_tools = {}
         for ff in mod.modified_since_install():
@@ -600,9 +607,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     ninstallfrom = 0
     # info('per-mod stats:')
-    triviallyinstalledmods: list[tuple[str, _ModInProgress]] = []
-    healabletotrivialmods: list[tuple[str, _ModInProgress]] = []
-    # fullyinstalledmods: list[tuple[str, _ModInProgress]] = []
+    fullyinstalledmods: list[tuple[str, _ModInProgress]] = []
+    healabletofullmods: list[tuple[str, _ModInProgress]] = []
     fullygithubmods: list[tuple[str, _ModInProgress]] = []
     othermods: list[tuple[str, _ModInProgress]] = []
     for modname, mod in mip.mods.items():
@@ -618,11 +624,11 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             # info("-> {}: install_from {}, install_data='{}'".format(
             #    modname, str(names), str(instdata)))
             ninstallfrom += 1
-            if mod.is_trivially_installed():
-                triviallyinstalledmods.append((modname, mod))
+            if mod.is_fully_installed():
+                fullyinstalledmods.append((modname, mod))
                 processed = True
-            elif mod.is_healable_to_trivial_install():
-                healabletotrivialmods.append((modname, mod))
+            elif mod.is_healable_to_full_install():
+                healabletofullmods.append((modname, mod))
                 processed = True
             # elif mod.is_fully_installed():
             #    fullyinstalledmods.append((modname, mod))
@@ -636,9 +642,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('found install_from archives for {} mods out of {}, {:.1f}%'.format(ninstallfrom, len(mip.mods),
                                                                              ninstallfrom / len(mip.mods) * 100.))
     info(
-        '{} mod(s) are github-only, {} mod(s) are trivially installed, {} mod(s) can probably be healed to trivial install'.format(
-            len(fullygithubmods), len(triviallyinstalledmods), len(healabletotrivialmods)))
-    # info('{} mod(s) are fully installed (with unexplained skips)'.format(len(fullyinstalledmods)))
+        '{} mod(s) are github-only, {} mod(s) are fully installed, {} mod(s) can probably be healed to full install'.format(
+            len(fullygithubmods), len(fullyinstalledmods), len(healabletofullmods)))
     alert('{} mod(s) remaining'.format(len(othermods)))
 
     unknownextstats = _ExtStats()
@@ -692,6 +697,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
         pm.unknown_files = [u for u in mod.unknown_files]
         pm.unknown_files_by_tools = [t for t in mod.unknown_files_could_be_produced_by_tools]
+        pm.mod_tools = [ProjectModTool(mtname, mtparam) for mtname, mtparam in mod.mod_tools]
 
     jdata = to_stable_json(pj)
     write_stable_json(cfg.this_modpack_folder() + "project.json", jdata)

@@ -462,6 +462,6 @@ class FomodArInstaller(ArInstaller):
                     out[f] = p, fia
                 elif p == pold:
                     if fiaold.file_hash != fia.file_hash:
-                        alert('Ambiguous overwriting of a file {} in FomodArInstaller'.format(f))
+                        warn('Ambiguous overwriting of a file {} in FomodArInstaller'.format(f))
             else:
                 out[f] = p, fia

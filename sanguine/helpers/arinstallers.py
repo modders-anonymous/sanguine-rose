@@ -23,6 +23,19 @@ class ArInstaller:
         pass
 
 
+class ArInstallerDetails:
+    ignored: set[str]
+    skip: set[str]
+    files: dict[str, FileInArchive]
+    modified_since_install: set[str]
+
+    def __init__(self) -> None:
+        self.ignored = set()
+        self.skip = set()
+        self.files = {}
+        self.modified_since_install = set()
+
+
 class ExtraArchiveDataFactory:
     @abstractmethod
     def name(self) -> str:
