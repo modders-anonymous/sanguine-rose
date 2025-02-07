@@ -15,15 +15,15 @@ from sanguine.plugins.arinstaller._fomod.fomod_parser import parse_fomod_modulec
 
 
 class _FomodArInstallerPluginExtraData:
-    SANGUINE_JSON: list[tuple] = [('module_config', None)]
-    module_config: FomodModuleConfig
+    SANGUINE_JSON: list[tuple] = [('module_configs', None, (str, FomodModuleConfig))]
+    module_configs: dict[str, FomodModuleConfig]
 
-    def __init__(self, mconfig: FomodModuleConfig) -> None:
-        self.module_config = mconfig
+    def __init__(self, mconfigs: dict[str, FomodModuleConfig]) -> None:
+        self.module_configs = mconfigs
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "_FomodArInstallerPluginExtraData":
-        return cls(FomodModuleConfig.for_sanguine_stable_json_load())
+        return cls({})
 
 
 class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
@@ -32,16 +32,38 @@ class FomodExtraArchiveDataFactory(ExtraArchiveDataFactory):
 
     def extra_data(self, fullarchivedir: str) -> _FomodArInstallerPluginExtraData | None:  # returns stable_json data
         assert is_normalized_dir_path(fullarchivedir)
-        fname = fullarchivedir + 'fomod\\moduleconfig.xml'
-        if os.path.isfile(fname):
+        fomod_paths = []
+        for dirpath, dirnames, filenames in os.walk(fullarchivedir):
+            d = dirpath.lower()
+            if d.endswith('\\fomod'):
+                for f in filenames:
+                    if f.lower() == 'moduleconfig.xml':
+                        assert d.startswith(fullarchivedir)
+                        drel = d[len(fullarchivedir):]
+                        if drel == 'fomod':
+                            fomod_paths.append('')
+                        else:
+                            assert drel.endswith('\\fomod')
+                            drel = drel[:-len('\\fomod')]
+                            fomod_paths.append(drel)
+
+        if len(fomod_paths) == 0:
+            return None
+
+        fomod_configs = []
+        for fomodroot in fomod_paths:
+            fname = fullarchivedir + fomodroot + '\\fomod\\moduleconfig.xml'
+            assert os.path.isfile(fname)
             with open_3rdparty_txt_file_autodetect(fname) as f:
                 xml = ''
                 for ln in f:
                     xml += ln
                 root = ElementTree.fromstring(xml)
                 modulecfg = parse_fomod_moduleconfig(root)
-            return _FomodArInstallerPluginExtraData(modulecfg)
-        return None
+                fomod_configs.append(modulecfg)
+
+        assert len(fomod_configs) == len(fomod_paths)
+        return _FomodArInstallerPluginExtraData({fomod_paths[i]: fomod_configs[i] for i in range(len(fomod_configs))})
 
 
 class _FomodArInstallerPluginInstallData:
@@ -82,7 +104,8 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
         if archive.archive_hash not in self.extra_data:
             return None
         instdata: _FomodArInstallerPluginExtraData = self.extra_data[archive.archive_hash]
-        return fomod_guess(instdata.module_config, archive, modfiles)
+        assert len(instdata.module_configs) == 1  # TODO: handle multiple fomod installers in the same file
+        return fomod_guess(instdata.module_configs[0], archive, modfiles)
 
     def got_loaded_data(self, data: dict[str, Any]) -> None:
         target = _FomodArInstallerPluginInstallData.for_sanguine_stable_json_load()
