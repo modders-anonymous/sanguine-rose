@@ -370,9 +370,9 @@ class _ModInProgress:
         return len(self.archive_files) == 0
 
     def is_trivially_installed(self) -> bool:
-        return self.is_fully_installed() and self._num_skips() == 0
+        return self._is_fully_installed() and self._num_skips() == 0
 
-    def is_fully_installed(self) -> bool:
+    def _is_fully_installed(self) -> bool:
         return len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == 0
 
     def is_healable_to_trivial_install(self) -> bool:
@@ -602,7 +602,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     # info('per-mod stats:')
     triviallyinstalledmods: list[tuple[str, _ModInProgress]] = []
     healabletotrivialmods: list[tuple[str, _ModInProgress]] = []
-    fullyinstalledmods: list[tuple[str, _ModInProgress]] = []
+    # fullyinstalledmods: list[tuple[str, _ModInProgress]] = []
     fullygithubmods: list[tuple[str, _ModInProgress]] = []
     othermods: list[tuple[str, _ModInProgress]] = []
     for modname, mod in mip.mods.items():
@@ -624,9 +624,9 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             elif mod.is_healable_to_trivial_install():
                 healabletotrivialmods.append((modname, mod))
                 processed = True
-            elif mod.is_fully_installed():
-                fullyinstalledmods.append((modname, mod))
-                processed = True
+            # elif mod.is_fully_installed():
+            #    fullyinstalledmods.append((modname, mod))
+            #    processed = True
 
         if processed:
             continue
@@ -638,7 +638,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info(
         '{} mod(s) are github-only, {} mod(s) are trivially installed, {} mod(s) can probably be healed to trivial install'.format(
             len(fullygithubmods), len(triviallyinstalledmods), len(healabletotrivialmods)))
-    info('{} mod(s) are fully installed (with unexplained skips)'.format(len(fullyinstalledmods)))
+    # info('{} mod(s) are fully installed (with unexplained skips)'.format(len(fullyinstalledmods)))
     alert('{} mod(s) remaining'.format(len(othermods)))
 
     unknownextstats = _ExtStats()

@@ -204,6 +204,8 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
     processed_forks: list[_FomodGuessFork] = []
     remaining_forks: list[_FomodGuessFork] = [_FomodGuessFork([])]
     info('Running simulations for FOMOD installer {}...'.format(modulecfg.module_name))
+    # if 'hunterborn' in modulecfg.module_name.lower():
+    #    pass
     while len(remaining_forks) > 0:
         startingfork = remaining_forks[0]
         remaining_forks = remaining_forks[1:]
@@ -249,7 +251,7 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
                     else:
                         pass
 
-        candidate: FomodArInstaller = FomodArInstaller(archive, selections)
+        candidate: FomodArInstaller = FomodArInstaller(archive, modulecfg.required, selections)
         n = 0
         for fpath, fia in candidate.all_desired_files():
             if fpath in modfiles and truncate_file_hash(modfiles[fpath][0].file_hash) == fia.file_hash:

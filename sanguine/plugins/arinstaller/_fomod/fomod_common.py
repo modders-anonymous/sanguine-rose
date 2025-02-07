@@ -432,10 +432,13 @@ class FomodArInstallerData:
 
 
 class FomodArInstaller(ArInstaller):
+    required: FomodFilesAndFolders
     selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
 
-    def __init__(self, archive: Archive, selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]):
+    def __init__(self, archive: Archive, required: FomodFilesAndFolders,
+                 selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]):
         super().__init__(archive)
+        self.required = required
         self.selections = selections
 
     def name(self) -> str:
@@ -443,15 +446,22 @@ class FomodArInstaller(ArInstaller):
 
     def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
         out: dict[str, tuple[int, FileInArchive]] = {}
+        self._to_out(out, self.required)
         for _, ff in self.selections:
-            for f, p, fia in ff.all_files(self.archive):
-                if f in out:
-                    pold, fiaold = out[f]
-                    if p > pold:
-                        out[f] = p, fia
-                else:
-                    out[f] = p, fia
+            self._to_out(out, ff)
         return [(k, v[1]) for k, v in out.items()]
 
     def install_params(self) -> Any:
         return FomodArInstallerData([sel[0] for sel in self.selections])
+
+    def _to_out(self, out: dict[str, tuple[int, FileInArchive]], ff: FomodFilesAndFolders) -> None:
+        for f, p, fia in ff.all_files(self.archive):
+            if f in out:
+                pold, fiaold = out[f]
+                if p > pold:
+                    out[f] = p, fia
+                elif p == pold:
+                    if fiaold.file_hash != fia.file_hash:
+                        alert('Ambiguous overwriting of a file {} in FomodArInstaller'.format(f))
+            else:
+                out[f] = p, fia
