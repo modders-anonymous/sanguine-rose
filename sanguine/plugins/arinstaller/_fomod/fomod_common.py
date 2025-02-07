@@ -78,21 +78,24 @@ class FomodFilesAndFolders:
         out.folders = self.folders.copy()
         return out
 
-    def all_files(self, archive: Archive) -> Iterable[tuple[str, int, FileInArchive]]:
+    def all_files(self, fomodroot: str, archive: Archive) -> Iterable[tuple[str, int, FileInArchive]]:
+        assert not fomodroot.endswith('\\')
+        fomodroot1 = '' if fomodroot == '' else fomodroot + '\\'
+
         out: dict[str, tuple[int, FileInArchive]] = {}
         arfiles: dict[str, FileInArchive] = {}
         for f in archive.files:
             arfiles[f.intra_path] = f
 
         for f in self.files:
-            src = FomodFilesAndFolders.normalize_file_path(f.src)
+            src = FomodFilesAndFolders.normalize_file_path(fomodroot1 + f.src)
             assert src in arfiles
             dst = FomodFilesAndFolders.normalize_file_path(f.dst)
             assert dst not in out
             out[dst] = f.priority, arfiles[src]
 
         for f in self.folders:
-            src = FomodFilesAndFolders.normalize_folder_path(f.src)
+            src = FomodFilesAndFolders.normalize_folder_path(fomodroot1 + f.src)
             dst = FomodFilesAndFolders.normalize_folder_path(f.dst)
             for af in archive.files:  # TODO: can/should we try speeding it up?
                 if af.intra_path.startswith(src):
@@ -424,20 +427,25 @@ class FomodModuleConfig:
 ### done with FomodModuleConfig
 
 class FomodArInstallerData:
-    SANGUINE_JSON: list[tuple] = [('selections', 'sel', FomodInstallerSelection, StableJsonFlags.Unsorted)]
+    SANGUINE_JSON: list[tuple] = [('fomod_root', 'root', ''),
+                                  ('selections', 'sel', FomodInstallerSelection, StableJsonFlags.Unsorted)]
+    fomod_root: str
     selections: list[FomodInstallerSelection]
 
-    def __init__(self, selections: list[FomodInstallerSelection]) -> None:
+    def __init__(self, fomodroot: str, selections: list[FomodInstallerSelection]) -> None:
+        self.fomod_root = fomodroot
         self.selections = selections
 
 
 class FomodArInstaller(ArInstaller):
+    fomod_root: str
     required: FomodFilesAndFolders
     selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
 
-    def __init__(self, archive: Archive, required: FomodFilesAndFolders,
+    def __init__(self, archive: Archive, fomodroot: str, required: FomodFilesAndFolders,
                  selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]):
         super().__init__(archive)
+        self.fomod_root = fomodroot
         self.required = required
         self.selections = selections
 
@@ -452,10 +460,10 @@ class FomodArInstaller(ArInstaller):
         return [(k, v[1]) for k, v in out.items()]
 
     def install_params(self) -> Any:
-        return FomodArInstallerData([sel[0] for sel in self.selections])
+        return FomodArInstallerData(self.fomod_root, [sel[0] for sel in self.selections])
 
     def _to_out(self, out: dict[str, tuple[int, FileInArchive]], ff: FomodFilesAndFolders) -> None:
-        for f, p, fia in ff.all_files(self.archive):
+        for f, p, fia in ff.all_files(self.fomod_root, self.archive):
             if f in out:
                 pold, fiaold = out[f]
                 if p > pold:

@@ -160,8 +160,11 @@ class _FomodGuessFakeUI(LinearUI):
                 assert len(self.current_step) == oldcurlen + 1
 
 
-def _find_required_tofs(archive: Archive, modfiles: dict[str, list[ArchiveFileRetriever]],
+def _find_required_tofs(archive: Archive, fomodroot: str, modfiles: dict[str, list[ArchiveFileRetriever]],
                         fork: _FomodGuessFork) -> list[FomodInstallerSelection]:
+    assert not fomodroot.endswith('\\')
+    fomodroot1 = '' if fomodroot == '' else fomodroot + '\\'
+
     fias: dict[str, FileInArchive] = {}
     for f in archive.files:
         assert f.intra_path not in fias
@@ -171,7 +174,7 @@ def _find_required_tofs(archive: Archive, modfiles: dict[str, list[ArchiveFileRe
     for instsel, ff in fork.true_or_false_plugins:
         if ff is not None:
             for f in ff.files:
-                fsrc = FomodFilesAndFolders.normalize_file_path(f.src)
+                fsrc = FomodFilesAndFolders.normalize_file_path(fomodroot1 + f.src)
                 fdst = FomodFilesAndFolders.normalize_file_path(f.dst)
                 if fsrc not in fias:
                     assert False
@@ -199,13 +202,11 @@ def _find_required_tofs(archive: Archive, modfiles: dict[str, list[ArchiveFileRe
     return list(required_tofs)
 
 
-def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
-                modfiles: dict[str, list[ArchiveFileRetriever]]) -> ArInstaller | None:
+def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
+                modfiles: dict[str, list[ArchiveFileRetriever]]) -> tuple[ArInstaller, int] | None:
     processed_forks: list[_FomodGuessFork] = []
     remaining_forks: list[_FomodGuessFork] = [_FomodGuessFork([])]
     info('Running simulations for FOMOD installer {}...'.format(modulecfg.module_name))
-    # if 'hunterborn' in modulecfg.module_name.lower():
-    #    pass
     while len(remaining_forks) > 0:
         startingfork = remaining_forks[0]
         remaining_forks = remaining_forks[1:]
@@ -214,7 +215,7 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
         engine.run(fakeui)
         processed_forks.append(fakeui.current_fork)
         remaining_forks += fakeui.requested_forks
-        if len(remaining_forks) > 1000:
+        if len(processed_forks) + len(remaining_forks) > 1000:
             alert('Too many simulations for {}, skipping'.format(modulecfg.module_name))
             return None
     info('{}: {} fork(s) found'.format(modulecfg.module_name, len(processed_forks)))
@@ -231,7 +232,7 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
         for sel, tof in pf.true_or_false_plugins:
             assert sel not in known
             known[sel] = tof
-        required_tofs: set[FomodInstallerSelection] = set(_find_required_tofs(archive, modfiles, pf))
+        required_tofs: set[FomodInstallerSelection] = set(_find_required_tofs(archive, fomodroot, modfiles, pf))
 
         selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]] = []
         for istep in modulecfg.install_steps:
@@ -251,7 +252,7 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
                     else:
                         pass
 
-        candidate: FomodArInstaller = FomodArInstaller(archive, modulecfg.required, selections)
+        candidate: FomodArInstaller = FomodArInstaller(archive, fomodroot, modulecfg.required, selections)
         n = 0
         for fpath, fia in candidate.all_desired_files():
             if fpath in modfiles and truncate_file_hash(modfiles[fpath][0].file_hash) == fia.file_hash:
@@ -260,4 +261,4 @@ def fomod_guess(modulecfg: FomodModuleConfig, archive: Archive,
             best_coverage = n
             best_arinstaller = candidate
 
-    return best_arinstaller
+    return best_arinstaller, best_coverage

@@ -104,8 +104,17 @@ class FomodArInstallerPlugin(ArInstallerPluginBase):
         if archive.archive_hash not in self.extra_data:
             return None
         instdata: _FomodArInstallerPluginExtraData = self.extra_data[archive.archive_hash]
-        assert len(instdata.module_configs) == 1  # TODO: handle multiple fomod installers in the same file
-        return fomod_guess(instdata.module_configs[0], archive, modfiles)
+        assert len(instdata.module_configs) > 0
+        bestguess = None
+        bestn = None
+        for root, modulecfg in instdata.module_configs.items():
+            guess0 = fomod_guess(root, modulecfg, archive, modfiles)
+            if guess0 is not None:
+                guess, n = guess0
+                if bestguess is None or n > bestn:
+                    bestguess = guess
+                    bestn = n
+        return bestguess
 
     def got_loaded_data(self, data: dict[str, Any]) -> None:
         target = _FomodArInstallerPluginInstallData.for_sanguine_stable_json_load()
