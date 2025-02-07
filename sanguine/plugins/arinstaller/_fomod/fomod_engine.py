@@ -1,7 +1,7 @@
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
 
 
-class FomodEngineWizardPlugin:
+class FomodEnginePluginSelector:
     istep_ctrl: LinearUIGroup
     istep: FomodInstallStep
     grp_ctrl: LinearUIGroup | None
@@ -49,7 +49,7 @@ class FomodEngineWizardPlugin:
 
 def _fomod_wizard_page_validator(wizardpage: LinearUIGroup) -> str | None:
     for ctrl in wizardpage.controls:
-        it = FomodEngineWizardPlugin(ctrl)
+        it = FomodEnginePluginSelector(ctrl)
         for c2 in ctrl.controls:
             it.set_grp(c2)
             sel = it.grp.select
@@ -82,10 +82,11 @@ class FomodEngine:
     def __init__(self, modulecfg: FomodModuleConfig) -> None:
         self.module_config = modulecfg
 
-    def run(self, ui: LinearUI) -> FomodFilesAndFolders:
+    def run(self, ui: LinearUI) -> tuple[list[FomodInstallerSelection], FomodFilesAndFolders]:
         flags: dict[str, str] = {}
         runtimedeps: FomodDependencyEngineRuntimeData = FomodDependencyEngineRuntimeData(flags)
-        files = self.module_config.required.copy()  # copying just in case
+        selections: list[FomodInstallerSelection] = []
+        files = self.module_config.required.copy()  # copying, as we'll append to files
         for istep in self.module_config.install_steps:
             if not istep.visible.is_satisfied(runtimedeps):
                 continue  # TODO: what about potential mandatory settings within non-visible pages?
@@ -110,7 +111,7 @@ class FomodEngine:
                     wizpagegrp.add_control(wizpageplugin)
             ui.wizard_page(wizpage, _fomod_wizard_page_validator)
 
-            pgextra = FomodEngineWizardPlugin(wizpage)
+            pgextra = FomodEnginePluginSelector(wizpage)
             for grp in wizpage.controls:
                 pgextra.set_grp(grp)
                 n = 0
@@ -118,7 +119,11 @@ class FomodEngine:
                     pgextra.set_chkbox(chkbox)
                     if chkbox.value:
                         n += 1
+                        if pgextra.plugin.files is not None:
+                            files.merge(pgextra.plugin.files)
                         flags |= {dep.name: dep.value for dep in pgextra.plugin.condition_flags}
+                        selections.append(
+                            FomodInstallerSelection(pgextra.istep.name, pgextra.grp.name, pgextra.plugin.name))
                 match pgextra.grp.select:
                     case FomodGroupSelect.SelectExactlyOne:
                         assert n == 1
@@ -132,4 +137,4 @@ class FomodEngine:
                         assert n == len(grp.controls)
                     case _:
                         assert False
-        return files
+        return selections, files

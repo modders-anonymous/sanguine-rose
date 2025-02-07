@@ -91,8 +91,7 @@ class FomodFilesAndFolders:
             src = FomodFilesAndFolders.normalize_file_path(fomodroot1 + f.src)
             assert src in arfiles
             dst = FomodFilesAndFolders.normalize_file_path(f.dst)
-            assert dst not in out
-            out[dst] = f.priority, arfiles[src]
+            FomodFilesAndFolders._add_to_out(out, dst, f.priority, arfiles[src])
 
         for f in self.folders:
             src = FomodFilesAndFolders.normalize_folder_path(fomodroot1 + f.src)
@@ -101,13 +100,7 @@ class FomodFilesAndFolders:
                 if af.intra_path.startswith(src):
                     remainder = af.intra_path[len(src):]
                     fdst = dst + remainder
-                    if fdst in out:
-                        oldpri, oldaf = out[fdst]
-                        if f.priority > oldpri:
-                            out[fdst] = f.priority, af
-                        elif f.priority == oldpri:
-                            assert af.file_hash == oldaf.file_hash
-                    out[fdst] = f.priority, af
+                    FomodFilesAndFolders._add_to_out(out, fdst, f.priority, af)
 
         return [(dst, pfia[0], pfia[1]) for dst, pfia in out.items()]
 
@@ -128,6 +121,18 @@ class FomodFilesAndFolders:
 
     def is_for_load(self) -> bool:
         return self.files == [] and self.folders == []
+
+    @staticmethod
+    def _add_to_out(out: dict[str, tuple[int, FileInArchive]], dst: str, priority: int, af: FileInArchive) -> None:
+        if dst in out:
+            oldpri, oldaf = out[dst]
+            if priority > oldpri:
+                out[dst] = priority, af
+            elif priority == oldpri:
+                if af.file_hash != oldaf.file_hash:
+                    warn('Ambiguous overwriting of a file {} in FomodArInstaller'.format(dst))
+        else:
+            out[dst] = priority, af
 
 
 class FomodDependencyEngineRuntimeData:
@@ -491,28 +496,30 @@ class FomodArInstallerData:
 
 class FomodArInstaller(ArInstaller):
     fomod_root: str
-    required: FomodFilesAndFolders
-    selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
+    files: FomodFilesAndFolders
+    # selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
+    selections: list[FomodInstallerSelection]
 
-    def __init__(self, archive: Archive, fomodroot: str, required: FomodFilesAndFolders,
-                 selections: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]):
+    def __init__(self, archive: Archive, fomodroot: str, files: FomodFilesAndFolders,
+                 selections: list[FomodInstallerSelection]) -> None:
         super().__init__(archive)
         self.fomod_root = fomodroot
-        self.required = required
+        # self.required = required
         self.selections = selections
+        self.files = files
 
     def name(self) -> str:
         return 'FOMOD'
 
     def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
         out: dict[str, tuple[int, FileInArchive]] = {}
-        self._to_out(out, self.required)
-        for _, ff in self.selections:
-            self._to_out(out, ff)
+        self._to_out(out, self.files)
+        # for _, ff in self.selections:
+        #    self._to_out(out, ff)
         return [(k, v[1]) for k, v in out.items()]
 
     def install_params(self) -> Any:
-        return FomodArInstallerData(self.fomod_root, [sel[0] for sel in self.selections])
+        return FomodArInstallerData(self.fomod_root, self.selections)
 
     def _to_out(self, out: dict[str, tuple[int, FileInArchive]], ff: FomodFilesAndFolders) -> None:
         for f, p, fia in ff.all_files(self.fomod_root, self.archive):
