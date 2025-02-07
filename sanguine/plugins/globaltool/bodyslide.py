@@ -3,7 +3,7 @@ import xml.etree.ElementTree as ElementTree
 
 from sanguine.common import *
 from sanguine.helpers.project_config import LocalProjectConfig
-from sanguine.helpers.tools import ToolPluginBase, ResolvedVFS, CouldBeProducedByTool
+from sanguine.helpers.globaltools import GlobalToolPluginBase, ResolvedVFS, CouldBeProducedByGlobalTool
 
 
 class _BodySlideToolPluginContext:
@@ -51,7 +51,7 @@ def _parse_osp(fname: str) -> list[str]:
         return []
 
 
-class BodySlideToolPlugin(ToolPluginBase):
+class BodySlideGlobalToolPlugin(GlobalToolPluginBase):
     def name(self) -> str:
         return 'BodySlide'
 
@@ -76,37 +76,37 @@ class BodySlideToolPlugin(ToolPluginBase):
                 ctx.rel_output_files |= {m: 1 for m in modified}
         return ctx
 
-    def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> CouldBeProducedByTool:
+    def could_be_produced(self, ctx: Any, srcpath: str, targetpath: str) -> CouldBeProducedByGlobalTool:
         assert isinstance(ctx, _BodySlideToolPluginContext)
         f, ext = os.path.splitext(targetpath)
         assert ext in self.extensions()
         if ext == '.tri':
             if f in ctx.rel_output_files:
-                return CouldBeProducedByTool.WithCurrentConfig
+                return CouldBeProducedByGlobalTool.WithCurrentConfig
             f0 = f + '_0.nif'
             f1 = f + '_1.nif'
             if f0 in ctx.target_files and f1 in ctx.target_files:
-                return CouldBeProducedByTool.Maybe
+                return CouldBeProducedByGlobalTool.Maybe
 
             fnif = f + '.nif'
             if fnif in ctx.target_files:
-                return CouldBeProducedByTool.Maybe
-            return CouldBeProducedByTool.NotFound
+                return CouldBeProducedByGlobalTool.Maybe
+            return CouldBeProducedByGlobalTool.NotFound
 
         assert ext == '.nif'
         if f.endswith('_0') or f.endswith('_1'):
             if f[:-2] in ctx.rel_output_files:
-                return CouldBeProducedByTool.WithCurrentConfig
+                return CouldBeProducedByGlobalTool.WithCurrentConfig
             f0 = f[:-2] + '_0.nif'
             f1 = f[:-2] + '_1.nif'
             ftri = f[:-2] + '.tri'
             if f0 in ctx.target_files and f1 in ctx.target_files and ftri in ctx.target_files:
-                return CouldBeProducedByTool.Maybe
-            return CouldBeProducedByTool.NotFound
+                return CouldBeProducedByGlobalTool.Maybe
+            return CouldBeProducedByGlobalTool.NotFound
         else:
             if f in ctx.rel_output_files:
-                return CouldBeProducedByTool.WithCurrentConfig
+                return CouldBeProducedByGlobalTool.WithCurrentConfig
             ftri = f + '.tri'
             if ftri in ctx.target_files:
-                return CouldBeProducedByTool.Maybe
-            return CouldBeProducedByTool.NotFound
+                return CouldBeProducedByGlobalTool.Maybe
+            return CouldBeProducedByGlobalTool.NotFound

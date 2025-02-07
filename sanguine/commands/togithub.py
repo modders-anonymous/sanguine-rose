@@ -12,8 +12,8 @@ from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstaller, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
+from sanguine.helpers.globaltools import GlobalToolPluginBase, all_global_tool_plugins, CouldBeProducedByGlobalTool
 from sanguine.helpers.project_config import LocalProjectConfig
-from sanguine.helpers.tools import ToolPluginBase, all_tool_plugins, CouldBeProducedByTool
 
 
 def _log_stats(stats: dict[str, int], level: int, title: str, max_lines: int) -> None:
@@ -109,7 +109,7 @@ class _ModInProgress:
     required_archives: dict[bytes, tuple[Archive, int]] | None
     install_from: list[tuple[ArInstaller, _ArInstEx]] | None
     remaining_after_install_from: dict[str, list[ArchiveFileRetriever]] | None
-    unknown_files_could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByTool]] | None
+    unknown_files_could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByGlobalTool]] | None
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -432,11 +432,11 @@ class _ModsInProgress:
 
 
 class _ToolFinder:
-    tools_by_ext: dict[str, list[tuple[ToolPluginBase, Any]]]
+    tools_by_ext: dict[str, list[tuple[GlobalToolPluginBase, Any]]]
 
     def __init__(self, cfg: LocalProjectConfig, resolvedvfs: ResolvedVFS) -> None:
         self.tools_by_ext = {}
-        for plugin in all_tool_plugins(cfg.root_modpack_config().game_universe):
+        for plugin in all_global_tool_plugins(cfg.root_modpack_config().game_universe):
             info('Preparing context for {} tool...'.format(plugin.name()))
             pluginex = (plugin, plugin.create_context(cfg, resolvedvfs))
             exts = plugin.extensions()
@@ -446,20 +446,20 @@ class _ToolFinder:
                     self.tools_by_ext[ext] = []
                 self.tools_by_ext[ext].append(pluginex)
 
-    def could_be_produced(self, srcfile: str, targetpath: str) -> tuple[CouldBeProducedByTool, str | None]:
+    def could_be_produced(self, srcfile: str, targetpath: str) -> tuple[CouldBeProducedByGlobalTool, str | None]:
         ext = os.path.splitext(srcfile)[1]
         assert ext == os.path.splitext(targetpath)[1]
         if ext in self.tools_by_ext:
             plugins = self.tools_by_ext[ext]
             besttool = None
-            maxcbp = CouldBeProducedByTool.NotFound
+            maxcbp = CouldBeProducedByGlobalTool.NotFound
             for plugin, ctx in plugins:
                 cbp = plugin.could_be_produced(ctx, srcfile, targetpath)
                 if cbp.is_greater_or_eq(maxcbp):
                     maxcbp = cbp
                     besttool = plugin.name()
             return maxcbp, besttool
-        return CouldBeProducedByTool.NotFound, None
+        return CouldBeProducedByGlobalTool.NotFound, None
 
 
 def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
@@ -588,7 +588,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             assert targetpath is not None
             srcf = cfg.mod_manager_config.modfile_to_source_vfs(mf)
             cbp, tool = toolsfinder.could_be_produced(srcf, targetpath)
-            if cbp.is_greater_or_eq(CouldBeProducedByTool.Maybe):
+            if cbp.is_greater_or_eq(CouldBeProducedByGlobalTool.Maybe):
                 ntools += 1
                 mod.unknown_files_could_be_produced_by_tools[ff] = (tool, cbp)
                 mod.unknown_files.remove(ff)

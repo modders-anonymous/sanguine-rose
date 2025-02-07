@@ -3,18 +3,18 @@ from sanguine.helpers.plugin_handler import load_plugins
 from sanguine.helpers.project_config import LocalProjectConfig
 
 
-class CouldBeProducedByTool(IntEnum):
+class CouldBeProducedByGlobalTool(IntEnum):
     NotFound = 0,
     Maybe = 1,
     WithKnownConfig = 2,
     WithOldConfig = 3,
     WithCurrentConfig = 4
 
-    def is_greater_or_eq(self, cbp: "CouldBeProducedByTool") -> bool:
+    def is_greater_or_eq(self, cbp: "CouldBeProducedByGlobalTool") -> bool:
         return int(self) >= int(cbp)
 
 
-class ToolPluginBase(ABC):
+class GlobalToolPluginBase(ABC):
     def __init__(self) -> None:
         pass
 
@@ -35,14 +35,14 @@ class ToolPluginBase(ABC):
         pass
 
     @abstractmethod
-    def could_be_produced(self, context: Any, srcpath: str, targetpath: str) -> CouldBeProducedByTool:
+    def could_be_produced(self, context: Any, srcpath: str, targetpath: str) -> CouldBeProducedByGlobalTool:
         pass
 
 
-_tool_plugins: list[ToolPluginBase] = []
+_tool_plugins: list[GlobalToolPluginBase] = []
 
 
-def _found_tool_plugin(plugin: ToolPluginBase):
+def _found_global_tool_plugin(plugin: GlobalToolPluginBase):
     global _tool_plugins
     if __debug__:
         for universe in plugin.supported_games():
@@ -50,9 +50,9 @@ def _found_tool_plugin(plugin: ToolPluginBase):
     _tool_plugins.append(plugin)
 
 
-load_plugins('plugins/tool/', ToolPluginBase, lambda plugin: _found_tool_plugin(plugin))
+load_plugins('plugins/globaltool/', GlobalToolPluginBase, lambda plugin: _found_global_tool_plugin(plugin))
 
 
-def all_tool_plugins(gameuniverse: str) -> list[ToolPluginBase]:
+def all_global_tool_plugins(gameuniverse: str) -> list[GlobalToolPluginBase]:
     global _tool_plugins
     return [t for t in _tool_plugins if gameuniverse.upper() in t.supported_games()]
