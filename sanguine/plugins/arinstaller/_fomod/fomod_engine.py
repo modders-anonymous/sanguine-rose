@@ -137,4 +137,7 @@ class FomodEngine:
                         assert n == len(grp.controls)
                     case _:
                         assert False
+        for cond in self.module_config.conditional_file_installs:
+            if cond.dependencies.is_satisfied(runtimedeps):
+                files.merge(cond.files)
         return selections, files

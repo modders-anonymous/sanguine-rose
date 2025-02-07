@@ -218,8 +218,8 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
     processed_forks: list[tuple[_FomodGuessPlugins, list[FomodInstallerSelection], FomodFilesAndFolders]] = []
     remaining_forks: list[_FomodGuessFork] = [_FomodGuessFork([])]
     info('Running simulations for FOMOD installer {}...'.format(modulecfg.module_name))
-    if 'clear map' in modulecfg.module_name.lower():
-        pass
+    # if 'clear map' in modulecfg.module_name.lower():
+    #    pass
     while len(remaining_forks) > 0:
         startingfork = remaining_forks[0]
         remaining_forks = remaining_forks[1:]
