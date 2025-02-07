@@ -48,13 +48,14 @@ def _validate_sjdecl(obj: Any) -> None:
     assert hasattr(obj, 'SANGUINE_JSON')
     sjlist = obj.SANGUINE_JSON
     for sj in sjlist:
-        assert sj[0] in obj.__dict__
+        if __debug__ and sj[0] not in obj.__dict__:
+            assert False
         assert sj[1] is None or isinstance(sj[1], str)
         if sj[1] is None:
             assert len(sjlist) == 1
         target = obj.__dict__[sj[0]]
         if isinstance(target, list):
-            if len(sj) != 3 and len(sj) != 4:
+            if __debug__ and len(sj) != 3 and len(sj) != 4:
                 assert False
             if len(sj) == 4:
                 assert isinstance(sj[3], StableJsonFlags)
@@ -73,7 +74,7 @@ def _validate_sjdecl(obj: Any) -> None:
         elif hasattr(target, 'SANGUINE_JSON'):
             assert len(sj) == 2
         else:
-            if target is not None and not isinstance(target, _PRIMITIVE_TYPES):
+            if __debug__ and target is not None and not isinstance(target, _PRIMITIVE_TYPES):
                 assert False
             assert len(sj) == 2 or len(sj) == 3
             if len(sj) == 3:

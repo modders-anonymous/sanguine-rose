@@ -329,7 +329,7 @@ class _ModInProgress:
                     if f not in arinstx.modified_since_install:
                         fromarch.add(f)
 
-            if len(fromarch) != len(self.archive_files):
+            if __debug__ and len(fromarch) != len(self.archive_files):
                 assert False
             assert len(fromarch.intersection(self.archive_files)) == len(fromarch)
 
