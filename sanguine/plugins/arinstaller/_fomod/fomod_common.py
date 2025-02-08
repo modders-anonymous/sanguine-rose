@@ -130,7 +130,9 @@ class FomodFilesAndFolders:
                 out[dst] = priority, af
             elif priority == oldpri:
                 if af.file_hash != oldaf.file_hash:
-                    warn('Ambiguous overwriting of a file {} in FomodArInstaller'.format(dst))
+                    # warn('Ambiguous overwriting of a file {} in FomodArInstaller'.format(dst))
+                    out[dst] = priority, af  # it looks that with equal priorities, newer one should win
+                    # (which is also consistent with usual "later overrides earlier" general modder philosophy
         else:
             out[dst] = priority, af
 
