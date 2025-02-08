@@ -523,6 +523,8 @@ class FomodArInstaller(ArInstaller):
 
     def _to_out(self, out: dict[str, tuple[int, FileInArchive]], ff: FomodFilesAndFolders) -> None:
         for f, p, fia in ff.all_files(self.fomod_root, self.archive):
+            assert not f in out
+            '''
             if f in out:
                 pold, fiaold = out[f]
                 if p > pold:
@@ -531,4 +533,5 @@ class FomodArInstaller(ArInstaller):
                     if fiaold.file_hash != fia.file_hash:
                         warn('Ambiguous overwriting of a file {} in FomodArInstaller'.format(f))
             else:
-                out[f] = p, fia
+            '''
+            out[f] = p, fia
