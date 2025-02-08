@@ -4,7 +4,7 @@ from sanguine.helpers.file_retriever import GithubFileRetriever
 
 
 class ProjectExtraArchiveFile:
-    SANGUINE_JSON: list[tuple] = [('target_file_name', 't'), ('intra_path', 's',''), ('intra_paths','sl',str)]
+    SANGUINE_JSON: list[tuple] = [('target_file_name', 't'), ('intra_path', 's', ''), ('intra_paths', 'sl', str)]
     target_file_name: str
     intra_path: str
     intra_paths: list[str]
@@ -90,7 +90,7 @@ class ProjectMod:
                                             ('remaining_archives', 'xarchives', ProjectExtraArchive),
                                             ('unknown_files_by_tools', 'unknownbytools', str),
                                             ('unknown_files', 'unknown', str),
-                                            ('mod_tools', 'tools', ProjectModTool)]
+                                            ('mod_tools', 'modtools', ProjectModTool)]
     mod_name: str | None
     zero_files: list[str] | None
     github_files: dict[str, GithubFileRetriever] | None
