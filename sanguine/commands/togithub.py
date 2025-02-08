@@ -690,7 +690,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                 arid = installerarchives.index(arh)
             if arh not in extraarchives:
                 extraarchives[arh] = ProjectExtraArchive(arid)
-            extraarchives[arh].extra_files.append(ProjectExtraArchiveFile(f, truncate_file_hash(r0.file_hash)))
+            intra_paths = [ar.file_in_archive.intra_path for ar in r0.single_archive_retrievers]
+            extraarchives[arh].extra_files.append(ProjectExtraArchiveFile(f, intra_paths))
 
         for xa in extraarchives.values():
             pm.remaining_archives.append(xa)

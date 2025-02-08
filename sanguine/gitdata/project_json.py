@@ -4,17 +4,23 @@ from sanguine.helpers.file_retriever import GithubFileRetriever
 
 
 class ProjectExtraArchiveFile:
-    SANGUINE_JSON: list[tuple] = [('target_file_name', 't'), ('file_hash', 'h')]
+    SANGUINE_JSON: list[tuple] = [('target_file_name', 't'), ('intra_path', 's',''), ('intra_paths','sl',str)]
     target_file_name: str
-    file_hash: bytes
+    intra_path: str
+    intra_paths: list[str]
 
-    def __init__(self, targetfname: str, h: bytes) -> None:
+    def __init__(self, targetfname: str, intra: list[str]) -> None:
         self.target_file_name = targetfname
-        self.file_hash = h
+        if len(intra) == 1:
+            self.intra_path = intra[0]
+            self.intra_paths = []
+        else:
+            self.intra_paths = intra
+            self.intra_path = ''
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "ProjectExtraArchiveFile":
-        return cls('', b'')
+        return cls('', '')
 
 
 class ProjectExtraArchive:

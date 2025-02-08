@@ -228,7 +228,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         engselections, engfiles = engine.run(fakeui)
         processed_forks.append((fakeui.current_fork.true_or_false_plugins, engselections, engfiles))
         remaining_forks += fakeui.requested_forks
-        if len(processed_forks) + len(remaining_forks) > 5000:
+        if len(processed_forks) + len(remaining_forks) > 1000:
             alert('Too many simulations for {}, skipping'.format(modulecfg.module_name))
             return None
     info('{}: {} fork(s) found'.format(modulecfg.module_name, len(processed_forks)))
