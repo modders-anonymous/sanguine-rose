@@ -220,6 +220,14 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
     info('Running simulations for FOMOD installer {}...'.format(modulecfg.module_name))
     # if 'clear map' in modulecfg.module_name.lower():
     #    pass
+
+    nmodfiles = 0
+    for f,retr in modfiles.items():
+        for r in retr:
+            if r.archive_hash() == archive.archive_hash:
+                nmodfiles += 1
+                break # for r
+
     while len(remaining_forks) > 0:
         startingfork = remaining_forks[0]
         remaining_forks = remaining_forks[1:]
