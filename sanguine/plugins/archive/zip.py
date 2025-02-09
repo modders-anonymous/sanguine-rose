@@ -11,12 +11,13 @@ class ZipArchivePlugin(ArchivePluginBase):
     def extract(self, archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
         info('Extracting {} file(s) from {}...'.format(len(listoffiles), archive))
         z = zipfile.ZipFile(archive)
-        names = z.namelist()
+        names = {n.lower(): n for n in z.namelist()}
         lof_normalized = []
         for f in listoffiles:
             normf = f.replace('\\', '/')
-            lof_normalized.append(normf)
-            assert normf in names
+            if __debug__ and normf not in names:
+                assert False
+            lof_normalized.append(names[normf])
         out = []
         for f in lof_normalized:
             z.extract(f, path=targetpath)
