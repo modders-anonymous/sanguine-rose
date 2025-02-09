@@ -9,7 +9,7 @@ class ZipArchivePlugin(ArchivePluginBase):
         return ['.zip']
 
     def extract(self, archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
-        info('Extracting from {}...'.format(archive))
+        info('Extracting {} file(s) from {}...'.format(len(listoffiles), archive))
         z = zipfile.ZipFile(archive)
         names = z.namelist()
         lof_normalized = []

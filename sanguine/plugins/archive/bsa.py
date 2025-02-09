@@ -9,7 +9,7 @@ class BsaArchivePlugin(ArchivePluginBase):
         return ['.bsa']
 
     def extract(self, archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
-        info('Extracting {} files from {}...'.format(len(listoffiles), archive))
+        info('Extracting {} file(s) from {}...'.format(len(listoffiles), archive))
         bsa = BSAArchive.parse_file(archive)
         # names = bsa.container.file_names
         # print(names)

@@ -350,11 +350,11 @@ class _ModInProgress:
     def is_fully_github(self) -> bool:
         return len(self.archive_files) == 0
 
-    def is_fully_installed(self) -> bool:
+    def is_cleanly_installed(self) -> bool:
         return (len(self.unknown_files) == 0 and len(self.remaining_after_install_from) == 0
                 and self._num_skips() == 0)
 
-    def is_healable_to_full_install(self) -> bool:
+    def is_healable_to_clean_install(self) -> bool:
         assert len(self.unknown_files_could_be_produced_by_tools) <= self._num_skips()
         if len(self.remaining_after_install_from) != 0 or len(
                 self.unknown_files_could_be_produced_by_tools) != self._num_skips():
@@ -663,8 +663,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
 
     ninstallfrom = 0
     # info('per-mod stats:')
-    fullyinstalledmods: list[tuple[str, _ModInProgress]] = []
-    healabletofullmods: list[tuple[str, _ModInProgress]] = []
+    cleanlyinstalledmods: list[tuple[str, _ModInProgress]] = []
+    healabletocleanmods: list[tuple[str, _ModInProgress]] = []
     fullygithubmods: list[tuple[str, _ModInProgress]] = []
     othermods: list[tuple[str, _ModInProgress]] = []
     for modname, mod in mip.mods.items():
@@ -680,15 +680,12 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
             # info("-> {}: install_from {}, install_data='{}'".format(
             #    modname, str(names), str(instdata)))
             ninstallfrom += 1
-            if mod.is_fully_installed():
-                fullyinstalledmods.append((modname, mod))
+            if mod.is_cleanly_installed():
+                cleanlyinstalledmods.append((modname, mod))
                 processed = True
-            elif mod.is_healable_to_full_install():
-                healabletofullmods.append((modname, mod))
+            elif mod.is_healable_to_clean_install():
+                healabletocleanmods.append((modname, mod))
                 processed = True
-            # elif mod.is_fully_installed():
-            #    fullyinstalledmods.append((modname, mod))
-            #    processed = True
 
         if processed:
             continue
@@ -698,8 +695,8 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
     info('found install_from archives for {} mods out of {}, {:.1f}%'.format(ninstallfrom, len(mip.mods),
                                                                              ninstallfrom / len(mip.mods) * 100.))
     info(
-        '{} mod(s) are github-only, {} mod(s) are fully installed, {} mod(s) can probably be healed to full install'.format(
-            len(fullygithubmods), len(fullyinstalledmods), len(healabletofullmods)))
+        '{} mod(s) are github-only, {} mod(s) are cleanly installed, {} mod(s) can probably be healed to clean install'.format(
+            len(fullygithubmods), len(cleanlyinstalledmods), len(healabletocleanmods)))
     alert('{} mod(s) remaining'.format(len(othermods)))
 
     unknownextstats = _ExtStats()

@@ -51,6 +51,17 @@ class ArchivePluginBase(ABC):
                 out.append(None)
         return out
 
+    @staticmethod
+    def prepare_file_spec(listoffiles: list[str], targetpath: str) -> str:
+        if len(listoffiles) == 1:
+            return listoffiles[0]
+        else:
+            listfilename = targetpath + '__@#$sanguine$#@__.lst'
+            with open(listfilename, 'wt') as listfile:
+                for f in listoffiles:
+                    listfile.write(f + '\n')
+            return '@' + listfilename
+
 
 _archive_plugins: dict[str, ArchivePluginBase] = {}  # file_extension -> ArchivePluginBase
 _archive_exts: list[str] = []

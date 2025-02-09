@@ -15,14 +15,11 @@ class RarArchivePlugin(ArchivePluginBase):
         return ['.rar']
 
     def extract(self, archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
-        info('Extracting {} files from {}...'.format(len(listoffiles), archive))
+        info('Extracting {} file(s) from {}...'.format(len(listoffiles), archive))
         assert is_normalized_dir_path(targetpath)
 
-        listfilename = targetpath + '__@#$sanguine$#@__.lst'
-        with open(listfilename, 'wt') as listfile:
-            for f in listoffiles:
-                listfile.write(f + '\n')
-        syscall = [_unrar_exe(), 'x', archive, '@' + listfilename, targetpath]
+        filespec = ArchivePluginBase.prepare_file_spec(listoffiles, targetpath)
+        syscall = [_unrar_exe(), 'x', archive, filespec, targetpath]
         info(' '.join(syscall))
         subprocess.check_call(syscall)
 

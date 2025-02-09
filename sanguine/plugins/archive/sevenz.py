@@ -16,14 +16,12 @@ class SevenzArchivePlugin(ArchivePluginBase):
         return ['.7z']
 
     def extract(self, archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
-        info('Extracting from {}...'.format(archive))
+        info('Extracting {} file(s) from {}...'.format(len(listoffiles), archive))
 
         assert is_normalized_dir_path(targetpath)
-        listfilename = targetpath + '__@#$sanguine$#@__.lst'
-        with open(listfilename, 'wt') as listfile:
-            for f in listoffiles:
-                listfile.write(f + '\n')
-        syscall = [_7z_exe(), 'x', '-o' + targetpath, archive, '@' + listfilename]
+
+        filespec = ArchivePluginBase.prepare_file_spec(listoffiles, targetpath)
+        syscall = [_7z_exe(), 'x', '-o' + targetpath, archive, filespec]
         info(' '.join(syscall))
         subprocess.check_call(syscall)
 
