@@ -40,10 +40,12 @@ class IniPatchPlugin(PatchPluginBase):
         return ['.ini']
 
     def patch(self, srcfile: str, dstfile: str) -> Any:
-        srcini = configparser.ConfigParser()
+        srcini = configparser.ConfigParser(allow_unnamed_section=True)
+        srcini.optionxform = str  # making key names case-sensitive
         with open_3rdparty_txt_file_autodetect(srcfile) as fp:
             srcini.read_file(fp)
-        dstini = configparser.ConfigParser()
+        dstini = configparser.ConfigParser(allow_unnamed_section=True)
+        dstini.optionxform = str  # making key names case-sensitive
         with open_3rdparty_txt_file_autodetect(dstfile) as fp:
             dstini.read_file(fp)
 
@@ -60,7 +62,8 @@ class IniPatchPlugin(PatchPluginBase):
                             override = False
                             nmatch += 1
                 if override:
-                    out.add_overwrite(section, name, value)
+                    sec = '__SANGUINE_UNNAMED_SECTION__' if section == configparser.UNNAMED_SECTION else section
+                    out.add_overwrite(sec, name, value)
 
         if nmatch == 0:
             return None

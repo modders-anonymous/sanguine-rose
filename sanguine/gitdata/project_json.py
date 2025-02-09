@@ -83,17 +83,19 @@ class ProjectModTool:
 
 
 class ProjectModPatch:
-    SANGUINE_JSON: list[tuple[str, str]] = [('name', 'name'), ('param', 'param')]
-    name: str
+    SANGUINE_JSON: list[tuple[str, str]] = [('file', 'f'), ('type', 't'), ('param', 'p')]
+    file: str
+    type: str
     param: Any
 
-    def __init__(self, name: str, param: Any) -> None:
-        self.name = name
+    def __init__(self, file: str, typ: str, param: Any) -> None:
+        self.file = file
+        self.type = typ
         self.param = param
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "ProjectModPatch":
-        return cls('', None)
+        return cls('', '', None)
 
 
 class ProjectMod:

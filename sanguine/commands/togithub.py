@@ -752,7 +752,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         pm.unknown_files = [u for u in mod.unknown_files]
         pm.unknown_files_by_tools = [t for t in mod.unknown_files_could_be_produced_by_tools]
         pm.mod_tools = [ProjectModTool(mtname, mtparam) for mtname, mtparam in mod.mod_tools]
-        pm.patches = [ProjectModPatch(name, val) for name, val in mod.patched.values()]
+        pm.patches = [ProjectModPatch(key, val[0], val[1]) for key, val in mod.patched.items()]
 
     jdata = to_stable_json(pj)
     write_stable_json(cfg.this_modpack_folder() + "project.json", jdata)
