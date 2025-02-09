@@ -60,6 +60,19 @@ class FomodSrcDst:
         return out
 
 
+class _ArchiveForFomodFilesAndFolders:
+    arfiles: dict[str, FileInArchive] = {}
+    arfiles4folders: list[tuple[str, FileInArchive]] = []
+
+    def __init__(self, archive: Archive) -> None:
+        self.arfiles = {}
+        self.arfiles4folders = []
+        for f in archive.files:
+            self.arfiles[f.intra_path] = f
+            self.arfiles4folders.append((f.intra_path, f))
+        self.arfiles4folders.sort(key=lambda x: x[0])
+
+
 class FomodFilesAndFolders:
     SANGUINE_JSON: list[tuple] = [('files', 'files', FomodSrcDst, StableJsonFlags.Unsorted),
                                   ('folders', 'folders', FomodSrcDst, StableJsonFlags.Unsorted)]
@@ -80,41 +93,36 @@ class FomodFilesAndFolders:
         out.folders = self.folders.copy()
         return out
 
-    def all_files(self, fomodroot: str, archive: Archive) -> Iterable[tuple[str, int, FileInArchive]]:
+    def all_files(self, fomodroot: str, ar4: _ArchiveForFomodFilesAndFolders) -> Iterable[
+        tuple[str, int, FileInArchive]]:
         assert not fomodroot.endswith('\\')
         fomodroot1 = '' if fomodroot == '' else fomodroot + '\\'
 
         out: dict[str, tuple[int, FileInArchive]] = {}
-        arfiles: dict[str, FileInArchive] = {}
-        arfiles4folders: list[tuple[str, FileInArchive]] = []
-        for f in archive.files:
-            arfiles[f.intra_path] = f
-            arfiles4folders.append((f.intra_path, f))
-        arfiles4folders.sort(key=lambda x: x[0])
 
         for f in self.files:
             src = FomodFilesAndFolders.normalize_file_path(fomodroot1 + f.src)
-            assert src in arfiles
+            assert src in ar4.arfiles
             dst = FomodFilesAndFolders.normalize_file_path(f.dst)
-            FomodFilesAndFolders._add_to_out(out, dst, f.priority, arfiles[src])
+            FomodFilesAndFolders._add_to_out(out, dst, f.priority, ar4.arfiles[src])
 
         for f in self.folders:
             src = FomodFilesAndFolders.normalize_folder_path(fomodroot1 + f.src)
             dst = FomodFilesAndFolders.normalize_folder_path(f.dst)
 
-            found = bisect_left(arfiles4folders, src, key=lambda x: x[0])
-            assert 0 <= found < len(arfiles4folders)
-            assert src < arfiles4folders[found][0]
-            assert found == len(arfiles4folders) - 1 or arfiles4folders[found + 1][0] > src
+            found = bisect_left(ar4.arfiles4folders, src, key=lambda x: x[0])
+            assert 0 <= found < len(ar4.arfiles4folders)
+            assert src < ar4.arfiles4folders[found][0]
+            assert found == len(ar4.arfiles4folders) - 1 or ar4.arfiles4folders[found + 1][0] > src
             idx = found
             while True:
-                if idx == len(arfiles4folders):
+                if idx == len(ar4.arfiles4folders):
                     break
-                fsrc = arfiles4folders[idx][0]
+                fsrc = ar4.arfiles4folders[idx][0]
                 if not fsrc.startswith(src):
                     break
 
-                af = arfiles4folders[idx][1]
+                af = ar4.arfiles4folders[idx][1]
                 assert af.intra_path == fsrc
 
                 remainder = af.intra_path[len(src):]
@@ -542,8 +550,9 @@ class FomodArInstaller(ArInstaller):
         return 'FOMOD'
 
     def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
+        ar4 = _ArchiveForFomodFilesAndFolders(self.archive)
         out: dict[str, tuple[int, FileInArchive]] = {}
-        self._to_out(out, self.files)
+        self._to_out(out, ar4, self.files)
         # for _, ff in self.selections:
         #    self._to_out(out, ff)
         return [(k, v[1]) for k, v in out.items()]
@@ -551,8 +560,9 @@ class FomodArInstaller(ArInstaller):
     def install_params(self) -> Any:
         return FomodArInstallerData(self.fomod_root, self.selections)
 
-    def _to_out(self, out: dict[str, tuple[int, FileInArchive]], ff: FomodFilesAndFolders) -> None:
-        for f, p, fia in ff.all_files(self.fomod_root, self.archive):
+    def _to_out(self, out: dict[str, tuple[int, FileInArchive]], ar4: _ArchiveForFomodFilesAndFolders,
+                ff: FomodFilesAndFolders) -> None:
+        for f, p, fia in ff.all_files(self.fomod_root, ar4):
             assert not f in out
             '''
             if f in out:
