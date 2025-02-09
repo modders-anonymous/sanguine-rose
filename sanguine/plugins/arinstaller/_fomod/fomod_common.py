@@ -74,6 +74,8 @@ class ArchiveForFomodFilesAndFolders:
 
     def for_all_starting_with(self,src: str,f:Callable[[str,FileInArchive],None]) -> None:
         found = bisect_left(self.arfiles4folders, src, key=lambda x: x[0])
+        if found == len(self.arfiles4folders):
+            return
         assert 0 <= found < len(self.arfiles4folders)
         assert src < self.arfiles4folders[found][0]
         assert found == len(self.arfiles4folders) - 1 or self.arfiles4folders[found + 1][0] > src

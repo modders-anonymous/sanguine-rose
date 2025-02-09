@@ -168,18 +168,20 @@ class _FomodGuessFakeUI(LinearUI):
 
                 assert len(self.current_step) == oldcurlen + 1
 
+def _add_folder_to_tofs(tofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]],
+                        fdst:str, instsel:FomodInstallerSelection, remainder:str, af:FileInArchive) -> None:
+    filedst = fdst + remainder
+    if filedst not in tofs:
+        tofs[filedst] = []
+    tofs[filedst].append((instsel, af))
 
-def _find_required_tofs(archive: Archive, fomodroot: str, modfiles: dict[str, list[ArchiveFileRetriever]],
+
+def _find_required_tofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str, modfiles: dict[str, list[ArchiveFileRetriever]],
                         true_or_false_plugins: _FomodGuessPlugins) -> list[FomodInstallerSelection]:
     if len(true_or_false_plugins) == 0:
         return []
     assert not fomodroot.endswith('\\')
     fomodroot1 = '' if fomodroot == '' else fomodroot + '\\'
-
-    fias: dict[str, FileInArchive] = {}
-    for f in archive.files:
-        assert f.intra_path not in fias
-        fias[f.intra_path] = f
 
     tofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]] = {}
     for instsel, ff in true_or_false_plugins:
@@ -187,21 +189,16 @@ def _find_required_tofs(archive: Archive, fomodroot: str, modfiles: dict[str, li
             for f in ff.files:
                 fsrc = FomodFilesAndFolders.normalize_file_path(fomodroot1 + f.src)
                 fdst = FomodFilesAndFolders.normalize_file_path(f.dst)
-                if fsrc not in fias:
+                if fsrc not in ar4.arfiles:
                     assert False
                 if fdst not in tofs:
                     tofs[fdst] = []
-                tofs[fdst].append((instsel, fias[fsrc]))
+                tofs[fdst].append((instsel, ar4.arfiles[fsrc]))
             for f in ff.folders:
                 fsrc = FomodFilesAndFolders.normalize_folder_path(f.src)
                 fdst = FomodFilesAndFolders.normalize_folder_path(f.dst)
-                for af in archive.files:
-                    if af.intra_path.startswith(fsrc):
-                        file = af.intra_path[len(fsrc):]
-                        filedst = fdst + file
-                        if filedst not in tofs:
-                            tofs[filedst] = []
-                        tofs[filedst].append((instsel, fias[af.intra_path]))
+                ar4.for_all_starting_with(fsrc,
+                                          lambda remainder,af:_add_folder_to_tofs(tofs, fdst, instsel, remainder, af))
 
     required_tofs: set[FomodInstallerSelection] = set()
     for modfile, rlist in modfiles.items():
@@ -244,6 +241,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
     best_arinstaller: ArInstaller | None = None
     best_coverage: int = 0
     i = 0
+    ar4 = ArchiveForFomodFilesAndFolders(archive)
     for pf in processed_forks:
         i += 1
         if i % 500 == 0:
@@ -257,7 +255,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         for sel, tof in pf[0]:
             assert sel not in known
             known[sel] = tof
-        required_tofs: set[FomodInstallerSelection] = set(_find_required_tofs(archive, fomodroot, modfiles, pf[0]))
+        required_tofs: set[FomodInstallerSelection] = set(_find_required_tofs(ar4, fomodroot, modfiles, pf[0]))
 
         selections: list[FomodInstallerSelection] = []
         files: FomodFilesAndFolders = pf[2].copy()
