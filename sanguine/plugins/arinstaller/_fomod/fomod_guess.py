@@ -222,11 +222,11 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
     #    pass
 
     nmodfiles = 0
-    for f,retr in modfiles.items():
+    for f, retr in modfiles.items():
         for r in retr:
             if r.archive_hash() == archive.archive_hash:
                 nmodfiles += 1
-                break # for r
+                break  # for r
 
     while len(remaining_forks) > 0:
         startingfork = remaining_forks[0]
@@ -236,14 +236,18 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         engselections, engfiles = engine.run(fakeui)
         processed_forks.append((fakeui.current_fork.true_or_false_plugins, engselections, engfiles))
         remaining_forks += fakeui.requested_forks
-        if len(processed_forks) + len(remaining_forks) > 1000:
+        if len(processed_forks) + len(remaining_forks) > 50000:
             alert('Too many simulations for {}, skipping'.format(modulecfg.module_name))
             return None
     info('{}: {} fork(s) found'.format(modulecfg.module_name, len(processed_forks)))
 
     best_arinstaller: ArInstaller | None = None
     best_coverage: int = 0
+    i = 0
     for pf in processed_forks:
+        i += 1
+        if i % 500 == 0:
+            info('{}...'.format(i))
         selected_plugins: set[FomodInstallerSelection] = set(pf[1])
         known: dict[FomodInstallerSelection, FomodFilesAndFolders] = {}
         # for sel, selected in pf.selected_plugins:
