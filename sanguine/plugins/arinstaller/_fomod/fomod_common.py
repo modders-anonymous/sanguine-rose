@@ -148,12 +148,16 @@ class FomodFilesAndFolders:
     @staticmethod
     def normalize_file_path(src: str) -> str:
         src = src.lower().replace('/', '\\')
+        if src.startswith('.\\'):
+            src = src[len('.\\'):]
         assert not src.endswith('\\')
         return src
 
     @staticmethod
     def normalize_folder_path(src: str) -> str:
         src = src.lower().replace('/', '\\')
+        if src.startswith('.\\'):
+            src = src[len('.\\'):]
         return src if src.endswith('\\') or len(src) == 0 else src + '\\'
 
     @classmethod
@@ -165,6 +169,8 @@ class FomodFilesAndFolders:
 
     @staticmethod
     def _add_to_out(out: dict[str, tuple[int, FileInArchive]], dst: str, priority: int, af: FileInArchive) -> None:
+        # if dst.startswith('.'):
+        #    pass
         if dst in out:
             oldpri, oldaf = out[dst]
             if priority > oldpri:
