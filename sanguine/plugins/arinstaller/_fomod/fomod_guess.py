@@ -168,15 +168,17 @@ class _FomodGuessFakeUI(LinearUI):
 
                 assert len(self.current_step) == oldcurlen + 1
 
+
 def _add_folder_to_tofs(tofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]],
-                        fdst:str, instsel:FomodInstallerSelection, remainder:str, af:FileInArchive) -> None:
+                        fdst: str, instsel: FomodInstallerSelection, remainder: str, af: FileInArchive) -> None:
     filedst = fdst + remainder
     if filedst not in tofs:
         tofs[filedst] = []
     tofs[filedst].append((instsel, af))
 
 
-def _find_required_tofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str, modfiles: dict[str, list[ArchiveFileRetriever]],
+def _find_required_tofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
+                        modfiles: dict[str, list[ArchiveFileRetriever]],
                         true_or_false_plugins: _FomodGuessPlugins) -> list[FomodInstallerSelection]:
     if len(true_or_false_plugins) == 0:
         return []
@@ -198,7 +200,7 @@ def _find_required_tofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str, mod
                 fsrc = FomodFilesAndFolders.normalize_folder_path(f.src)
                 fdst = FomodFilesAndFolders.normalize_folder_path(f.dst)
                 ar4.for_all_starting_with(fsrc,
-                                          lambda remainder,af:_add_folder_to_tofs(tofs, fdst, instsel, remainder, af))
+                                          lambda remainder, af: _add_folder_to_tofs(tofs, fdst, instsel, remainder, af))
 
     required_tofs: set[FomodInstallerSelection] = set()
     for modfile, rlist in modfiles.items():

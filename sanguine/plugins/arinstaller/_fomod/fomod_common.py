@@ -72,7 +72,7 @@ class ArchiveForFomodFilesAndFolders:
             self.arfiles4folders.append((f.intra_path, f))
         self.arfiles4folders.sort(key=lambda x: x[0])
 
-    def for_all_starting_with(self,src: str,f:Callable[[str,FileInArchive],None]) -> None:
+    def for_all_starting_with(self, src: str, f: Callable[[str, FileInArchive], None]) -> None:
         found = bisect_left(self.arfiles4folders, src, key=lambda x: x[0])
         if found == len(self.arfiles4folders):
             return
@@ -91,7 +91,7 @@ class ArchiveForFomodFilesAndFolders:
             assert af.intra_path == fsrc
 
             remainder = af.intra_path[len(src):]
-            f(remainder,af)
+            f(remainder, af)
 
             idx += 1
 
@@ -133,8 +133,8 @@ class FomodFilesAndFolders:
             src = FomodFilesAndFolders.normalize_folder_path(fomodroot1 + f.src)
             dst = FomodFilesAndFolders.normalize_folder_path(f.dst)
 
-            ar4.for_all_starting_with(src,lambda remainder,af:FomodFilesAndFolders._add_to_out(out, dst+remainder, f.priority, af))
-
+            ar4.for_all_starting_with(src, lambda remainder, af: FomodFilesAndFolders._add_to_out(out, dst + remainder,
+                                                                                                  f.priority, af))
 
             '''
             for af in archive.files:  # TODO: can/should we try speeding it up?
