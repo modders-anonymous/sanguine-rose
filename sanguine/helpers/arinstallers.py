@@ -27,13 +27,13 @@ class ArInstallerDetails:
     ignored: set[str]
     skip: set[str]
     files: dict[str, FileInArchive]
-    modified_since_install: set[str]
+    modified_since_install: dict[str, FileInArchive]
 
     def __init__(self) -> None:
         self.ignored = set()
         self.skip = set()
         self.files = {}
-        self.modified_since_install = set()
+        self.modified_since_install = {}
 
 
 class ExtraArchiveDataFactory:
@@ -79,7 +79,7 @@ class ArInstallerPluginBase(ABC):
 _arinstaller_plugins: dict[str, ArInstallerPluginBase] = {}
 
 
-def _found_arinstaller_plugin(plugin: ArInstallerPluginBase):
+def _found_arinstaller_plugin(plugin: ArInstallerPluginBase) -> None:
     global _arinstaller_plugins
     _arinstaller_plugins[plugin.name()] = plugin  # order is preserved since Python 3.6 or so
 

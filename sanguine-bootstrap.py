@@ -2,6 +2,7 @@ import os
 import re
 import subprocess
 import sys
+import traceback
 
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 

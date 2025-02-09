@@ -42,7 +42,7 @@ class GlobalToolPluginBase(ABC):
 _global_tool_plugins: list[GlobalToolPluginBase] = []
 
 
-def _found_global_tool_plugin(plugin: GlobalToolPluginBase):
+def _found_global_tool_plugin(plugin: GlobalToolPluginBase) -> None:
     global _global_tool_plugins
     if __debug__:
         for universe in plugin.supported_games():

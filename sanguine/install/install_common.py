@@ -1,7 +1,7 @@
 # part of common.py which can be used in install scripts too
 # noinspection PyUnresolvedReferences
 import os
-import traceback
+import traceback as _traceback
 import typing
 # noinspection PyUnresolvedReferences
 from abc import ABC, abstractmethod
@@ -46,7 +46,7 @@ def raise_if_not(cond: bool, msg: Callable[[], str] | str | None = None):
                 msg1 += ': ' + msg
             else:
                 assert False
-        where = traceback.extract_stack(limit=2)[0]
+        where = _traceback.extract_stack(limit=2)[0]
         critical(msg1 + ' @line ' + str(where.lineno) + ' of ' + os.path.split(where.filename)[1])
         raise SanguinicError(msg1)
 

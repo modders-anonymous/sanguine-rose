@@ -117,6 +117,9 @@ class AvailableFiles:
     def archive_by_hash(self, h: bytes) -> Archive | None:
         return self._root_data.archive_by_hash(h)
 
+    def downloaded_file_by_hash(self, h: bytes) -> list[FileOnDisk] | None:
+        return self._downloads_cache.file_by_hash(h)
+
     def tentative_names_for_archive(self, h: bytes) -> list[str]:
         return self._root_data.tentative_names_for_archive(h)
 

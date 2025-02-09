@@ -1,6 +1,7 @@
 import heapq
 import logging
 import time
+import traceback
 from multiprocessing import Queue as PQueue, SimpleQueue, Process, shared_memory
 from threading import Thread  # only for logging!
 

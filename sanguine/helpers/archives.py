@@ -28,27 +28,35 @@ class Archive:
 
 
 class ArchivePluginBase(ABC):
-    def __init__(self) -> None:
-        pass
-
     @abstractmethod
     def extensions(self) -> list[str]:
         pass
 
     @abstractmethod
-    def extract(self, archive: str, list_of_files: list[str], targetpath: str) -> None:
+    def extract(self, archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
         pass
 
     @abstractmethod
     def extract_all(self, archive: str, targetpath: str) -> None:
         pass
 
+    @staticmethod
+    def unarchived_list_helper(archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
+        out: list[str | None] = []
+        for f in listoffiles:
+            if os.path.isfile(targetpath + f):
+                out.append(targetpath + f)
+            else:
+                warn('{} NOT EXTRACTED from {}'.format(f, archive))
+                out.append(None)
+        return out
+
 
 _archive_plugins: dict[str, ArchivePluginBase] = {}  # file_extension -> ArchivePluginBase
 _archive_exts: list[str] = []
 
 
-def _found_archive_plugin(plugin: ArchivePluginBase):
+def _found_archive_plugin(plugin: ArchivePluginBase) -> None:
     global _archive_plugins
     global _archive_exts
     for ext in plugin.extensions():

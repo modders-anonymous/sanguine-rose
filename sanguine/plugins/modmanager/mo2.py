@@ -154,8 +154,8 @@ class Mo2ProjectConfig(ModManagerConfig):
             target_files[key] = [f[1] for f in val]
             assert (len(target_files[key]) == len(set(target_files[key])))
 
-        info('MO2: ResolvedVFS: {} files resolved, with {} overrides'.format(nsourcevfs,
-                                                                             nsourcevfs - len(target_files)))
+        info('MO2: ResolvedVFS: {} files resolved, with {} overwrites'.format(nsourcevfs,
+                                                                              nsourcevfs - len(target_files)))
         return ResolvedVFS(source_to_target, target_files)
 
     def parse_source_vfs(self, path: str) -> ModFile:

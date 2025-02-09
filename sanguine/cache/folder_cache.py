@@ -293,6 +293,7 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
     name: str
     _folder_list: FolderListToCache
     _files_by_path: dict[str, FileOnDisk] | None
+    _files_by_hash: dict[bytes, list[FileOnDisk]] | None
     _filtered_files: list[FileOnDisk]
     _all_scan_stats: dict[str, dict[str, int]]  # rootfolder -> {fpath -> nfiles}
     _new_all_scan_stats: dict[str, dict[str, int]] | None
@@ -307,6 +308,7 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         self.name = name
         self._folder_list = folderlist
         self._files_by_path = None
+        self._files_by_hash = None
         self._filtered_files = []
         self._all_scan_stats = _read_all_scan_stats(cachedir, name)
         self._new_all_scan_stats = {}
@@ -324,8 +326,11 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         assert (self._state & 0x3) == 0x3
         return self._files_by_path.values()
 
-    def file_by_path(self, fpath: str) -> FileOnDisk:
+    def file_by_path(self, fpath: str) -> FileOnDisk | None:
         return self._files_by_path.get(fpath)
+
+    def file_by_hash(self, h: bytes) -> list[FileOnDisk] | None:
+        return self._files_by_hash.get(h)
 
     # private functions
 
@@ -593,8 +598,7 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
              'sanguine.foldercache.' + self.name + '.pub_files_by_path'])
 
     def _load_files_own_task_func(self, out: tuple[dict[str, FileOnDisk], list[FileOnDisk]],
-                                  parallel: tasks.Parallel) -> \
-            tuple[tasks.SharedPubParam]:
+                                  parallel: tasks.Parallel) -> tuple[tasks.SharedPubParam]:
         assert (self._state & 0x1) == 0
         self._state |= 0x1
         debug('FolderCache.{}: started processing loading files'.format(self.name))
@@ -602,6 +606,12 @@ class FolderCache:  # folder cache; can handle multiple folders, each folder wit
         assert self._files_by_path is None
         assert self._filtered_files == []
         self._files_by_path = filesbypath
+        assert self._files_by_hash is None
+        self._files_by_hash = {}
+        for f in filesbypath.values():
+            if f.file_hash not in self._files_by_hash:
+                self._files_by_hash[f.file_hash] = []
+            self._files_by_hash[f.file_hash].append(f)
         self._filtered_files = filteredfiles
 
         debug('FolderCache.{}: _load_files_own_task_func(): {} _files_by_path'.format(self.name,

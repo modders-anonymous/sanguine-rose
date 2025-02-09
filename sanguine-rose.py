@@ -3,6 +3,7 @@
 import os
 import sys
 import time
+import traceback
 
 from sanguine.helpers.tmp_path import TmpPath
 

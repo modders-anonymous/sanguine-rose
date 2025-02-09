@@ -1,26 +1,21 @@
 from bethesda_structs.archive import BSAArchive
 
-from sanguine.helpers.archives import ArchivePluginBase
 from sanguine.common import *
+from sanguine.helpers.archives import ArchivePluginBase
 
 
 class BsaArchivePlugin(ArchivePluginBase):
     def extensions(self) -> list[str]:
         return ['.bsa']
 
-    def extract(self, archive: str, list_of_files: list[str], targetpath: str) -> list[str]:
-        info('Extracting from {}...'.format(archive))
+    def extract(self, archive: str, listoffiles: list[str], targetpath: str) -> list[str | None]:
+        info('Extracting {} files from {}...'.format(len(listoffiles), archive))
         bsa = BSAArchive.parse_file(archive)
         # names = bsa.container.file_names
         # print(names)
+        # cannot extract partially, have to extract the whole thing
         bsa.extract(targetpath)
-        out = []
-        for f in list_of_files:
-            if os.path.isfile(targetpath + f):
-                out.append(targetpath + f)
-            else:
-                warn('{} NOT EXTRACTED from {}'.format(f, archive))
-                out.append(None)
+        out = ArchivePluginBase.unarchived_list_helper(archive, listoffiles, targetpath)
         info('Extraction done')
         return out
 

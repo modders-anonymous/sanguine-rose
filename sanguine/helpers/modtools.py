@@ -36,7 +36,7 @@ class ModToolPluginBase(ABC):
 _mod_tool_plugins: list[ModToolPluginBase] = []
 
 
-def _found_mod_tool_plugin(plugin: ModToolPluginBase):
+def _found_mod_tool_plugin(plugin: ModToolPluginBase) -> None:
     global _mod_tool_plugins
     if __debug__:
         for universe in plugin.supported_games():

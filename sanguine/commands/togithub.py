@@ -1,20 +1,24 @@
 import logging
 import re
+import traceback
 
 from sanguine.cache.available_files import AvailableFiles
 from sanguine.cache.folder_cache import FolderCache
 from sanguine.cache.whole_cache import WholeCache
 from sanguine.common import *
 from sanguine.gitdata.project_json import (ProjectJson, ProjectMod, ProjectInstaller,
-                                           ProjectExtraArchive, ProjectExtraArchiveFile, ProjectModTool)
+                                           ProjectExtraArchive, ProjectExtraArchiveFile, ProjectModTool,
+                                           ProjectModPatch)
 from sanguine.gitdata.stable_json import to_stable_json, write_stable_json
-from sanguine.helpers.archives import Archive, FileInArchive
+from sanguine.helpers.archives import Archive, FileInArchive, archive_plugin_for
 from sanguine.helpers.arinstallers import ArInstaller, ArInstallerDetails, all_arinstaller_plugins
 from sanguine.helpers.file_retriever import (FileRetriever, ArchiveFileRetriever,
                                              GithubFileRetriever, ZeroFileRetriever)
 from sanguine.helpers.globaltools import GlobalToolPluginBase, all_global_tool_plugins, CouldBeProducedByGlobalTool
 from sanguine.helpers.modtools import all_mod_tool_plugins, ModToolGuessParam, ModToolGuessDiff
+from sanguine.helpers.patches import patch_plugins_for
 from sanguine.helpers.project_config import LocalProjectConfig
+from sanguine.helpers.tmp_path import TmpPath
 
 
 def _log_stats(stats: dict[str, int], level: int, title: str, max_lines: int) -> None:
@@ -99,6 +103,7 @@ class _ModInProgress:
     remaining_after_install_from: dict[str, list[ArchiveFileRetriever]] | None
     unknown_files_could_be_produced_by_tools: dict[str, tuple[str, CouldBeProducedByGlobalTool]] | None
     mod_tools: list[tuple[str, Any]]
+    patched: dict[str, tuple[str, Any]]
 
     def __init__(self, name: str) -> None:
         self.name = name
@@ -119,6 +124,7 @@ class _ModInProgress:
         self.unknown_files_could_be_produced_by_tools = None
 
         self.mod_tools = []
+        self.patched = {}
 
     def add_file(self, available: AvailableFiles, intramod: str, retrievers: list[FileRetriever]) -> None:
         assert intramod not in self.unknown_files
@@ -262,7 +268,8 @@ class _ModInProgress:
                                 else:
                                     assert f not in aic.skip
                                     aic.skip.add(f)
-                                    aic.modified_since_install.add(f)
+                                    assert f not in aic.modified_since_install
+                                    aic.modified_since_install[f] = fia
                         else:
                             src = cfg.modfile_to_source_vfs(mf)
                             srcfile = srccache.file_by_path(src)
@@ -273,7 +280,8 @@ class _ModInProgress:
                             else:
                                 assert f not in aic.skip
                                 aic.skip.add(f)
-                                aic.modified_since_install.add(f)
+                                assert f not in aic.modified_since_install
+                                aic.modified_since_install[f] = fia
                     break
 
         assert self.remaining_after_install_from is None
@@ -605,6 +613,54 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
                 toolstats[tool].add(srcf)
     info('{} unknown mod files could have been produced by tools'.format(ntools))
 
+    info('Trying to find possible patches...')
+    with TmpPath(cfg.tmp_dir) as tmp:
+        for mod in mip.mods.values():
+            for arinst, aic in mod.install_from:
+                for ff in list(aic.modified_since_install.keys()):
+                    if not ff in mod.unknown_files:
+                        continue  # TODO: double-check that we don't want to do anything about such strange (usually spurious) files
+
+                    modified: FileInArchive = aic.modified_since_install[ff]
+                    inarpath = modified.intra_path
+
+                    patchplugins = patch_plugins_for(ff)
+                    if patchplugins is None:
+                        continue
+
+                    mf = ModFile(mod.name, ff)
+                    realpath = cfg.modfile_to_source_vfs(mf)
+                    assert realpath is not None
+
+                    arh = arinst.archive.archive_hash
+                    ar = wcache.available.archive_by_hash(arh)
+                    if ar is not None:
+                        assert ar.archive_hash == arh
+                        arfiles: list[FileOnDisk] = wcache.available.downloaded_file_by_hash(arh)
+                        if arfiles is None:
+                            continue
+                        arfile = arfiles[0]  # if there is more than one, any will do
+                        arplg = archive_plugin_for(arfile.file_path)
+                        extracted = arplg.extract(arfile.file_path, [inarpath], tmp.tmpdir)
+                        assert len(extracted) == 1
+                        if extracted[0] is not None:
+                            extracted = extracted[0]
+                            for pplg in patchplugins:
+                                try:
+                                    patch = pplg.patch(extracted, realpath)
+                                    if patch is not None:
+                                        info('Patch found for {}'.format(ff))
+                                        assert ff in aic.modified_since_install
+                                        del aic.modified_since_install[ff]
+                                        assert ff in aic.skip
+                                        aic.skip.remove(ff)
+                                        mod.unknown_files.remove(ff)
+                                        mod.patched[ff] = (pplg.name(), patch)
+                                        break
+                                except Exception as e:
+                                    warn('Exception while patching {}: {}'.format(ff, e))
+                                    warn(traceback.format_exc())
+
     ninstallfrom = 0
     # info('per-mod stats:')
     fullyinstalledmods: list[tuple[str, _ModInProgress]] = []
@@ -699,6 +755,7 @@ def togithub(cfg: LocalProjectConfig, wcache: WholeCache) -> None:
         pm.unknown_files = [u for u in mod.unknown_files]
         pm.unknown_files_by_tools = [t for t in mod.unknown_files_could_be_produced_by_tools]
         pm.mod_tools = [ProjectModTool(mtname, mtparam) for mtname, mtparam in mod.mod_tools]
+        pm.patches = [ProjectModPatch(name, val) for name, val in mod.patched.values()]
 
     jdata = to_stable_json(pj)
     write_stable_json(cfg.this_modpack_folder() + "project.json", jdata)

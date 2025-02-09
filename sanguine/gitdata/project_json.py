@@ -20,7 +20,7 @@ class ProjectExtraArchiveFile:
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "ProjectExtraArchiveFile":
-        return cls('', '')
+        return cls('', [''])
 
 
 class ProjectExtraArchive:
@@ -82,6 +82,20 @@ class ProjectModTool:
         return cls('', '')
 
 
+class ProjectModPatch:
+    SANGUINE_JSON: list[tuple[str, str]] = [('name', 'name'), ('param', 'param')]
+    name: str
+    param: Any
+
+    def __init__(self, name: str, param: Any) -> None:
+        self.name = name
+        self.param = param
+
+    @classmethod
+    def for_sanguine_stable_json_load(cls) -> "ProjectModPatch":
+        return cls('', None)
+
+
 class ProjectMod:
     SANGUINE_JSON: list[tuple[str, str]] = [('mod_name', 'name'),
                                             ('zero_files', 'zero', str),
@@ -90,7 +104,8 @@ class ProjectMod:
                                             ('remaining_archives', 'xarchives', ProjectExtraArchive),
                                             ('unknown_files_by_tools', 'unknownbytools', str),
                                             ('unknown_files', 'unknown', str),
-                                            ('mod_tools', 'modtools', ProjectModTool)]
+                                            ('mod_tools', 'modtools', ProjectModTool),
+                                            ('patches', 'patches', ProjectModPatch)]
     mod_name: str | None
     zero_files: list[str] | None
     github_files: dict[str, GithubFileRetriever] | None
@@ -99,6 +114,7 @@ class ProjectMod:
     unknown_files: list[str] | None
     unknown_files_by_tools: list[str] | None
     mod_tools: list[ProjectModTool] | None
+    patches: list[ProjectModPatch] | None
 
     def __init__(self) -> None:
         self.mod_name = None
@@ -109,6 +125,7 @@ class ProjectMod:
         self.unknown_files = None
         self.unknown_files_by_tools = None
         self.mod_tools = None
+        self.patches = None
 
     @classmethod
     def for_sanguine_stable_json_load(cls) -> "ProjectMod":
@@ -120,6 +137,7 @@ class ProjectMod:
         out.remaining_archives = []
         out.unknown_files = []
         out.unknown_files_by_tools = []
+        out.patches = []
         return out
 
 

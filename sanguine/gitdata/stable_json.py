@@ -87,6 +87,13 @@ def _to_sort_key(jsonobj: Any, sjlist: list[tuple] | None) -> Any:
             if sj[1] in jsonobj:
                 return _to_sort_key(jsonobj[sj[1]], None)
         assert False  # no field found
+    elif isinstance(jsonobj, list):
+        key = ''
+        for item in jsonobj:
+            if len(key) != 0:
+                key += '|'
+            key = key + _to_sort_key(item, None)
+        return key
     elif isinstance(jsonobj, str):
         return 's' + jsonobj
     elif isinstance(jsonobj, int):
@@ -117,8 +124,9 @@ def _stable_json_list(data: list[Any], typ: _StableJsonType) -> list[Any]:
         data1 = [to_json_hash(x) for x in data]
         return data1 if (typ.flags & StableJsonFlags.Unsorted) else sorted(data1)
 
-    assert hasattr(d0, 'SANGUINE_JSON')
     if __debug__:
+        if not hasattr(d0, 'SANGUINE_JSON'):
+            assert False
         for i in data:
             assert d0.SANGUINE_JSON == i.SANGUINE_JSON
     data2 = [to_stable_json(d) for d in data]

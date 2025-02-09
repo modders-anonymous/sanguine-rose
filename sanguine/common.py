@@ -1,9 +1,9 @@
-import base64
-import codecs
-import hashlib
+import base64 as _base64
+import codecs as _codecs
+import hashlib as _hashlib
 import json
 import pickle
-from bisect import bisect_right
+from bisect import bisect_right as _bisect_right
 from stat import S_ISREG, S_ISLNK
 
 import chardet
@@ -159,7 +159,7 @@ def calculate_file_hash_ex(fpath: str, extrahashfactories: list[ExtraHashFactory
     """
     st = os.lstat(fpath)
     assert S_ISREG(st.st_mode) and not S_ISLNK(st.st_mode)
-    h = hashlib.sha256()
+    h = _hashlib.sha256()
     xh = [xf() for xf in extrahashfactories]
     blocksize = 1048576
     fsize = 0
@@ -250,7 +250,7 @@ class FastSearchOverPartialStrings:
 
     def find_val_for_str(self, s: str) -> tuple[str, Any] | None:
         # k = (s, -1, None)
-        idx = bisect_right(self._strings, s, key=lambda x2: x2[0])
+        idx = _bisect_right(self._strings, s, key=lambda x2: x2[0])
         if idx == 0:
             return None
         prev = self._strings[idx - 1]
@@ -286,7 +286,7 @@ def open_3rdparty_txt_file_autodetect(fname: str) -> typing.TextIO:
     with open(fname, 'rb') as fb:
         raw = fb.read(n)
 
-    if raw.startswith(codecs.BOM_UTF8):
+    if raw.startswith(_codecs.BOM_UTF8):
         enc = 'utf-8-sig'
     else:
         enc = chardet.detect(raw)['encoding']
@@ -308,7 +308,7 @@ def open_git_data_file_for_reading(fpath: str) -> typing.TextIO:
 # JSON-related
 
 def to_json_hash(h: bytes) -> str:
-    b64 = base64.b64encode(h).decode('ascii')
+    b64 = _base64.b64encode(h).decode('ascii')
     # print(b64)
     s = b64.rstrip('=')
     # assert from_json_hash(s) == h
@@ -318,7 +318,7 @@ def to_json_hash(h: bytes) -> str:
 def from_json_hash(s: str) -> bytes:
     ntopad = (3 - (len(s) % 3)) % 3
     s += '=='[:ntopad]
-    b = base64.b64decode(s)
+    b = _base64.b64decode(s)
     return b
 
 
@@ -328,7 +328,7 @@ class SanguineJsonEncoder(json.JSONEncoder):
 
     def default(self, o: Any) -> Any:
         if isinstance(o, bytes):
-            return base64.b64encode(o).decode('ascii')
+            return _base64.b64encode(o).decode('ascii')
         elif isinstance(o, Callable):
             return o.__name__
         elif isinstance(o, dict):
@@ -344,7 +344,7 @@ class SanguineJsonEncoder(json.JSONEncoder):
         out = {}
         for k, v in d.items():
             if isinstance(k, bytes):
-                k = base64.b64encode(k).decode('ascii')
+                k = _base64.b64encode(k).decode('ascii')
             out[k] = self.default(v)
         return out
 
