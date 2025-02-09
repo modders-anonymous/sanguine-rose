@@ -1,3 +1,5 @@
+from bisect import bisect_left
+
 from sanguine.common import *
 from sanguine.gitdata.stable_json import StableJsonFlags
 from sanguine.helpers.archives import Archive, FileInArchive
@@ -84,8 +86,11 @@ class FomodFilesAndFolders:
 
         out: dict[str, tuple[int, FileInArchive]] = {}
         arfiles: dict[str, FileInArchive] = {}
+        arfiles4folders: list[tuple[str, FileInArchive]] = []
         for f in archive.files:
             arfiles[f.intra_path] = f
+            arfiles4folders.append((f.intra_path, f))
+        arfiles4folders.sort(key=lambda x: x[0])
 
         for f in self.files:
             src = FomodFilesAndFolders.normalize_file_path(fomodroot1 + f.src)
@@ -96,12 +101,35 @@ class FomodFilesAndFolders:
         for f in self.folders:
             src = FomodFilesAndFolders.normalize_folder_path(fomodroot1 + f.src)
             dst = FomodFilesAndFolders.normalize_folder_path(f.dst)
+
+            found = bisect_left(arfiles4folders, src, key=lambda x: x[0])
+            assert 0 <= found < len(arfiles4folders)
+            assert src < arfiles4folders[found][0]
+            assert found == len(arfiles4folders) - 1 or arfiles4folders[found + 1][0] > src
+            idx = found
+            while True:
+                if idx == len(arfiles4folders):
+                    break
+                fsrc = arfiles4folders[idx][0]
+                if not fsrc.startswith(src):
+                    break
+
+                af = arfiles4folders[idx][1]
+                assert af.intra_path == fsrc
+
+                remainder = af.intra_path[len(src):]
+                fdst = dst + remainder
+                FomodFilesAndFolders._add_to_out(out, fdst, f.priority, af)
+
+                idx += 1
+
+            '''
             for af in archive.files:  # TODO: can/should we try speeding it up?
                 if af.intra_path.startswith(src):
                     remainder = af.intra_path[len(src):]
                     fdst = dst + remainder
                     FomodFilesAndFolders._add_to_out(out, fdst, f.priority, af)
-
+            '''
         return [(dst, pfia[0], pfia[1]) for dst, pfia in out.items()]
 
     @staticmethod
