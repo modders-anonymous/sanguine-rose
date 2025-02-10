@@ -60,9 +60,9 @@ class Mo2ProjectConfig(ModManagerConfig):
                      lambda: "'masterprofile' in config must be a string, got " + repr(self.master_profile))
         raise_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + self.master_profile))
 
-        self.generated_profiles = section.get('generatedprofiles')
-        raise_if_not(self.generated_profiles is not None and isinstance(self.generated_profiles, dict),
-                     lambda: "'generatedprofiles' in config must be a list, got " + repr(self.generated_profiles))
+        self.generated_profiles = section.get('generatedprofiles', {})
+        raise_if_not(isinstance(self.generated_profiles, dict),
+                     lambda: "'generatedprofiles' in config must be a dict, got " + repr(self.generated_profiles))
         for gp in self.generated_profiles.keys():
             raise_if_not(os.path.isdir(self.mo2dir + 'profiles\\' + gp))
 
