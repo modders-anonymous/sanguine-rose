@@ -294,4 +294,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
                 best_arinstaller = candidate
                 best_desired = ndesired
 
+            if len(modfiles) == best_desired == best_coverage:  # ideal case found
+                break
+
     return best_arinstaller, best_coverage
