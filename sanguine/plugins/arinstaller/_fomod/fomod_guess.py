@@ -242,6 +242,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
 
     best_arinstaller: ArInstaller | None = None
     best_coverage: int = 0
+    best_desired: int | None = None
     i = 0
     ar4 = ArchiveForFomodFilesAndFolders(archive)
     for pf in processed_forks:
@@ -286,8 +287,11 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
             ndesired += 1
             if fpath in modfiles and truncate_file_hash(modfiles[fpath][0].file_hash) == fia.file_hash:
                 n += 1
-        if n > best_coverage and n > (ndesired / 2):
-            best_coverage = n
-            best_arinstaller = candidate
+        if n > (ndesired / 2):
+            if n > best_coverage or (
+                    n == best_coverage and ndesired < best_desired):
+                best_coverage = n
+                best_arinstaller = candidate
+                best_desired = ndesired
 
     return best_arinstaller, best_coverage
