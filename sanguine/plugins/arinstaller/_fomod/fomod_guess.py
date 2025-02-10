@@ -197,7 +197,7 @@ def _find_required_tofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
                     tofs[fdst] = []
                 tofs[fdst].append((instsel, ar4.arfiles[fsrc]))
             for f in ff.folders:
-                fsrc = FomodFilesAndFolders.normalize_folder_path(f.src)
+                fsrc = FomodFilesAndFolders.normalize_folder_path(fomodroot1 + f.src)
                 fdst = FomodFilesAndFolders.normalize_folder_path(f.dst)
                 ar4.for_all_starting_with(fsrc,
                                           lambda remainder, af: _add_folder_to_tofs(tofs, fdst, instsel, remainder, af))
