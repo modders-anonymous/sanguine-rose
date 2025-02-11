@@ -330,10 +330,13 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
                 for plugin in group.plugins:
                     sel = FomodInstallerSelection(istep.name, group.name, plugin.name)
                     if sel in required_xofs:
-                        if sel in known: # otherwise it is empty
+                        if sel in known:
                             assert known[sel] is not None
                             selections.append(sel)
                             files.merge(known[sel])
+                        else:
+                            selections.append(sel)
+                            # nothing to merge - it is empty (can happen as a result of empty entry in SelectExactlyOne)
                     elif sel in selected_plugins:
                         selections.append(sel)
                     else:
@@ -344,6 +347,8 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         ndesired = 0
         for fpath, fia in candidate.all_desired_files():
             ndesired += 1
+            #if  'sbridge01.nif' in fpath:
+            #    pass
             if fpath in modfiles and truncate_file_hash(modfiles[fpath][0].file_hash) == fia.file_hash:
                 n += 1
         if n > (ndesired / 2):
