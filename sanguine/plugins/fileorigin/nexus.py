@@ -1,4 +1,5 @@
 import re
+import hashlib
 
 import sanguine.gitdata.git_data_file as gitdatafile
 from sanguine.common import *
