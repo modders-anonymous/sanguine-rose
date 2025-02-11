@@ -78,9 +78,11 @@ def _fomod_wizard_page_validator(wizardpage: LinearUIGroup) -> str | None:
 
 class FomodEngine:
     module_config: FomodModuleConfig
+    select_no_radio_hack: bool # for very specific _FomodGuessFakeUI use cases
 
     def __init__(self, modulecfg: FomodModuleConfig) -> None:
         self.module_config = modulecfg
+        self.select_no_radio_hack = False
 
     def run(self, ui: LinearUI) -> tuple[list[FomodInstallerSelection], FomodFilesAndFolders]:
         flags: dict[str, str] = {}
@@ -126,7 +128,7 @@ class FomodEngine:
                             FomodInstallerSelection(pgextra.istep.name, pgextra.grp.name, pgextra.plugin.name))
                 match pgextra.grp.select:
                     case FomodGroupSelect.SelectExactlyOne:
-                        assert n == 1
+                        assert n == 1 or (self.select_no_radio_hack and n == 0)
                     case FomodGroupSelect.SelectAny:
                         pass
                     case FomodGroupSelect.SelectAtMostOne:

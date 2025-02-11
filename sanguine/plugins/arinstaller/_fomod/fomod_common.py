@@ -135,14 +135,6 @@ class FomodFilesAndFolders:
 
             ar4.for_all_starting_with(src, lambda remainder, af: FomodFilesAndFolders._add_to_out(out, dst + remainder,
                                                                                                   f.priority, af))
-
-            '''
-            for af in archive.files:  # TODO: can/should we try speeding it up?
-                if af.intra_path.startswith(src):
-                    remainder = af.intra_path[len(src):]
-                    fdst = dst + remainder
-                    FomodFilesAndFolders._add_to_out(out, fdst, f.priority, af)
-            '''
         return [(dst, pfia[0], pfia[1]) for dst, pfia in out.items()]
 
     @staticmethod

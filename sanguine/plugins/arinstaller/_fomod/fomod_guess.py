@@ -5,26 +5,22 @@ from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodE
 type _FomodReplaySteps = list[tuple[FomodInstallerSelection, bool | None]]
 type _FomodGuessPlugins = list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
 
-
-# type _FomodGuessFlags = dict[str, FomodFlagDependency]
-
-
 class _FomodGuessFork:
     start_step: _FomodReplaySteps
-    # selected_plugins: _FomodGuessPlugins  # selected for sure in current fork
     true_or_false_plugins: _FomodGuessPlugins
+    one_of_plugins: list[_FomodGuessPlugins]
 
     def __init__(self, start: _FomodReplaySteps,
-                 # sel: _FomodGuessPlugins | None = None,
-                 tof: _FomodGuessPlugins | None = None) -> None:
+                 tof: _FomodGuessPlugins | None = None,
+                 oof: list[_FomodGuessPlugins]| None = None) -> None:
         self.start_step = start
-        # self.selected_plugins = sel if sel is not None else []
         self.true_or_false_plugins = tof if tof is not None else []
+        self.one_of_plugins = oof if oof is not None else []
 
     def copy(self) -> "_FomodGuessFork":
         return _FomodGuessFork(self.start_step.copy(),
-                               # self.selected_plugins.copy(),
-                               self.true_or_false_plugins.copy())
+                               self.true_or_false_plugins.copy(),
+                               self.one_of_plugins.copy())
 
 
 class _FomodGuessFakeUI(LinearUI):
@@ -87,16 +83,28 @@ class _FomodGuessFakeUI(LinearUI):
                     case FomodGroupSelect.SelectAll:
                         possible = (True,)
                     case FomodGroupSelect.SelectExactlyOne:
-                        possible = (True, False)
-                        for i in range(c2idx):
-                            prevstep = self.current_step[-1 - i]
-                            assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
-                            assert prevstep[1] is False or prevstep[1] is True
-                            if prevstep[1] is True:
-                                possible = (False,)
+                        independent = True
+                        for plg in it.grp.plugins:
+                            if len(plg.condition_flags) > 0:
+                                independent = False
                                 break
-                        if len(possible) == 2 and c2idx == len(cgrp.controls) - 1:
-                            possible = (True,)
+
+                        if independent:
+                            possible = (None,)
+                            if c2idx == 0:
+                                self.current_fork.one_of_plugins.append([(FomodInstallerSelection(cur.step_name,cur.group_name, plg.name),
+                                                                         plg.files) for plg in it.grp.plugins])
+                        else:
+                            possible = (True, False)
+                            for i in range(c2idx):
+                                prevstep = self.current_step[-1 - i]
+                                assert prevstep[0].step_name == it.istep.name and prevstep[0].group_name == it.grp.name
+                                assert prevstep[1] is False or prevstep[1] is True
+                                if prevstep[1] is True:
+                                    possible = (False,)
+                                    break
+                            if len(possible) == 2 and c2idx == len(cgrp.controls) - 1:
+                                possible = (True,)
                     case FomodGroupSelect.SelectAtLeastOne:
                         possible = (True, False)
                         found = False
@@ -138,16 +146,13 @@ class _FomodGuessFakeUI(LinearUI):
                     assert len(possible) == 1
                     assert possible[0] is False or possible[0] is True
                     it.plugin_ctrl.value = possible[0]
-                    # if possible[0]:
-                    # self.current_fork.flags |= {dep.name: dep.value for dep in it.plugin.condition_flags}
-                    #    if it.plugin.files is not None:
-                    #        self.current_fork.selected_plugins.append((cur, it.plugin.files))
                     self.current_step.append((cur, possible[0]))
                 elif len(it.plugin.condition_flags) > 0:
                     willfork = True
                 elif possible[0] is None:
                     self.current_step.append((cur, None))
-                    if it.plugin.files is not None:
+                    assert it.grp.select in (FomodGroupSelect.SelectExactlyOne, FomodGroupSelect.SelectAny)
+                    if it.grp.select == FomodGroupSelect.SelectAny and it.plugin.files is not None:
                         self.current_fork.true_or_false_plugins.append((cur, it.plugin.files))
                 else:
                     willfork = True
@@ -169,52 +174,105 @@ class _FomodGuessFakeUI(LinearUI):
                 assert len(self.current_step) == oldcurlen + 1
 
 
-def _add_folder_to_tofs(tofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]],
+def _add_folder_to_xofs(xofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]],
                         fdst: str, instsel: FomodInstallerSelection, remainder: str, af: FileInArchive) -> None:
     filedst = fdst + remainder
-    if filedst not in tofs:
-        tofs[filedst] = []
-    tofs[filedst].append((instsel, af))
+    if filedst not in xofs:
+        xofs[filedst] = []
+    xofs[filedst].append((instsel, af))
 
 
-def _find_required_tofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
+def _find_required_xofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
                         modfiles: dict[str, list[ArchiveFileRetriever]],
-                        true_or_false_plugins: _FomodGuessPlugins) -> list[FomodInstallerSelection]:
-    if len(true_or_false_plugins) == 0:
+                        true_or_false_plugins: _FomodGuessPlugins,
+                        one_of_plugins: list[_FomodGuessPlugins]) -> list[FomodInstallerSelection]:
+    if len(true_or_false_plugins) == 0 and len(one_of_plugins) == 0:
         return []
     assert not fomodroot.endswith('\\')
     fomodroot1 = '' if fomodroot == '' else fomodroot + '\\'
 
-    tofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]] = {}
-    for instsel, ff in true_or_false_plugins:
+    xofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]] = {}
+    allcandidates:list[tuple[FomodInstallerSelection,FomodFilesAndFolders]] = true_or_false_plugins
+    for oof in one_of_plugins:
+        allcandidates += oof
+    for instsel, ff in allcandidates:
         if ff is not None:
             for f in ff.files:
                 fsrc = FomodFilesAndFolders.normalize_file_path(fomodroot1 + f.src)
                 fdst = FomodFilesAndFolders.normalize_file_path(f.dst)
                 if fsrc not in ar4.arfiles:
                     assert False
-                if fdst not in tofs:
-                    tofs[fdst] = []
-                tofs[fdst].append((instsel, ar4.arfiles[fsrc]))
+                if fdst not in xofs:
+                    xofs[fdst] = []
+                xofs[fdst].append((instsel, ar4.arfiles[fsrc]))
             for f in ff.folders:
                 fsrc = FomodFilesAndFolders.normalize_folder_path(fomodroot1 + f.src)
                 fdst = FomodFilesAndFolders.normalize_folder_path(f.dst)
                 ar4.for_all_starting_with(fsrc,
-                                          lambda remainder, af: _add_folder_to_tofs(tofs, fdst, instsel, remainder, af))
+                                          lambda remainder, af: _add_folder_to_xofs(xofs, fdst, instsel, remainder, af))
 
-    required_tofs: set[FomodInstallerSelection] = set()
+    required_xofs: set[FomodInstallerSelection] = set()
     for modfile, rlist in modfiles.items():
         r0: ArchiveFileRetriever = rlist[0]
-        fh = r0.file_hash
-        if modfile in tofs and len(tofs[modfile]) == 1 and tofs[modfile][0][1].file_hash == truncate_file_hash(fh):
-            required_tofs.add(tofs[modfile][0][0])
+        fh = truncate_file_hash(r0.file_hash)
+        if modfile in xofs:
+            if len(xofs[modfile]) == 1 and xofs[modfile][0][1].file_hash == fh:
+                required_xofs.add(xofs[modfile][0][0])
+            else:
+                nmatch = 0
+                matched = None
+                for cand in xofs[modfile]:
+                    if cand[1].file_hash == fh:
+                        nmatch += 1
+                        matched = cand[0]
+                if nmatch == 1:
+                    assert matched is not None
+                    required_xofs.add(matched)
+                else:
+                    pass
 
-    return list(required_tofs)
+    for oof in one_of_plugins:
+        n = 0
+        for of in oof:
+            isel:FomodInstallerSelection = of[0]
+            if isel in required_xofs:
+                n += 1
+        if n == 0:
+            # none is needed, but this is not an option
+            # we'll find the smallest one
+            minsz = None
+            minof = None
+            for of in oof:
+                nfiles = sum(1 for f in of[1].all_files(fomodroot,ar4)) if of[1] is not None else 0
+                if minsz is None or nfiles < minsz:
+                    minsz = nfiles
+                    minof = of
+            if __debug__ and minsz is None:
+                assert False
+            assert minof is not None
+            required_xofs.add(minof[0])
+        elif n == 1:
+            pass
+        else:
+            assert False # TODO
+    return list(required_xofs)
 
+class _ProcessedFork:
+    tofs: _FomodGuessPlugins
+    oofs: list[_FomodGuessPlugins]
+    engselections: list[FomodInstallerSelection]
+    engplugins: FomodFilesAndFolders
+
+    def __init__(self, tofs: _FomodGuessPlugins, oofs: list[_FomodGuessPlugins],
+                 engselections: list[FomodInstallerSelection], engplugins: FomodFilesAndFolders) -> None:
+        self.tofs=tofs
+        self.oofs=oofs
+        self.engselections=engselections
+        self.engplugins=engplugins
 
 def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
                 modfiles: dict[str, list[ArchiveFileRetriever]]) -> tuple[ArInstaller, int] | None:
-    processed_forks: list[tuple[_FomodGuessPlugins, list[FomodInstallerSelection], FomodFilesAndFolders]] = []
+    processed_forks: list[_ProcessedFork] = []
     remaining_forks: list[_FomodGuessFork] = [_FomodGuessFork([])]
     info('Running simulations for FOMOD installer {}...'.format(modulecfg.module_name))
     # if 'clear map' in modulecfg.module_name.lower():
@@ -232,10 +290,12 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         remaining_forks = remaining_forks[1:]
         fakeui = _FomodGuessFakeUI(startingfork)
         engine = FomodEngine(modulecfg)
+        engine.select_no_radio_hack = True
         engselections, engfiles = engine.run(fakeui)
-        processed_forks.append((fakeui.current_fork.true_or_false_plugins, engselections, engfiles))
+        processed_forks.append(_ProcessedFork(fakeui.current_fork.true_or_false_plugins, fakeui.current_fork.one_of_plugins,
+                                              engselections, engfiles))
         remaining_forks += fakeui.requested_forks
-        if len(processed_forks) + len(remaining_forks) > 50000:
+        if len(processed_forks) + len(remaining_forks) > 1000:
             alert('Too many simulations for {}, skipping'.format(modulecfg.module_name))
             return None
     info('{}: {} fork(s) found'.format(modulecfg.module_name, len(processed_forks)))
@@ -249,33 +309,32 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         i += 1
         if i % 500 == 0:
             info('{}...'.format(i))
-        selected_plugins: set[FomodInstallerSelection] = set(pf[1])
+        selected_plugins: set[FomodInstallerSelection] = set(pf.engselections)
         known: dict[FomodInstallerSelection, FomodFilesAndFolders] = {}
-        # for sel, selected in pf.selected_plugins:
-        #    if sel in known:
-        #        assert as_json(known[sel]) == as_json(selected)
-        #    known[sel] = selected
-        for sel, tof in pf[0]:
+        for sel, tof in pf.tofs:
             assert sel not in known
-            known[sel] = tof
-        required_tofs: set[FomodInstallerSelection] = set(_find_required_tofs(ar4, fomodroot, modfiles, pf[0]))
+            if tof is not None:
+                known[sel] = tof
+        for oof in pf.oofs:
+            for sel,of in oof:
+                if sel in known:
+                    assert False
+                if of is not None:
+                    known[sel] = of
+        required_xofs: set[FomodInstallerSelection] = set(_find_required_xofs(ar4, fomodroot, modfiles, pf.tofs, pf.oofs))
 
         selections: list[FomodInstallerSelection] = []
-        files: FomodFilesAndFolders = pf[2].copy()
+        files: FomodFilesAndFolders = pf.engplugins.copy()
         for istep in modulecfg.install_steps:
             for group in istep.groups:
                 for plugin in group.plugins:
                     sel = FomodInstallerSelection(istep.name, group.name, plugin.name)
-                    if sel in required_tofs:
-                        if sel not in known:
-                            assert False
-                        assert known[sel] is not None
-                        selections.append(sel)
-                        files.merge(known[sel])
+                    if sel in required_xofs:
+                        if sel in known: # otherwise it is empty
+                            assert known[sel] is not None
+                            selections.append(sel)
+                            files.merge(known[sel])
                     elif sel in selected_plugins:
-                        # if sel not in known:
-                        #    assert False
-                        # assert known[sel] is not None
                         selections.append(sel)
                     else:
                         pass
