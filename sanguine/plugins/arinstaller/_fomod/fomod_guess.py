@@ -245,7 +245,7 @@ def _find_required_xofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
             minsz = None
             minof = None
             for of in oof:
-                nfiles = sum(1 for f in of[1].all_files(fomodroot, ar4)) if of[1] is not None else 0
+                nfiles = sum(1 for _ in of[1].all_files(fomodroot, ar4)) if of[1] is not None else 0
                 if minsz is None or nfiles < minsz:
                     minsz = nfiles
                     minof = of
@@ -331,6 +331,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         required_xofs: set[FomodInstallerSelection] = set(
             _find_required_xofs(ar4, fomodroot, modfiles, pf.tofs, pf.oofs))
 
+        '''
         # gathering properly ordered selections
         selections: list[FomodInstallerSelection] = []
         # files: FomodFilesAndFolders = pf.engplugins.copy()
@@ -350,18 +351,15 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
                         selections.append(sel)
                     else:
                         pass
+        '''
 
-        # re-running FomodEngine with autoplay to ensure correct order
-        autoplay = FomodAutoplayFakeUI(selections)
+        # re-running FomodEngine with autoplay to ensure correct file overwrite order
+        autoplay = FomodAutoplayFakeUI(list(required_xofs | selected_plugins))
         engine2 = FomodEngine(modulecfg)
-        try:
-            _, engfiles = engine2.run(autoplay)
-            autoplay.check_done()
-        except SanguinicError as e:
-            warn('Exception while trying to run generated FOMOD fork for {}: {}'.format(modulecfg.module_name, e))
-            continue
+        engselections, engfiles = engine2.run(autoplay)
+        autoplay.check_done()
 
-        candidate: FomodArInstaller = FomodArInstaller(archive, fomodroot, engfiles, selections)
+        candidate: FomodArInstaller = FomodArInstaller(archive, fomodroot, engfiles, engselections)
         n = 0
         ndesired = 0
         for fpath, fia in candidate.all_desired_files():

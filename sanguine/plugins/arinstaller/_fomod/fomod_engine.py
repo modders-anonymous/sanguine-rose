@@ -2,12 +2,12 @@ from sanguine.plugins.arinstaller._fomod.fomod_common import *
 
 
 class FomodAutoplayFakeUI(LinearUI):
-    selections: list[FomodInstallerSelection]
-    pos: int
+    selections: set[FomodInstallerSelection]
+    selected: set[FomodInstallerSelection]
 
     def __init__(self, selections: list[FomodInstallerSelection]) -> None:
-        self.selections = selections
-        self.pos = 0
+        self.selections = set(selections)
+        self.selected = set()
 
     def set_silent_mode(self) -> None:
         assert False
@@ -35,9 +35,10 @@ class FomodAutoplayFakeUI(LinearUI):
                 assert isinstance(chkbox, LinearUICheckbox)
                 sel = FomodInstallerSelection(wizardpage.name, grp.name, chkbox.name)
                 val = False
-                if self.pos < len(self.selections) and sel == self.selections[self.pos]:
+                assert sel not in self.selected
+                if sel in self.selections:
                     val = True
-                    self.pos += 1
+                    self.selected.add(sel)
                 if chkbox.disabled:
                     raise_if_not(val == chkbox.value)
                 else:
@@ -48,7 +49,7 @@ class FomodAutoplayFakeUI(LinearUI):
             raise_if_not(errstr is None)
 
     def check_done(self) -> None:
-        raise_if_not(self.pos == len(self.selections))
+        raise_if_not(len(self.selected) == len(self.selections))
 
 
 class FomodEnginePluginSelector:
