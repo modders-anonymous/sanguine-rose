@@ -1,6 +1,56 @@
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
 
 
+class FomodAutoplayFakeUI(LinearUI):
+    selections: list[FomodInstallerSelection]
+    pos: int
+
+    def __init__(self, selections: list[FomodInstallerSelection]) -> None:
+        self.selections = selections
+        self.pos = 0
+
+    def set_silent_mode(self) -> None:
+        assert False
+
+    # noinspection PyTypeChecker
+    def message_box(self, prompt: str, spec: list[str],
+                    level: LinearUIImportance = LinearUIImportance.Default) -> str:
+        assert False
+
+    # noinspection PyTypeChecker
+    def input_box(self, prompt: str, default: str, level: LinearUIImportance = LinearUIImportance.Default) -> str:
+        assert False
+
+    def confirm_box(self, prompt: str, level: LinearUIImportance = LinearUIImportance.Default) -> None:
+        assert False
+
+    # noinspection PyTypeChecker
+    def network_error_handler(self, nretries: int) -> NetworkErrorHandler:
+        assert False
+
+    def wizard_page(self, wizardpage: LinearUIGroup,
+                    validator: Callable[[LinearUIGroup], str | None] | None = None) -> None:
+        for grp in wizardpage.controls:
+            for chkbox in grp.controls:
+                assert isinstance(chkbox, LinearUICheckbox)
+                sel = FomodInstallerSelection(wizardpage.name, grp.name, chkbox.name)
+                val = False
+                if self.pos < len(self.selections) and sel == self.selections[self.pos]:
+                    val = True
+                    self.pos += 1
+                if chkbox.disabled:
+                    raise_if_not(val == chkbox.value)
+                else:
+                    chkbox.value = val
+
+        if validator is not None:
+            errstr = validator(wizardpage)
+            raise_if_not(errstr is None)
+
+    def check_done(self) -> None:
+        raise_if_not(self.pos == len(self.selections))
+
+
 class FomodEnginePluginSelector:
     istep_ctrl: LinearUIGroup
     istep: FomodInstallStep
@@ -48,37 +98,36 @@ class FomodEnginePluginSelector:
 
 
 def _fomod_wizard_page_validator(wizardpage: LinearUIGroup) -> str | None:
-    for ctrl in wizardpage.controls:
-        it = FomodEnginePluginSelector(ctrl)
-        for c2 in ctrl.controls:
-            it.set_grp(c2)
-            sel = it.grp.select
-            nsel = 0
-            for c3 in c2.controls:
-                it.set_chkbox(c3)
-                if c3.value:
-                    nsel += 1
+    it = FomodEnginePluginSelector(wizardpage)
+    for grp in wizardpage.controls:
+        it.set_grp(grp)
+        sel = it.grp.select
+        nsel = 0
+        for chk in grp.controls:
+            it.set_chkbox(chk)
+            if chk.value:
+                nsel += 1
 
-            assert nsel >= 0
-            match sel:
-                case FomodGroupSelect.SelectAll:
-                    assert nsel == len(c2.controls)
-                case FomodGroupSelect.SelectAny:
-                    pass
-                case FomodGroupSelect.SelectExactlyOne:
-                    assert nsel == 1
-                case FomodGroupSelect.SelectAtMostOne:
-                    if nsel > 1:
-                        return 'Too many selections in group {}'.format(c2.name)
-                case FomodGroupSelect.SelectAtLeastOne:
-                    if nsel < 1:
-                        return 'Too few selections in group {}'.format(c2.name)
+        assert nsel >= 0
+        match sel:
+            case FomodGroupSelect.SelectAll:
+                assert nsel == len(grp.controls)
+            case FomodGroupSelect.SelectAny:
+                pass
+            case FomodGroupSelect.SelectExactlyOne:
+                assert nsel == 1
+            case FomodGroupSelect.SelectAtMostOne:
+                if nsel > 1:
+                    return 'Too many selections in group {}'.format(grp.name)
+            case FomodGroupSelect.SelectAtLeastOne:
+                if nsel < 1:
+                    return 'Too few selections in group {}'.format(grp.name)
     return None
 
 
 class FomodEngine:
     module_config: FomodModuleConfig
-    select_no_radio_hack: bool # for very specific _FomodGuessFakeUI use cases
+    select_no_radio_hack: bool  # for very specific _FomodGuessFakeUI use cases
 
     def __init__(self, modulecfg: FomodModuleConfig) -> None:
         self.module_config = modulecfg

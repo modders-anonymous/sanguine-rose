@@ -1,9 +1,10 @@
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
-from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodEnginePluginSelector
+from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodEnginePluginSelector, FomodAutoplayFakeUI
 
 type _FomodReplaySteps = list[tuple[FomodInstallerSelection, bool | None]]
 type _FomodGuessPlugins = list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
+
 
 class _FomodGuessFork:
     start_step: _FomodReplaySteps
@@ -12,7 +13,7 @@ class _FomodGuessFork:
 
     def __init__(self, start: _FomodReplaySteps,
                  tof: _FomodGuessPlugins | None = None,
-                 oof: list[_FomodGuessPlugins]| None = None) -> None:
+                 oof: list[_FomodGuessPlugins] | None = None) -> None:
         self.start_step = start
         self.true_or_false_plugins = tof if tof is not None else []
         self.one_of_plugins = oof if oof is not None else []
@@ -92,8 +93,9 @@ class _FomodGuessFakeUI(LinearUI):
                         if independent:
                             possible = (None,)
                             if c2idx == 0:
-                                self.current_fork.one_of_plugins.append([(FomodInstallerSelection(cur.step_name,cur.group_name, plg.name),
-                                                                         plg.files) for plg in it.grp.plugins])
+                                self.current_fork.one_of_plugins.append(
+                                    [(FomodInstallerSelection(cur.step_name, cur.group_name, plg.name),
+                                      plg.files) for plg in it.grp.plugins])
                         else:
                             possible = (True, False)
                             for i in range(c2idx):
@@ -192,7 +194,7 @@ def _find_required_xofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
     fomodroot1 = '' if fomodroot == '' else fomodroot + '\\'
 
     xofs: dict[str, list[tuple[FomodInstallerSelection, FileInArchive]]] = {}
-    allcandidates:list[tuple[FomodInstallerSelection,FomodFilesAndFolders]] = true_or_false_plugins
+    allcandidates: list[tuple[FomodInstallerSelection, FomodFilesAndFolders]] = true_or_false_plugins
     for oof in one_of_plugins:
         allcandidates += oof
     for instsel, ff in allcandidates:
@@ -234,7 +236,7 @@ def _find_required_xofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
     for oof in one_of_plugins:
         n = 0
         for of in oof:
-            isel:FomodInstallerSelection = of[0]
+            isel: FomodInstallerSelection = of[0]
             if isel in required_xofs:
                 n += 1
         if n == 0:
@@ -243,7 +245,7 @@ def _find_required_xofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
             minsz = None
             minof = None
             for of in oof:
-                nfiles = sum(1 for f in of[1].all_files(fomodroot,ar4)) if of[1] is not None else 0
+                nfiles = sum(1 for f in of[1].all_files(fomodroot, ar4)) if of[1] is not None else 0
                 if minsz is None or nfiles < minsz:
                     minsz = nfiles
                     minof = of
@@ -254,21 +256,24 @@ def _find_required_xofs(ar4: ArchiveForFomodFilesAndFolders, fomodroot: str,
         elif n == 1:
             pass
         else:
-            assert False # TODO
+            assert False  # TODO
     return list(required_xofs)
+
 
 class _ProcessedFork:
     tofs: _FomodGuessPlugins
     oofs: list[_FomodGuessPlugins]
     engselections: list[FomodInstallerSelection]
-    engplugins: FomodFilesAndFolders
+
+    # engplugins: FomodFilesAndFolders - we cannot use engplugins from GuessFakeUI run, need to re-run with AutoplayFakeUI to ensure correct order
 
     def __init__(self, tofs: _FomodGuessPlugins, oofs: list[_FomodGuessPlugins],
-                 engselections: list[FomodInstallerSelection], engplugins: FomodFilesAndFolders) -> None:
-        self.tofs=tofs
-        self.oofs=oofs
-        self.engselections=engselections
-        self.engplugins=engplugins
+                 engselections: list[FomodInstallerSelection]) -> None:
+        self.tofs = tofs
+        self.oofs = oofs
+        self.engselections = engselections
+        # self.engplugins=engplugins
+
 
 def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
                 modfiles: dict[str, list[ArchiveFileRetriever]]) -> tuple[ArInstaller, int] | None:
@@ -291,9 +296,11 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         fakeui = _FomodGuessFakeUI(startingfork)
         engine = FomodEngine(modulecfg)
         engine.select_no_radio_hack = True
-        engselections, engfiles = engine.run(fakeui)
-        processed_forks.append(_ProcessedFork(fakeui.current_fork.true_or_false_plugins, fakeui.current_fork.one_of_plugins,
-                                              engselections, engfiles))
+        engselections, _ = engine.run(
+            fakeui)  # we cannot use engfiles from GuessFakeUI run, need to re-run using AutoplayFakeUI to ensure correct order
+        processed_forks.append(
+            _ProcessedFork(fakeui.current_fork.true_or_false_plugins, fakeui.current_fork.one_of_plugins,
+                           engselections))
         remaining_forks += fakeui.requested_forks
         if len(processed_forks) + len(remaining_forks) > 1000:
             alert('Too many simulations for {}, skipping'.format(modulecfg.module_name))
@@ -316,15 +323,17 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
             if tof is not None:
                 known[sel] = tof
         for oof in pf.oofs:
-            for sel,of in oof:
+            for sel, of in oof:
                 if sel in known:
                     assert False
                 if of is not None:
                     known[sel] = of
-        required_xofs: set[FomodInstallerSelection] = set(_find_required_xofs(ar4, fomodroot, modfiles, pf.tofs, pf.oofs))
+        required_xofs: set[FomodInstallerSelection] = set(
+            _find_required_xofs(ar4, fomodroot, modfiles, pf.tofs, pf.oofs))
 
+        # gathering properly ordered selections
         selections: list[FomodInstallerSelection] = []
-        files: FomodFilesAndFolders = pf.engplugins.copy()
+        # files: FomodFilesAndFolders = pf.engplugins.copy()
         for istep in modulecfg.install_steps:
             for group in istep.groups:
                 for plugin in group.plugins:
@@ -333,7 +342,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
                         if sel in known:
                             assert known[sel] is not None
                             selections.append(sel)
-                            files.merge(known[sel])
+                            # files.merge(known[sel])
                         else:
                             selections.append(sel)
                             # nothing to merge - it is empty (can happen as a result of empty entry in SelectExactlyOne)
@@ -342,13 +351,21 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
                     else:
                         pass
 
-        candidate: FomodArInstaller = FomodArInstaller(archive, fomodroot, files, selections)
+        # re-running FomodEngine with autoplay to ensure correct order
+        autoplay = FomodAutoplayFakeUI(selections)
+        engine2 = FomodEngine(modulecfg)
+        try:
+            _, engfiles = engine2.run(autoplay)
+            autoplay.check_done()
+        except SanguinicError as e:
+            warn('Exception while trying to run generated FOMOD fork for {}: {}'.format(modulecfg.module_name, e))
+            continue
+
+        candidate: FomodArInstaller = FomodArInstaller(archive, fomodroot, engfiles, selections)
         n = 0
         ndesired = 0
         for fpath, fia in candidate.all_desired_files():
             ndesired += 1
-            #if  'sbridge01.nif' in fpath:
-            #    pass
             if fpath in modfiles and truncate_file_hash(modfiles[fpath][0].file_hash) == fia.file_hash:
                 n += 1
         if n > (ndesired / 2):
