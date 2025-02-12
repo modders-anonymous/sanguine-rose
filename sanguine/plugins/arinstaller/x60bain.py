@@ -1,3 +1,6 @@
+"""
+BAIN installer. In practice very rare, mostly superseded by FOMOD
+"""
 import re
 
 from sanguine.common import *

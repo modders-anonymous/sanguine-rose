@@ -1,3 +1,9 @@
+"""
+FOMOD installer. Bread and butter of modern modding.
+guessing is really complicated, trying to replay all possible install scenarios a.k.a. forks
+  (though separating independent selections from forking to keep replaying times within reason)
+"""
+
 # noinspection PyUnresolvedReferences
 import xml.etree.ElementTree as ElementTree
 

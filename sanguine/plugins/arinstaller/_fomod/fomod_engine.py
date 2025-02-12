@@ -1,7 +1,14 @@
+"""
+FOMOD installer engine. More or less clean FOMOD installer itself, on top of (already-parsed by
+  fomod_parser) ModuleConfig.xml.
+To support auto-install, uses FomodAutoinstallFakeUI.
+Also heavily used for FOMOD guessing.
+"""
+
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
 
 
-class FomodAutoplayFakeUI(LinearUI):
+class FomodAutoinstallFakeUI(LinearUI):
     selections: set[FomodInstallerSelection]
     selected: set[FomodInstallerSelection]
 

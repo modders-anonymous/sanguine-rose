@@ -1,3 +1,6 @@
+"""
+Common FOMOD data structures (ModuleConfig.xml will be parsed to them using fomod_parser)
+"""
 from bisect import bisect_left
 
 from sanguine.common import *

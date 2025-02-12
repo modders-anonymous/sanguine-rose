@@ -1,3 +1,7 @@
+"""
+FOMOD XML parser, from ModuleConfig.xml to fomod_common data structures
+"""
+
 import xml.etree.ElementTree as ElementTree
 
 from sanguine.plugins.arinstaller._fomod.fomod_common import *

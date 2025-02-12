@@ -1,10 +1,15 @@
+"""
+SimpleUnpack archive installer. Simply unpacking archive, starting from root.
+Very unusually for plugins, it is being relied on by another plugin: MO2DEFAULT one
+"""
+
 from sanguine.common import *
 from sanguine.helpers.archives import Archive, FileInArchive
 from sanguine.helpers.arinstallers import ArInstallerPluginBase, ArInstaller, ExtraArchiveDataFactory
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 
 
-class _SimpleArInstallerInstallData:
+class SimpleUnpackArInstallerInstallData:
     SANGUINE_JSON: list[tuple[str, str]] = [('install_from_root', 'root')]
     install_from_root: str
 
@@ -16,7 +21,7 @@ class _SimpleArInstallerInstallData:
         return cls('')
 
 
-class SimpleArInstaller(ArInstaller):
+class SimpleUnpackArInstaller(ArInstaller):
     install_from_root: str | None
 
     def __init__(self, archive: Archive):
@@ -24,7 +29,7 @@ class SimpleArInstaller(ArInstaller):
         self.install_from_root = None
 
     def name(self) -> str:
-        return 'SIMPLE'
+        return 'SIMPLEUNPACK'
 
     def all_desired_files(self) -> Iterable[tuple[str, FileInArchive]]:  # list[relpath]
         out: list[tuple[str, FileInArchive]] = []
@@ -35,12 +40,12 @@ class SimpleArInstaller(ArInstaller):
         return out
 
     def install_params(self) -> Any:
-        return _SimpleArInstallerInstallData(self.install_from_root)
+        return SimpleUnpackArInstallerInstallData(self.install_from_root)
 
 
-class SimpleArInstallerPlugin(ArInstallerPluginBase):
+class SimpleUnpackArInstallerPlugin(ArInstallerPluginBase):
     def name(self) -> str:
-        return 'SIMPLE'
+        return 'SIMPLEUNPACK'
 
     def guess_arinstaller_from_vfs(self, archive: Archive, modname: str,
                                    modfiles: dict[str, list[ArchiveFileRetriever]]) -> ArInstaller | None:
@@ -64,7 +69,7 @@ class SimpleArInstallerPlugin(ArInstallerPluginBase):
 
         if len(candidate_roots) == 0:
             return None
-        out = SimpleArInstaller(archive)
+        out = SimpleUnpackArInstaller(archive)
         out.install_from_root = sorted(candidate_roots.items(), key=lambda x: x[1])[-1][0]
 
         return out

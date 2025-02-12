@@ -1,6 +1,13 @@
+"""
+FOMOD guessing. Really complicated. Replaying all scenarios (a.k.a. forks) from
+  (already parsed by fomod_parser) ModuleConfig.xml using _FomodGuessFakeUI, and then replaying
+  again using FomodAutoinstallFakeUI
+Tries to keep number of forks in check separating independent selections from forks
+"""
 from sanguine.helpers.file_retriever import ArchiveFileRetriever
 from sanguine.plugins.arinstaller._fomod.fomod_common import *
-from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodEnginePluginSelector, FomodAutoplayFakeUI
+from sanguine.plugins.arinstaller._fomod.fomod_engine import FomodEngine, FomodEnginePluginSelector, \
+    FomodAutoinstallFakeUI
 
 type _FomodReplaySteps = list[tuple[FomodInstallerSelection, bool | None]]
 type _FomodGuessPlugins = list[tuple[FomodInstallerSelection, FomodFilesAndFolders]]
@@ -354,7 +361,7 @@ def fomod_guess(fomodroot: str, modulecfg: FomodModuleConfig, archive: Archive,
         '''
 
         # re-running FomodEngine with autoplay to ensure correct file overwrite order
-        autoplay = FomodAutoplayFakeUI(list(required_xofs | selected_plugins))
+        autoplay = FomodAutoinstallFakeUI(list(required_xofs | selected_plugins))
         engine2 = FomodEngine(modulecfg)
         engselections, engfiles = engine2.run(autoplay)
         autoplay.check_done()
